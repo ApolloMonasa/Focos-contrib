@@ -30,8 +30,6 @@ make check
 
 这里的分支名只是 #1 的例子；认领其他任务时换成对应编号和主题。`origin` 是你的 fork，`upstream` 是团队仓库。
 
-**目前入门文档还在 PR #14 等待合入。** 如果 main 上暂时看不到这些文档，可先阅读 [PR #14 的文件](https://github.com/MindScrath/Focos/pull/14/files)；main 已经能执行 `make check`。
-
 ## 3. 判断是否跑通
 
 `make check` 依次做格式检查、clippy 检查、裸机构建和 QEMU 启动验证。成功时会出现 `PASS: BOOT-001`。
