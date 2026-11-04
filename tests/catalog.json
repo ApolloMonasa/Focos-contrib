@@ -1,0 +1,277 @@
+{
+  "suite": "pre-2024-fat32-riscv",
+  "commit": "0de5d9b11cd3b5d7f75436460bd826be5e989a5c",
+  "upstream_runner": "riscv-syscalls-testing/user/src/oscomp/run-all.sh",
+  "entry_count": 32,
+  "p0_candidate_count": 16,
+  "note": "32 source test programs matched to per-test judge files. Original runner has 31 entries, omits sleep and refers to absent yield.sh. Adapted runner must preserve test semantics and record changes. No tests executed.",
+  "entries": [
+    {
+      "entry": "brk",
+      "source": "riscv-syscalls-testing/user/src/oscomp/brk.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/brk_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "chdir",
+      "source": "riscv-syscalls-testing/user/src/oscomp/chdir.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/chdir_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "clone",
+      "source": "riscv-syscalls-testing/user/src/oscomp/clone.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/clone_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "close",
+      "source": "riscv-syscalls-testing/user/src/oscomp/close.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/close_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "dup",
+      "source": "riscv-syscalls-testing/user/src/oscomp/dup.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/dup_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "dup2",
+      "source": "riscv-syscalls-testing/user/src/oscomp/dup2.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/dup2_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "execve",
+      "source": "riscv-syscalls-testing/user/src/oscomp/execve.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/execve_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "exit",
+      "source": "riscv-syscalls-testing/user/src/oscomp/exit.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/exit_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN",
+      "dependencies": [
+        "fork",
+        "wait",
+        "exit"
+      ]
+    },
+    {
+      "entry": "fork",
+      "source": "riscv-syscalls-testing/user/src/oscomp/fork.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/fork_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "fstat",
+      "source": "riscv-syscalls-testing/user/src/oscomp/fstat.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/fstat_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "getcwd",
+      "source": "riscv-syscalls-testing/user/src/oscomp/getcwd.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/getcwd_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "getdents",
+      "source": "riscv-syscalls-testing/user/src/oscomp/getdents.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/getdents_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "getpid",
+      "source": "riscv-syscalls-testing/user/src/oscomp/getpid.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/getpid_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "getppid",
+      "source": "riscv-syscalls-testing/user/src/oscomp/getppid.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/getppid_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "gettimeofday",
+      "source": "riscv-syscalls-testing/user/src/oscomp/gettimeofday.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/gettimeofday_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "mkdir_",
+      "source": "riscv-syscalls-testing/user/src/oscomp/mkdir_.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/mkdir_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "mmap",
+      "source": "riscv-syscalls-testing/user/src/oscomp/mmap.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/mmap_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "mount",
+      "source": "riscv-syscalls-testing/user/src/oscomp/mount.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/mount_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "munmap",
+      "source": "riscv-syscalls-testing/user/src/oscomp/munmap.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/munmap_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "open",
+      "source": "riscv-syscalls-testing/user/src/oscomp/open.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/open_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "openat",
+      "source": "riscv-syscalls-testing/user/src/oscomp/openat.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/openat_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "pipe",
+      "source": "riscv-syscalls-testing/user/src/oscomp/pipe.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/pipe_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "read",
+      "source": "riscv-syscalls-testing/user/src/oscomp/read.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/read_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "sleep",
+      "source": "riscv-syscalls-testing/user/src/oscomp/sleep.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/sleep_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "times",
+      "source": "riscv-syscalls-testing/user/src/oscomp/times.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/times_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "umount",
+      "source": "riscv-syscalls-testing/user/src/oscomp/umount.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/umount_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "uname",
+      "source": "riscv-syscalls-testing/user/src/oscomp/uname.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/uname_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "unlink",
+      "source": "riscv-syscalls-testing/user/src/oscomp/unlink.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/unlink_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "wait",
+      "source": "riscv-syscalls-testing/user/src/oscomp/wait.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/wait_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "waitpid",
+      "source": "riscv-syscalls-testing/user/src/oscomp/waitpid.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/waitpid_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "write",
+      "source": "riscv-syscalls-testing/user/src/oscomp/write.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/write_test.py",
+      "priority": "P0",
+      "status": "NOT_RUN"
+    },
+    {
+      "entry": "yield",
+      "source": "riscv-syscalls-testing/user/src/oscomp/yield.c",
+      "judge": "riscv-syscalls-testing/user/src/oscomp/yield_test.py",
+      "priority": "P1",
+      "status": "NOT_RUN"
+    }
+  ],
+  "legacy_runner_entries": [
+    "brk",
+    "chdir",
+    "clone",
+    "close",
+    "dup2",
+    "dup",
+    "execve",
+    "exit",
+    "fork",
+    "fstat",
+    "getcwd",
+    "getdents",
+    "getpid",
+    "getppid",
+    "gettimeofday",
+    "mkdir_",
+    "mmap",
+    "mount",
+    "munmap",
+    "openat",
+    "open",
+    "pipe",
+    "read",
+    "times",
+    "umount",
+    "uname",
+    "unlink",
+    "wait",
+    "waitpid",
+    "write",
+    "yield.sh"
+  ],
+  "runner_adaptations_required": [
+    "Add sleep",
+    "Replace missing yield.sh with yield",
+    "Include text.txt, test_echo and required directories/device fixtures"
+  ]
+}
