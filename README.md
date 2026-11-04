@@ -1,34 +1,40 @@
 # FocOS
 
-FocOS（File-system Optimized Core OS，读作 Focus）是面向操作系统设计赛的 Rust `no_std` 裸机内核。首个真实硬件平台为 VisionFive2 / JH7110（RV64GC），第二平台为龙芯 2K1000LA 星云板（LoongArch64）。基础文件系统固定为 FAT32。
+我们要做一个能在 VisionFive2 上运行、能读写 FAT32 文件的 Rust 操作系统，再用实验说明文件缓存为什么能提速。项目名读作 Focus。
 
-研究主线：在受限内存下识别随机小 I/O 的存储瓶颈，通过可消融的缓存和写回策略改进文件访问，再用相同实现的跨平台实验与磁盘向量检索验证收益。
+**第一次加入：先按下面步骤跑通，再认领一个小任务。不用先读完所有设计文档。**
 
-## 当前可运行内容
+## 现在做到哪里了？
 
-2026-11-04 的初始化版本仅实现 QEMU RISC-V `virt` 单 hart 启动、SBI 早期控制台和关机。它已经通过本地构建与冒烟检查。尚未验证 VisionFive2 / 龙芯上板，也尚未实现内存管理、任务、用户态、UART 驱动、块设备或 FAT32；官方功能测例当前无通过记录。
+已完成：QEMU 中启动一个 RISC-V 裸机内核，打印启动标记并关机；CI 能自动检查这一过程。
 
-安装 Rust/rustup、GNU make、Python 3 和 `qemu-system-riscv64` 后，在仓库根目录运行：
+接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
-```sh
-make check
-```
+## 第一天：跑起来 → 选任务 → 提第一个 PR
 
-工具链固定为 Rust 1.99.0，目标由 `rust-toolchain.toml` 指定。`make build` 生成 `target/riscv64gc-unknown-none-elf/release/focos-kernel`，`make smoke` 将版本及串口日志保存到 `target/evidence/boot-qemu-rv.log`。本地验收 QEMU 为 10.2.2；CI 和比赛环境须分别记录版本，不能将本地环境当作往届官方环境。
+1. 按 [上手指南](docs/getting-started.md) 安装工具、fork 仓库并运行 `make check`。
+2. 在 [任务入口](docs/backlog.md) 选一个可以现在开始的任务，在对应 Issue 认领。
+3. 找一位队友确认接口和验收方法，再开始实现。提交方法见 [协作流程](docs/collaboration.md)。
 
-## 项目入口
+跑通后的成功标志：终端出现 `PASS: BOOT-001`，串口日志中有 `FOCOS_BOOT_OK`。
 
-- [阶段目标与模块依赖](docs/roadmap.md)
-- [12 个模块任务与认领入口](docs/backlog.md)
-- [协作要求与认领流程](docs/collaboration.md)
-- [评测分支选择和功能证据](docs/verification.md)
-- [性能实验与图表要求](docs/benchmarks.md)
-- [资料来源及规则边界](docs/references.md)
-- [AI 辅助开发记录](docs/ai-usage.md)
-- [启动规格 BOOT 001](specs/BOOT-001.md)
+## 做到哪个阶段，再读哪份文档？
 
-`kernel/` 存内核，`specs/` 存已审阅的契约，`scripts/` 存复现工具，`tests/` 存测试清单，`docs/` 存团队设计与证据说明。大型镜像和日志不进入 Git；`devdoc/` 为本地研究材料，默认忽略。
+| 你现在要做什么 | 阅读入口 |
+| --- | --- |
+| 配环境、第一次提交 | [上手指南](docs/getting-started.md) |
+| 选任务、看依赖 | [任务入口](docs/backlog.md) |
+| 写 spec、提交和审阅 PR | [协作流程](docs/collaboration.md) |
+| 看本周目标和取舍 | [推进路线](docs/roadmap.md) |
+| 接入往届官方测例 | [功能验证](docs/verification.md) |
+| 做性能实验、准备图表 | [性能实验](docs/benchmarks.md) |
+| 查赛规、外部来源 | [来源说明](docs/references.md) |
 
-公有 upstream 为 [MindScrath/Focos](https://github.com/MindScrath/Focos)。日常开发采用成员公有 fork、短分支和 PR；`main` 已启用 CI 必过、至少一名非作者批准和禁止强推等保护。成员的账号、模块 owner 与 review 轮值待确认后绑定。团队报名个人资料不得进入此仓库。
+## 几条固定约定
 
-区域赛赛方另有 GitLab 提交和来源披露要求，详见资料说明；此 GitHub 仓库不替代赛方提交仓库。代码许可证须在引入第三方代码前确定并核对兼容性，参赛提交按当届规则办理。
+- 内核用 Rust `no_std`；首块真板是 VisionFive2 / JH7110（RV64GC），全国赛再扩展龙芯 2K1000LA 星云板（LoongArch64）。
+- 基础文件系统是 FAT32。CPU/板卡差异放在 HAL 和 arch，文件系统与 VFS 不写架构条件编译。
+- [MindScrath/Focos](https://github.com/MindScrath/Focos) 是公有上游。成员从个人 fork 提 PR，main 必须可构建，合入需要 CI 和队友批准。
+- 报名资料、邮箱、令牌不放进代码库或日志。`devdoc/` 只用于本地资料，已被 Git 忽略。
+
+GitHub 开发仓库不能替代赛方要求的 GitLab 提交。第三方代码引入前要确认许可证并记录来源；AI 辅助记录见 [ai-usage.md](docs/ai-usage.md)。

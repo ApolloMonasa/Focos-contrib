@@ -1,24 +1,32 @@
-# FocOS 模块任务入口
+# 先选一个小任务
 
-这些链接指向 upstream 的实际 issue，认领人、状态、依赖和证据以 issue 为准。此处只提供导航，不维护第二套状态表。
+每人同时只认领一个实现任务。先在 Issue 说明想做的第一步，再约一位队友 review；不要把模块名当作一次 PR 的工作量。认领与进度以 Issue 为准，这里不复制状态。
 
-| 模块任务 | 认领入口 |
+## 现在就能开始
+
+| 任务 | 第一小步 |
 | --- | --- |
-| HAL-001 确定 BlockDevice 契约并建立可测试内存盘 | [#1](https://github.com/MindScrath/Focos/issues/1) |
-| BOARD-001 验证 VisionFive2 启动 UART 和定时器 | [#2](https://github.com/MindScrath/Focos/issues/2) |
-| IO-001 打通 JH7110 真实 SD 块读写 | [#3](https://github.com/MindScrath/Focos/issues/3) |
-| MM-001 实现帧分配器并验证回收和 OOM | [#4](https://github.com/MindScrath/Focos/issues/4) |
-| CORE-001 接通异常 定时调度与用户 ELF | [#5](https://github.com/MindScrath/Focos/issues/5) |
-| FS-001 实现 FAT32 读写与同步后重启校验 | [#6](https://github.com/MindScrath/Focos/issues/6) |
-| VFS-001 确定路径 FD 错误语义并接入用户文件操作 | [#7](https://github.com/MindScrath/Focos/issues/7) |
-| TEST-001 锁定并接入 pre-2024 的 32 个源码测试程序 | [#8](https://github.com/MindScrath/Focos/issues/8) |
-| PERF-001 记录存储基线并实现同预算缓存消融 | [#9](https://github.com/MindScrath/Focos/issues/9) |
-| DOC-001 维护设计 教学实验与区域赛演示证据 | [#10](https://github.com/MindScrath/Focos/issues/10) |
-| ARCH-002 在 2K1000LA 星云板复用同一存储实现 | [#11](https://github.com/MindScrath/Focos/issues/11) |
-| COMPAT-001 建立全国赛原环境兼容性和磁盘检索数据闭环 | [#12](https://github.com/MindScrath/Focos/issues/12) |
+| [#1 先做一个能在开发机测试的内存盘](https://github.com/MindScrath/Focos/issues/1) | 审块设备接口，准备内存盘测试 |
+| [#2 让 VisionFive2 打印启动信息](https://github.com/MindScrath/Focos/issues/2) | 确认固件、串口与启动步骤 |
+| [#4 实现物理页分配和回收](https://github.com/MindScrath/Focos/issues/4) | 定义页分配/回收和耗尽行为 |
+| [#8 先把一个官方测试编译并判对，再接入全部清单](https://github.com/MindScrath/Focos/issues/8) | 先构建一个官方程序并核对判分 |
+| [#10 每周留下可复现演示和答辩材料](https://github.com/MindScrath/Focos/issues/10) | 从干净环境复现当前启动演示 |
 
-第一周建议三条并行线：一人处理 BOARD-001 并启动 MM-001，一人处理 HAL-001 并尽早做 IO-001 验证，一人处理 TEST-001 并和另一位成员共审 VFS-001。具体人选通过 issue 认领，不能让同一人包办所有关键路径。
+第一次接触存储可选 #1；手边有板可选 #2；熟悉 rCore 内存实验可选 #4；想先熟悉测试工具链可选 #8。#10 是持续任务，每个人都参与自己的功能说明。
 
-每天异步记录遇到的阻塞，每周演示实际运行结果。每个模块大任务按协作要求拆成小 PR，不能把整套模块攒到一次合入。
+## 接口确认后逐步推进
 
-[查看所有开放任务](https://github.com/MindScrath/Focos/issues) · [查看里程碑](https://github.com/MindScrath/Focos/milestones)
+| 任务 | 如何安排 |
+| --- | --- |
+| [#3 让内核真正读写 SD 卡扇区](https://github.com/MindScrath/Focos/issues/3) | 接口依赖 #1，上板依赖 #2；资料调查可先做 |
+| [#6 从 FAT32 读文件，再做到写后重启不丢](https://github.com/MindScrath/Focos/issues/6) | 内存盘准备好就能做解析，真盘验收等 #3 |
+| [#7 统一路径、文件描述符和文件错误](https://github.com/MindScrath/Focos/issues/7) | 先与 #1 共审接口，再接 #5/#6 |
+| [#5 让两个任务轮流运行，再启动用户程序](https://github.com/MindScrath/Focos/issues/5) | 先审异常与 ABI，再接 #2/#4 |
+| [#9 测清文件访问开销，再比较普通块缓存](https://github.com/MindScrath/Focos/issues/9) | 先准备测量方法，正式实验等文件功能正确 |
+
+## 全国赛扩展
+
+- [#11 星云板移植](https://github.com/MindScrath/Focos/issues/11)：区域赛后主推。
+- [#12 正式环境兼容与磁盘检索](https://github.com/MindScrath/Focos/issues/12)：拆成两条独立验收线。
+
+三人的建议并行路线和周目标见 [推进路线](roadmap.md)，提交方法见 [上手指南](getting-started.md)。
