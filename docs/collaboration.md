@@ -46,6 +46,14 @@ main 的 `bootstrap` 检查必须由 GitHub Actions 提供且成功，分支须�
 
 两人审阅的特殊要求靠团队执行，不能误认为统一的一人门禁已经覆盖。自动代码审阅由仓库负责人手动配置；它提供建议，不能替代人工批准。具体保护配置见 [.github/main-protection.json](../.github/main-protection.json)，该文件本身不会自动改服务器设置。
 
+### 自动审阅与分支保护有什么区别？
+
+GitHub 分支保护决定什么时候允许合并；当前 main 已启用，不需要再建一套重复 ruleset。Ruleset 中的 “Automatically request Copilot code review” 属于 Copilot，不是 Codex Connector 的开关。
+
+Codex 的仓库授权、Automatic review 和触发时机在 Codex 设置中管理。安装 Connector、选中仓库只说明完成了相应接入步骤；是否自动运行，要看新 PR 或新提交上是否出现 Connector 的响应。仓库 [AGENTS.md](../AGENTS.md) 规定审阅关注点及文档写法，不负责调度审阅，也不能代替服务开关。
+
+参考：[Codex 官方设置说明](https://learn.chatgpt.com/docs/third-party/github)、[GitHub Copilot ruleset 说明](https://docs.github.com/en/copilot/how-tos/copilot-on-github/set-up-copilot/configure-code-review)。
+
 ## 6. 每周留下什么？
 
 用 30 分钟一起演示本周能运行的东西。owner 更新 Issue 的进展、阻塞和证据；新成员也要轮换实现与 review，不把某个人固定成材料整理员。
