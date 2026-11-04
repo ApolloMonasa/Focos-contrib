@@ -29,6 +29,6 @@ make check
 
 `kernel/` 存内核，`specs/` 存已审阅的契约，`scripts/` 存复现工具，`tests/` 存测试清单，`docs/` 存团队设计与证据说明。大型镜像和日志不进入 Git；`devdoc/` 为本地研究材料，默认忽略。
 
-私有 upstream 为 `MindScrath/Focos`。日常开发采用成员私有 fork、短分支和 PR；成员的账号、模块 owner 与 review 轮值待认领后确定。团队报名个人资料不得进入此仓库。
+公有 upstream 为 [MindScrath/Focos](https://github.com/MindScrath/Focos)。日常开发采用成员公有 fork、短分支和 PR；`main` 已启用 CI 必过、至少一名非作者批准和禁止强推等保护。成员的账号、模块 owner 与 review 轮值待确认后绑定。团队报名个人资料不得进入此仓库。
 
-区域赛赛方另有 GitLab 提交、来源披露与公开要求，详见资料说明；私有开发仓库不替代赛方提交仓库。代码许可证须在引入第三方代码前确定并核对兼容性，公开发布时执行当届规则。
+区域赛赛方另有 GitLab 提交和来源披露要求，详见资料说明；此 GitHub 仓库不替代赛方提交仓库。代码许可证须在引入第三方代码前确定并核对兼容性，参赛提交按当届规则办理。

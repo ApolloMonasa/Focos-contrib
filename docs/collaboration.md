@@ -14,7 +14,7 @@
 
 ## 分支和 PR
 
-- upstream 为组织的私有 `Focos`；成员在组织允许的私有 fork 网络中开发，`origin` 指向个人 fork、`upstream` 指向组织仓库。
+- upstream 为组织的公有 `MindScrath/Focos`；成员创建公有 fork，`origin` 指向个人 fork、`upstream` 指向组织仓库。无需为此配置组织的私有 fork 策略。
 - 分支建议 `spec/<issue>-<topic>`、`feat/<issue>-<topic>`、`fix/<issue>-<topic>`；从最新 upstream main 分出，一次解决一个可解释的问题。
 - 初始仓库必须先有一个本地通过检查的可构建基线。该初始化之后，一切功能变更走 PR；禁止向 main 直接推送、强推或将长期集成留到赛前。
 - PR 关联认领 issue 与准确 spec 版本，说明可观察行为、测试结果、来源/AI 使用和剩余限制。新语义先审 spec，再实现；小修复可以在同一 PR 中明确 spec 修订及其测试。
@@ -39,13 +39,20 @@ TDD 记录以「预期行为的测试先失败→最小实现通过→重构回�
 
 初始 CI 执行格式检查、裸机 clippy、构建与 QEMU 冒烟，保存环境版本和串口日志。后续门禁逐步增加 host 测试、两架构构建、FS/VFS 架构隔离检查、选定基础测例和 spec/issue 关联检查。选定的必过集合只能通过独立的范围变更 PR 修改；新发现的失败不能静默移出分母。
 
-组织需设置 required checks、至少一名非作者 review、禁止强推、更新后重审；平台套餐或权限不支持时，明确记录缺口，由 maintainer 执行人工合入清单，不能声称已强制保护。自动 code review 是辅助反馈，不能代替非作者批准和实际测试。
+`main` 已通过 GitHub 分支保护强制执行以下规则，管理员同样受约束：
 
-2026-11-04 配置结果：组织已允许私有 fork，Focos 已启用该能力；初始 main 的 GitHub CI 已成功。分支保护 API 返回 403，提示当前套餐不支持该私有仓库功能，因此 required checks/review/禁止强推尚未由 GitHub 强制执行。当前必须由维护者人工执行上述规则；升级相应套餐后重新启用服务器门禁。不得为取得保护能力而把此仓库改为公开。
+- `bootstrap` 必须通过，并限定由 GitHub Actions 应用提供；合并前分支须跟上最新 main。
+- 至少一名有仓库写权限的非作者批准；新提交撤销旧批准，最近一次推送也须由推送者之外的审阅人批准。
+- 所有审阅讨论须解决，禁止强推及删除 main，保持线性历史。
+- 仓库仅允许 squash 合并，合并后自动删除适用的上游分支。
 
-成员 fork CI 的审批按组织策略配置。无凭证的 host/QEMU 检查优先放普通 CI；连接真实板卡的 runner 只执行维护者确认的提交，使用独占锁避免争抢设备。不要用携带 upstream 凭证的工作流执行未经审阅的 fork 代码。
+分支保护的可复用配置为 [.github/main-protection.json](../.github/main-protection.json)，由管理员通过 `gh api --method PUT repos/MindScrath/Focos/branches/main/protection --input .github/main-protection.json` 应用；提交此文件本身不会自动修改 GitHub 设置。实际设置已在 2026-11-04 应用并读取核验。HAL、ABI、内存安全、持久化语义的两人审阅仍按上文流程执行，不能误称已由统一的一人门禁覆盖。
 
-当前组织另有私有 fork PR 工作流禁用策略，现有 gh 授权缺少管理该策略所需的 `admin:org` scope，组织侧设置未修改。初始化采用成员 fork 的 push CI 验证同一 head SHA，并将运行链接交给 upstream PR review；没有发送 upstream secrets 或写令牌。组织管理员后续可按团队要求开启 upstream 的 fork PR CI。自动代码审阅应用是否已启用需以实际 PR 上的 review/check 为准。
+2026-11-04 经仓库负责人明确授权，upstream 从私有转为公有，原先的套餐门禁限制和私有 fork PR CI 绕行方案不再适用于此仓库。原 `ApolloMonasa/Focos` 私有 fork 已脱离上游网络，保留为独立私有仓库；新的公有贡献 fork 为 `ApolloMonasa/Focos-contrib`。其他成员直接从公有 upstream 创建自己的 fork。
+
+CI 使用 `pull_request` 在上游直接报告检查，并在 main 的 push 上复验；不再为每个 fork 开发分支重复执行 push CI。令牌权限为 `contents: read`，checkout 不持久保存令牌。GitHub 当前策略要求维护者批准首次贡献者的工作流；成员获得写权限后可按 GitHub 的协作者规则运行。连接真实板卡的 runner 只执行维护者确认的提交，使用独占锁避免争抢设备。不要用携带 upstream 凭证的工作流执行未经审阅的 fork 代码。
+
+尚待补齐的是两名队员的准确 GitHub 账号及模块分工：确认后授予 Focos 写权限、分配 issue 并绑定实际 owner；不把组织中现有的只读账号当作队员，也不预填无效 CODEOWNERS。自动 code review 是辅助反馈，不能代替非作者批准和实际测试；应用已安装不等于该仓库已启用自动审阅，须以实际 PR 上的 review/check 验收。
 
 ## 性能回归与证据维护
 
@@ -53,6 +60,6 @@ TDD 记录以「预期行为的测试先失败→最小实现通过→重构回�
 
 每条回归记录包含 base/head SHA、spec/PR、设备与镜像、配置、工作负载、每轮原始数据、噪声范围、图表生成命令、变化幅度、复测结论和处理结果。功能断言、资源泄漏与持久化错误立即阻断，不受性能容忍阈值影响。
 
-版本化小型 JSON/CSV 结果与绘图脚本，大日志/镜像放私有 CI artifact 或团队存储，记录校验和与保留期限。比赛候选版本应额外归档，避免 CI artifact 到期导致证据丢失。个人报名材料始终留在工作区 `enroll_info/`，不进入代码库、日志或公开材料。
+版本化小型 JSON/CSV 结果与绘图脚本，可公开的日志放 CI artifact，大镜像放团队存储，记录校验和与保留期限。公有仓库的 CI 日志及 artifact 按公开材料管理；非公开资料只存团队的私有空间。比赛候选版本应额外归档，避免 CI artifact 到期导致证据丢失。个人报名材料始终留在工作区 `enroll_info/`，不进入代码库、日志或公开材料。
 
 按 2026 区域赛章程记录 AI 工具、使用场景、受影响文件、人工复核与验证结果；借鉴代码记录来源版本、许可证与本队增量。开发历史是过程性资料的一部分，不能赛前补造。
