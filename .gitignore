@@ -1,0 +1,7 @@
+/target/
+/devdoc/
+*.img
+*.img.xz
+*.log
+.env
+
