@@ -4,4 +4,5 @@
 *.img.xz
 *.log
 .env
-
+# 省略IDE配置
+.idea

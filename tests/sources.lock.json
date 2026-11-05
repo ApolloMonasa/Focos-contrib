@@ -1,0 +1,367 @@
+{
+  "audited_at": "2026-11-04",
+  "repository": "https://github.com/oscomp/testsuits-for-oskernel",
+  "audit_scope": "All branch root listings and README files; selected build scripts and test sources. No test execution.",
+  "branches": [
+    {
+      "branch": "2025_multiarch",
+      "commit": "9ac474b8c6af8be405e83dea1c04756073bc20cf",
+      "readme_sha256": "03aa442dd77756f41d2217631eed13ef97c77dd6fc06ca4938b5507609cbbfae",
+      "root_entries": [
+        ".gitignore",
+        "Makefile",
+        "Makefile.sub",
+        "README.md",
+        "UnixBench",
+        "basic",
+        "busybox",
+        "config",
+        "fat32-info.md",
+        "iozone",
+        "iperf",
+        "libc-bench",
+        "libc-test",
+        "lmbench_src",
+        "ltp-full-20240524",
+        "lua",
+        "netperf",
+        "oscomp_syscalls.md",
+        "rt-tests",
+        "scripts"
+      ]
+    },
+    {
+      "branch": "final",
+      "commit": "c49da6b5bd67a93b52cab56881260d2aa34881cb",
+      "readme_sha256": "3306b50f522b9ea3f19dcc0ccff7165fe06bd8ba29e04eeb0db47a3baa9a1d6a",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "busybox",
+        "docs",
+        "lmbench",
+        "lua",
+        "scripts",
+        "评测时SD卡中内容.zip"
+      ]
+    },
+    {
+      "branch": "final-2023",
+      "commit": "e8d502ceb8fa36c6564e53777d06f87c1945802a",
+      "readme_sha256": "1cd6434d65a88d55287678f7dce8ffbf02b638a7628102eddbd75819dfb65879",
+      "root_entries": [
+        ".gitignore",
+        "Makefile",
+        "README.md",
+        "UnixBench",
+        "busybox-config",
+        "busybox",
+        "copy-file-range-test",
+        "docs",
+        "interrupts-test",
+        "iozone",
+        "iperf",
+        "k210",
+        "libc-bench",
+        "libc-test",
+        "lmbench",
+        "lua",
+        "netperf",
+        "out",
+        "rt-tests",
+        "scripts",
+        "sdcard",
+        "time-test",
+        "true"
+      ]
+    },
+    {
+      "branch": "final-2024-la",
+      "commit": "0113fac42afc8013bb154904c5a621f55da9f1a5",
+      "readme_sha256": "8a6671b871bbc15fb0bc4e34fc5fa96a19099b7f08cb9cf0eafe0c9a9b9f630d",
+      "root_entries": [
+        ".gitignore",
+        ".gitmodules",
+        "Makefile",
+        "README.md",
+        "UnixBench",
+        "busybox",
+        "config",
+        "copy-file-range-test",
+        "interrupts-test",
+        "iperf",
+        "libc-bench",
+        "libc-test",
+        "linux-test-project",
+        "lmbench",
+        "loongarch-linux-qemu",
+        "lua",
+        "netperf",
+        "prebuilt",
+        "rt-tests",
+        "runtime",
+        "scripts",
+        "time-test",
+        "true"
+      ]
+    },
+    {
+      "branch": "final-2024-rv",
+      "commit": "3691e5f1c65d68df11466dfd6d815904aca0d8fd",
+      "readme_sha256": "72bf38f94f5dae82b1b051434c0e2eb909fcb76cfb179836ca7550d562e9995c",
+      "root_entries": [
+        ".gitignore",
+        "Makefile",
+        "README.md",
+        "UnixBench",
+        "busybox-config",
+        "busybox",
+        "copy-file-range-test",
+        "docs",
+        "interrupts-test",
+        "iozone",
+        "iperf",
+        "k210",
+        "libc-bench",
+        "libc-test",
+        "lmbench",
+        "ltp-full-20240524",
+        "lua",
+        "netperf",
+        "out",
+        "rt-tests",
+        "scripts",
+        "sdcard",
+        "time-test",
+        "true"
+      ]
+    },
+    {
+      "branch": "final-2025",
+      "commit": "aa84a2b0cf17960fdcd1dec1c0d036cf3827b45b",
+      "readme_sha256": "904dfd070ea56e0429d6c812f5c0b9dfcb7812bb00f6a13cdac4d9a361425c2d",
+      "root_entries": [
+        "Makefile",
+        "Makefile.sub",
+        "README.md",
+        "busybox",
+        "config",
+        "copy-file-range-test",
+        "interrupts-test",
+        "scripts",
+        "splice-test"
+      ]
+    },
+    {
+      "branch": "final-2026",
+      "commit": "b5ec6ef8497e1818cbdec3b54bb722f036e57972",
+      "readme_sha256": "20eb5abc1e23ebed2cef18c5ca0265ee59be2741b44127e6ecc35500e02eb947",
+      "root_entries": [
+        "Makefile",
+        "Makefile.sub",
+        "README.md",
+        "busybox",
+        "cagent-test",
+        "config",
+        "judge",
+        "scripts",
+        "third_party"
+      ]
+    },
+    {
+      "branch": "final-comp",
+      "commit": "b657ab7579638d4de03aac69fd0c605ab4bb9dbd",
+      "readme_sha256": "2fe7fcfecc0402c12fe92d2653cbc63ea83d7e5b1d483d83b633197335578f7b",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "busybox",
+        "docs",
+        "lmbench",
+        "lua",
+        "scripts",
+        "sdcard.img.gz"
+      ]
+    },
+    {
+      "branch": "libc-test",
+      "commit": "a8b90a19d16b0f05f89fe4a326f14a2ad51853dd",
+      "readme_sha256": "2fe7fcfecc0402c12fe92d2653cbc63ea83d7e5b1d483d83b633197335578f7b",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "busybox",
+        "docs",
+        "libc-test",
+        "lmbench",
+        "lua",
+        "scripts",
+        "评测时SD卡中内容.zip"
+      ]
+    },
+    {
+      "branch": "main",
+      "commit": "02ed4fcb056d114f8e3d8b39106b0f79fc2f9170",
+      "readme_sha256": "23b4286db442bd7f35fba882155bdc8944237a1debf8eef71425e3c6d82bc9dd",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "fat32-info.md",
+        "oscomp_syscalls.md",
+        "riscv-linux-rootfs",
+        "riscv-syscalls-testing"
+      ]
+    },
+    {
+      "branch": "master",
+      "commit": "bc040a56bdeff383bf6e48fa18db5442ecdfd319",
+      "readme_sha256": "23b4286db442bd7f35fba882155bdc8944237a1debf8eef71425e3c6d82bc9dd",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "fat32-info.md",
+        "oscomp_syscalls.md",
+        "riscv-linux-rootfs",
+        "riscv-syscalls-testing"
+      ]
+    },
+    {
+      "branch": "on-site-final-2023",
+      "commit": "0072ba93a32f6497dd9e6eaf7521a113e5e29e86",
+      "readme_sha256": "9614062c8e55384c53880d64693ab9983e81c923ed0e57ce2c8a809b5d148feb",
+      "root_entries": [
+        ".gitignore",
+        "README.md"
+      ]
+    },
+    {
+      "branch": "on-site-final-2024",
+      "commit": "cb9042e416f9663f23265cd393dde4834e13aced",
+      "readme_sha256": "7c7839206828c6fe5d9588cf20348a318c3b37a43bbe1628a8195976844a506c",
+      "root_entries": [
+        ".gitignore",
+        "README.md"
+      ]
+    },
+    {
+      "branch": "on-site-final-2025",
+      "commit": "9ea291d8535774680e88f4e6bf725d7ba156e752",
+      "readme_sha256": "d99e9927c5cd710c00f009011ccdc7fb40cf43f33a8727d76c564160579cb664",
+      "root_entries": [
+        "README.md",
+        "soft-info.txt"
+      ]
+    },
+    {
+      "branch": "pre-2023",
+      "commit": "6efdff31d9eb882ff73352e7010019fc56ead4de",
+      "readme_sha256": "7bc028748385242b650cafbd0314189700536f2cdf4e6ad991bda681ca8efaca",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "fat32-info.md",
+        "oscomp_syscalls.md",
+        "riscv-linux-rootfs",
+        "riscv-syscalls-testing",
+        "sdcard.img.gz"
+      ]
+    },
+    {
+      "branch": "pre-2024-riscv64/aarch64/x86_64",
+      "commit": "c3fa3c1c24fe83c2ff295d355f83fe2525018f62",
+      "readme_sha256": "51d91de7f3c8d74a40b67e47e1e7b0b6a4d70e8514bcafdb463725d37fd0079e",
+      "root_entries": [
+        ".gitignore",
+        "Makefile",
+        "README.md",
+        "UnixBench",
+        "busybox-config",
+        "busybox",
+        "copy-file-range-test",
+        "docs",
+        "interrupts-test",
+        "iozone",
+        "iperf",
+        "k210",
+        "libc-bench",
+        "libc-test",
+        "lmbench",
+        "lua",
+        "netperf",
+        "out",
+        "rt-tests",
+        "scripts",
+        "sdcard",
+        "time-test",
+        "true"
+      ]
+    },
+    {
+      "branch": "pre-2024",
+      "commit": "0de5d9b11cd3b5d7f75436460bd826be5e989a5c",
+      "readme_sha256": "7bc028748385242b650cafbd0314189700536f2cdf4e6ad991bda681ca8efaca",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "fat32-info.md",
+        "oscomp_syscalls.md",
+        "riscv-linux-rootfs",
+        "riscv-syscalls-testing",
+        "sdcard-loongarch.img.gz",
+        "sdcard-riscv.img.gz"
+      ]
+    },
+    {
+      "branch": "pre-2025",
+      "commit": "8b58dd16d26d30f7c74d48d5832d870d3051b703",
+      "readme_sha256": "03aa442dd77756f41d2217631eed13ef97c77dd6fc06ca4938b5507609cbbfae",
+      "root_entries": [
+        ".gitignore",
+        "Makefile",
+        "Makefile.sub",
+        "README.md",
+        "UnixBench",
+        "basic",
+        "busybox",
+        "config",
+        "fat32-info.md",
+        "iozone",
+        "iperf",
+        "libc-bench",
+        "libc-test",
+        "lmbench_src",
+        "ltp-full-20240524",
+        "lua",
+        "netperf",
+        "oscomp_syscalls.md",
+        "rt-tests-2.7",
+        "runtime",
+        "scripts",
+        "sdcard"
+      ]
+    },
+    {
+      "branch": "testscripts",
+      "commit": "76da9ad9c7833abf11530e45aeb46166bfe4e872",
+      "readme_sha256": "23b4286db442bd7f35fba882155bdc8944237a1debf8eef71425e3c6d82bc9dd",
+      "root_entries": [
+        ".gitignore",
+        "README.md",
+        "fat32-info.md",
+        "oscomp_syscalls.md",
+        "riscv-linux-rootfs",
+        "riscv-syscalls-testing"
+      ]
+    }
+  ],
+  "auxiliary_sources": [
+    {
+      "repository": "oscomp/autotest-for-oskernel",
+      "commit": "d1bb3a3c4b27274e196a2648518525c1a304e339"
+    },
+    {
+      "repository": "oscomp/oskernel-testsuits-cooperation",
+      "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b"
+    }
+  ]
+}
