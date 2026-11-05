@@ -18,11 +18,67 @@
 
 跑通后的成功标志：终端出现 `PASS: BOOT-001`，串口日志中有 `FOCOS_BOOT_OK`。
 
+## 仓库里各处放什么？
+
+下面列出纳入版本管理的文件和目录。想看内核代码先找 `kernel/`，想查功能怎样验收先找 `specs/`。
+
+```text
+Focos/
+├── README.md                          # 项目首页和成员入口
+├── AGENTS.md                          # 开发、文档与审阅约定
+├── kernel/                            # Rust 裸机内核
+│   ├── Cargo.toml                     # 内核 crate 的构建定义
+│   └── src/                           # 内核源代码
+│       ├── main.rs                    # Rust 入口和 panic 处理
+│       ├── hal.rs                     # 供内核调用的早期输出和关机接口
+│       └── arch/                      # 与 CPU 架构相关的实现
+│           ├── mod.rs                 # 选择目标架构并导出接口
+│           └── riscv64/               # RISC-V 启动与 SBI 实现
+│               ├── entry.S            # 设置栈、清理 BSS 并进入 Rust
+│               ├── linker.ld          # 内核加载地址和段布局
+│               └── mod.rs             # 调用 SBI 输出字符和关机
+├── specs/                             # 接口行为与验收条件
+│   └── BOOT-001.md                    # QEMU 启动规格
+├── scripts/                           # 构建与验证辅助脚本
+│   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
+├── tests/                             # 往届测例清单与来源
+│   ├── catalog.json                   # 测例、优先级与验收状态
+│   └── sources.lock.json              # 测例仓库和分支的固定提交
+├── docs/                              # 上手、设计与验证指南
+│   ├── getting-started.md             # 配环境、运行和首次提交
+│   ├── architecture.md                # 内核分层与跨平台扩展图
+│   ├── backlog.md                     # 可认领任务与依赖入口
+│   ├── collaboration.md               # 认领、测试、审阅与合入流程
+│   ├── roadmap.md                     # 周目标与进度取舍
+│   ├── verification.md                # 怎样接入测例并记录功能证据
+│   ├── benchmarks.md                  # 怎样测性能并生成图表
+│   ├── references.md                  # 赛规、测例和技术资料来源
+│   ├── ai-usage.md                    # AI 辅助和人工复核记录
+│   └── reference/                     # 按需查阅的技术细节
+│       ├── delivery-details.md        # 接口、交付边界和阶段目标
+│       ├── experiment-protocol.md     # 实验参数与数据记录要求
+│       └── test-audit.md              # 历史测评分支与测例审计
+├── .cargo/                            # Cargo 的仓库级配置
+│   └── config.toml                    # RISC-V 裸机目标的链接选项
+├── .github/                           # GitHub 自动检查与保护配置
+│   ├── main-protection.json           # main 分支保护的可复用配置
+│   └── workflows/                     # GitHub Actions 工作流
+│       └── ci.yml                     # PR 与 main 的构建和启动检查
+├── .gitignore                         # Git 忽略规则
+├── Cargo.toml                         # Rust 工作区与构建配置
+├── Cargo.lock                         # 锁定 Cargo 依赖版本
+├── Makefile                           # 构建、检查和 QEMU 启动入口
+└── rust-toolchain.toml                # 固定 Rust 版本、组件与目标
+```
+
+**随 PR 维护文件树。** 新增、移动或删除纳入版本管理的路径，或改变它的用途时，作者在同一 PR 更新这一节，审阅者对照变更核对路径和说明。
+
 ## 做到哪个阶段，再读哪份文档？
 
 | 你现在要做什么 | 阅读入口 |
 | --- | --- |
 | 配环境、第一次提交 | [上手指南](docs/getting-started.md) |
+| 看一次文件读取经过哪些层、如何扩到双板 | [架构图](docs/architecture.md) |
 | 选任务、看依赖 | [任务入口](docs/backlog.md) |
 | 写 spec、提交和审阅 PR | [协作流程](docs/collaboration.md) |
 | 看本周目标和取舍 | [推进路线](docs/roadmap.md) |
