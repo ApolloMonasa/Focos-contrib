@@ -38,10 +38,10 @@ mmc part
 ```sh
 git clone https://github.com/ApolloMonasa/Focos-contrib.git Focos-vf2
 cd Focos-vf2
-git switch --detach 3e536a444387c1d383dea7a21c505189cb1e94b3
+git switch --detach c363b1cb3ba121c2c07f0266f52a12f0a4e29227
 ```
 
-这是首次上板实现的完整提交；本指南后续的文档提交不改变该次实现。该版本尚待人工审阅。工具准备见 [上手指南](getting-started.md)。
+这是基于已合入 main 整理后的首次上板实现提交，代码与首次实测版本一致；本指南后续的文档提交不改变该次实现。该版本尚待人工审阅。工具准备见 [上手指南](getting-started.md)。
 
 在 FocOS 仓库根目录执行：
 
