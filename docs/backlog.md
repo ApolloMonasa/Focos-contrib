@@ -1,32 +1,35 @@
-# 先选一个小任务
+# 选一个 3–6 小时的第一步
 
-每人同时只认领一个实现任务。先在 Issue 说明想做的第一步，再约一位队友 review；不要把模块名当作一次 PR 的工作量。认领与进度以 Issue 为准，这里不复制状态。
+在 Issue 认领、约 reviewer，再从 [SPEC 模板](../specs/TEMPLATE.md) 写行为。负责人和进度只维护在 Issue，下面只作导航。
 
-## 现在就能开始
+## 基础链路
 
-| 任务 | 第一小步 |
+| 任务 | 第一份交付 |
 | --- | --- |
-| [#1 先做一个能在开发机测试的内存盘](https://github.com/MindScrath/Focos/issues/1) | 审块设备接口，准备内存盘测试 |
-| [#2 让 VisionFive2 打印启动信息](https://github.com/MindScrath/Focos/issues/2) | 确认固件、串口与启动步骤 |
-| [#4 实现物理页分配和回收](https://github.com/MindScrath/Focos/issues/4) | 定义页分配/回收和耗尽行为 |
-| [#8 先把一个官方测试编译并判对，再接入全部清单](https://github.com/MindScrath/Focos/issues/8) | 先构建一个官方程序并核对判分 |
-| [#10 每周留下可复现演示和答辩材料](https://github.com/MindScrath/Focos/issues/10) | 从干净环境复现当前启动演示 |
+| [#1 块设备与内存盘](https://github.com/MindScrath/Focos/issues/1) | 越界/错误行为 SPEC 与失败测试 |
+| [#2 真板 UART 与时钟](https://github.com/MindScrath/Focos/issues/2) | 独立复现首次启动，标明 SBI 与自有驱动 |
+| [#3 SD 与 QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 读已知扇区并校验 |
+| [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | 分配、释放、耗尽测试 |
+| [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) | 两任务切换和异常隔离规格 |
+| [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) | 内存盘 BPB/簇链测试 |
+| [#7 VFS 与文件接口](https://github.com/MindScrath/Focos/issues/7) | 路径、FD、共享偏移约定 |
 
-第一次接触存储可选 #1；手边有板可选 #2；熟悉 rCore 内存实验可选 #4；想先熟悉测试工具链可选 #8。#10 是持续任务，每个人都参与自己的功能说明。
+## 区域赛新增的兼容工作
 
-## 接口确认后逐步推进
-
-| 任务 | 如何安排 |
+| 任务 | 第一份交付 |
 | --- | --- |
-| [#3 让内核真正读写 SD 卡扇区](https://github.com/MindScrath/Focos/issues/3) | 接口依赖 #1，上板依赖 #2；资料调查可先做 |
-| [#6 从 FAT32 读文件，再做到写后重启不丢](https://github.com/MindScrath/Focos/issues/6) | 内存盘准备好就能做解析，真盘验收等 #3 |
-| [#7 统一路径、文件描述符和文件错误](https://github.com/MindScrath/Focos/issues/7) | 先与 #1 共审接口，再接 #5/#6 |
-| [#5 让两个任务轮流运行，再启动用户程序](https://github.com/MindScrath/Focos/issues/5) | 先审异常与 ABI，再接 #2/#4 |
-| [#9 测清文件访问开销，再比较普通块缓存](https://github.com/MindScrath/Focos/issues/9) | 先准备测量方法，正式实验等文件功能正确 |
+| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 2025 镜像与 11 组子用例清单 |
+| [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与只读测试 |
+| [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 一个动态 ELF 的解释器/库依赖 |
+| [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发测试 |
+| [#25 vim/gcc/make](https://github.com/MindScrath/Focos/issues/25) | 工具版本、依赖与终端需求 |
 
-## 全国赛扩展
+基础运行依赖 #2/#4/#5；文件依赖 #1/#3/#6/#7。Ext4 和运行时调查可提前开始，运行验收要等相关能力接通。#8 的失败结果分派给能力 owner，不由测试负责人包办所有内核实现。
 
-- [#11 星云板移植](https://github.com/MindScrath/Focos/issues/11)：区域赛后主推。
-- [#12 正式环境兼容与磁盘检索](https://github.com/MindScrath/Focos/issues/12)：拆成两条独立验收线。
+## 实验与后续
 
-三人的建议并行路线和周目标见 [推进路线](roadmap.md)，提交方法见 [上手指南](getting-started.md)。
+- [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9)：功能正确后比较 B0/B1。
+- [#10 提交与教学材料](https://github.com/MindScrath/Focos/issues/10)：每周独立复现；补许可证和赛方 GitLab 提交项。
+- [#11 星云板](https://github.com/MindScrath/Focos/issues/11)、[#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、LTP、2026 参考负载和真实磁盘检索。
+
+交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。

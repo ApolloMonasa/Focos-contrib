@@ -1,23 +1,21 @@
-# 第一次参与 FocOS
+# 第一天：运行 → 认领 → 提交
 
-目标是先看到一次成功启动，再提交一个队友能审完的小改动。第一天不需要接板子，也不需要实现一个完整模块。
+目标：看到 `PASS: BOOT-001`，然后交一个队友能快速审完的小改动。
 
-## 1. 准备工具
+## 1. 准备环境
 
-建议先用 Linux；Windows 成员可以用 WSL2。需要 Git、rustup、GNU make、Python 3 和 `qemu-system-riscv64`。
-
-Ubuntu / Debian 的系统工具可这样安装（其他发行版使用对应包管理器）：
+需要 Linux、Git、rustup、make、Python 3、QEMU RISC-V。Ubuntu / Debian：
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y git make python3 qemu-system-misc
+sudo apt-get install -y git make python3 qemu-system-misc binutils-riscv64-linux-gnu
 ```
 
-Rust 请先按 [官方 rustup 安装说明](https://www.rust-lang.org/tools/install) 安装 rustup。项目固定 Rust 1.99.0，进入仓库后 rustup 会按 `rust-toolchain.toml` 获取工具链、组件和目标。
+按 [rustup 官方说明](https://www.rust-lang.org/tools/install) 安装 Rust 管理器。仓库的 `rust-toolchain.toml` 固定工具链；首次运行会下载。Fedora 使用对应系统包；WSL2 可用于 QEMU 开发，板卡连接需另配。
 
-## 2. 获取代码
+## 2. 获取并运行
 
-在 GitHub 打开 [上游仓库](https://github.com/MindScrath/Focos)，点击 Fork，创建自己的公有 fork。然后运行下面命令，先把 `YOUR_GITHUB_LOGIN` 换成自己的用户名：
+在 [团队仓库](https://github.com/MindScrath/Focos) 点击 Fork，再将下方用户名和 fork 名改成自己的：
 
 ```sh
 git clone https://github.com/YOUR_GITHUB_LOGIN/Focos.git
@@ -28,43 +26,27 @@ git switch -c feat/1-memory-disk upstream/main
 make check
 ```
 
-这里的分支名只是 #1 的例子；认领其他任务时换成对应编号和主题。`origin` 是你的 fork，`upstream` 是团队仓库。
+`origin` 是个人 fork，`upstream` 是团队仓库。分支名中的 `1` 换成认领的 Issue 编号。
 
-## 3. 判断是否跑通
+成功标志：`PASS: BOOT-001`。日志：`target/evidence/boot-qemu-rv.log`。只编译用 `make build`，只跑启动流程用 `make smoke`。
 
-`make check` 依次做格式检查、clippy 检查、裸机构建和 QEMU 启动验证。成功时会出现 `PASS: BOOT-001`。
-
-| 需要什么 | 命令或路径 |
+| 遇到问题 | 先检查 |
 | --- | --- |
-| 只编译 | `make build` |
-| 编译并跑启动检查 | `make smoke` |
-| 串口与 QEMU 版本记录 | `target/evidence/boot-qemu-rv.log` |
-| 内核 ELF | `target/riscv64gc-unknown-none-elf/release/focos-kernel` |
+| 找不到 QEMU | `qemu-system-riscv64 --version` |
+| Rust 下载失败 | 网络与 rustup 安装 |
+| 格式不对 | `cargo fmt --all` 后查看 diff |
+| 启动超时 | 日志、完整命令与当前 SHA；不要删断言 |
 
-常见问题：找不到 QEMU，先运行 `qemu-system-riscv64 --version` 检查安装；Rust 下载失败，检查网络并重试工具链安装；格式失败，运行 `cargo fmt --all` 后查看 diff；启动超时，贴出上述串口日志和完整命令，找队友一起定位。不要通过删除断言让检查变绿。
+## 3. 交第一份 PR
 
-当前基线只验证 QEMU 的启动和关机，不能证明真板、UART 驱动或文件系统已经可用。
-
-## 4. 找到要改的位置
-
-| 路径 | 用途 |
-| --- | --- |
-| `kernel/src/main.rs` | 内核入口 |
-| `kernel/src/hal.rs` | 硬件抽象入口 |
-| `kernel/src/arch/riscv64/` | 汇编入口、链接脚本和 RISC-V 操作 |
-| `specs/BOOT-001.md` | 第一份功能规格，写新 spec 时可参考它的粒度 |
-| `scripts/smoke.py` | 启动检查脚本 |
-| `tests/` | 外部测例版本与清单，目前不是已运行的测试集 |
-
-## 5. 提交第一个小改动
-
-在 [任务入口](backlog.md) 选择任务，到 Issue 说明你准备先做哪一小步、何时交付，请一名队友做 reviewer。先把预期行为写进 spec，经审阅后补一个会失败的测试，再写实现。
-
-提交前运行相关测试和 `make check`，检查 `git diff`，确认没有日志、镜像或凭据。用 `git add <本次文件>` 暂存后执行：
+1. 从 [任务入口](backlog.md) 选一项，在 Issue 认领并约 reviewer。
+2. 复制 [SPEC 模板](../specs/TEMPLATE.md)，先约定行为，再写失败测试和实现。示例见 [BOOT-001](../specs/BOOT-001.md)。
+3. 运行相关检查和 `make check`，检查 diff；路径变化时更新 README 文件树。
+4. `git add <本次文件>` 后提交并推送：
 
 ```sh
 git commit -m "feat: add memory disk boundary checks"
 git push -u origin HEAD
 ```
 
-在 GitHub 创建 PR：目标选 `MindScrath/Focos:main`，来源选自己的 fork 和分支。写清关联 Issue、spec、做了什么、怎样验证；邀请队友审阅。GitHub 登录或推送认证使用自己的凭据，不要把凭据放进命令示例或 Issue。详细规则见 [协作流程](collaboration.md)。
+PR 目标选 `MindScrath/Focos:main`，按自动出现的模板填写。完整流程只有 [六步](collaboration.md)。当前启动成功不代表文件系统或历史测例已通过。
