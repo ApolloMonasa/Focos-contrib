@@ -38,7 +38,6 @@ Focos/
 │               ├── linker.ld          # 内核加载地址和段布局
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
-│   └── BOOT-001.md                    # QEMU 启动规格
 ├── scripts/                           # 构建与验证辅助脚本
 │   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
 ├── tests/                             # 往届测例清单与来源
