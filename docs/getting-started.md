@@ -7,8 +7,8 @@
 需要 Linux、Git、rustup、make、Python 3、QEMU RISC-V。Ubuntu / Debian：
 
 ```sh
-sudo apt-get update
-sudo apt-get install -y git make python3 qemu-system-misc binutils-riscv64-linux-gnu
+sudo apt update
+sudo apt install -y git make python3 qemu-system-misc binutils-riscv64-linux-gnu
 ```
 
 按 [rustup 官方说明](https://www.rust-lang.org/tools/install) 安装 Rust 管理器。仓库的 `rust-toolchain.toml` 固定工具链；首次运行会下载。Fedora 使用对应系统包；WSL2 可用于 QEMU 开发，板卡连接需另配。
