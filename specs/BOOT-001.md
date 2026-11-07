@@ -1,17 +1,25 @@
-# BOOT 001 裸机工程起点
+# BOOT-001：在 QEMU 启动并关机
 
-状态：本次实现范围；2026-11-04。关联任务：仓库初始化。
+状态：已实现，有启动检查。范围：RISC-V `virt` 单 hart；不含真板驱动。
 
-FocOS 使用 Rust `no_std` / `no_main`。本规格只验收 QEMU RISC-V `virt` 单 hart 的启动链；VisionFive2 是首个真实硬件目标，其启动、UART 和存储驱动另行验收。
+## 要做到什么
 
-- 固定 Rust 1.99.0，目标 `riscv64gc-unknown-none-elf`，无第三方 Rust 依赖。
-- 由 QEMU 自带 OpenSBI 进入 S 模式，内核链接地址为 `0x80200000`。
-- 汇编入口建立 64 KiB 栈并清零 BSS，再进入 Rust；当前仅支持 `-smp 1`。
-- 内核经 HAL 调用 SBI 早期控制台输出 `FOCOS_BOOT_OK`；该标记只代表启动成功。
-- 通过 SBI System Reset 扩展请求正常关机。不能关机时停机等待，由测试超时判失败。
-- 所有寄存器、汇编和 SBI 调用在 `arch/`，对内核提供窄 HAL 接口；不将 SBI 控制台称为已实现 UART 驱动。
-- panic 输出 `FOCOS_PANIC` 后请求失败关机；不得继续输出成功标记。
+OpenSBI 进入内核后，输出一次 `FOCOS_BOOT_OK`，正常关机。
 
-验收：先运行 `python3 scripts/smoke.py` 确认缺少内核时失败，再实现；`make check` 必须通过格式、裸机 clippy、构建与 QEMU 冒烟。脚本检查 ELF 存在、QEMU 正常退出、成功标记恰好一次且无 panic；超时、缺少文件、标记缺失均失败。实际 QEMU 版本随日志保存。
+## 行为约定
 
-本规格不承诺内存管理、中断、用户态、文件系统、官方测例通过或板上启动。后续每项功能须有独立 spec、失败测试和 PR。
+- Rust 1.99.0，`no_std`，目标 `riscv64gc-unknown-none-elf`。
+- S 模式入口位于 `0x80200000`；先建 64 KiB 栈、清零 BSS，再进入 Rust。
+- `arch/` 封装汇编和 SBI，内核经 HAL 输出和关机；SBI 输出不算自写 UART。
+- panic 输出 `FOCOS_PANIC`，请求失败关机，不继续报告成功。
+- 关机不可用时停机等待，由检查脚本判超时失败。
+
+## 怎样验收
+
+| 场景 | 操作 | 预期 |
+| --- | --- | --- |
+| 缺少内核 | 构建前执行 `python3 scripts/smoke.py` | 因 ELF 缺失失败 |
+| 正常启动 | `make check` | 格式、clippy、构建通过；输出 `PASS: BOOT-001` |
+| 启动异常 | smoke 检查退出状态、超时和标记 | 缺标记、重复标记、panic 或异常退出均失败 |
+
+日志：`target/evidence/boot-qemu-rv.log`，含 QEMU 版本。首次失败与通过记录见 [AI 辅助记录](../docs/ai-usage.md)。

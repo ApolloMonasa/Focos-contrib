@@ -1,26 +1,38 @@
 # FocOS
 
-我们要做一个能在 VisionFive2 上运行、能读写 FAT32 文件的 Rust 操作系统，再用实验说明文件缓存为什么能提速。项目名读作 Focus。
+FocOS（读作 Focus）是 Rust `no_std` 操作系统。我们要在 VisionFive2 上运行常用 Linux 程序，做好 FAT32 文件访问，再研究文件缓存如何帮助有限内存下的 AI 记忆检索。
 
-**第一次加入：先按下面步骤跑通，再认领一个小任务。不用先读完所有设计文档。**
+## 区域赛要交什么
 
-## 现在做到哪里了？
+- **兼容性**：2025 初赛除 LTP 的 11 组测试，RISC-V 的 musl/glibc 都通过。
+- **可用性**：vim 编辑保存，gcc 编译并运行新程序，make 完整与增量构建；在 QEMU RISC-V 和 VisionFive2 分别演示。
+- **内核与存储**：真板自有设备驱动、内存与任务、用户态；FAT32 同步后重启读回。Ext4 后端运行历史原版镜像。
+- **实验**：真板 FAT32 基线与缓存对照，有原始数据和可重画的图表。
 
-已完成：QEMU 中启动一个 RISC-V 裸机内核，打印启动标记并关机；CI 能自动检查这一过程。
+准确范围见 [REGION-001](specs/REGION-001.md)。LoongArch 双平台、完整 LTP、2026 复杂负载和真实磁盘 HNSW 查询留到全国赛。新目标工期风险较高，检查点见 [路线](docs/roadmap.md)。
 
-接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
+## 当前到哪里了
 
-## 第一天：跑起来 → 选任务 → 提第一个 PR
+main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 VisionFive2 启动证据见 [PR #16](https://github.com/MindScrath/Focos/pull/16)，它不代表自有 UART/SD 已完成。
 
-1. 按 [上手指南](docs/getting-started.md) 安装工具、fork 仓库并运行 `make check`。
-2. 在 [任务入口](docs/backlog.md) 选一个可以现在开始的任务，在对应 Issue 认领。
-3. 找一位队友确认接口和验收方法，再开始实现。提交方法见 [协作流程](docs/collaboration.md)。
+**历史测试、开发工具和文件系统性能均无通过成绩。** 本页目标不是已有功能。
 
-跑通后的成功标志：终端出现 `PASS: BOOT-001`，串口日志中有 `FOCOS_BOOT_OK`。
+## 第一天怎么做
 
-## 仓库里各处放什么？
+1. 按 [上手指南](docs/getting-started.md) 运行 `make check`，看到 `PASS: BOOT-001`。
+2. 到 [任务入口](docs/backlog.md) 认领一小步，约队友审阅。
+3. 用 [SPEC 模板](specs/TEMPLATE.md) 约定行为，按 [六步 SOP](docs/collaboration.md) 实现并提交 PR。
 
-下面列出纳入版本管理的文件和目录。想看内核代码先找 `kernel/`，想查功能怎样验收先找 `specs/`。
+| 想了解什么 | 去哪里 |
+| --- | --- |
+| 分层与平台扩展 | [架构图](docs/architecture.md) |
+| 测试版本和通过标准 | [功能验证](docs/verification.md) |
+| 缓存实验与图表 | [性能实验](docs/benchmarks.md) |
+| 赛规、来源与 AI 记录 | [来源](docs/references.md) · [AI 使用](docs/ai-usage.md) |
+
+## 仓库结构
+
+代码看 `kernel/`，行为看 `specs/`，操作入口看 `docs/`。以下列出本分支纳入版本管理的路径；待合入的其他 PR 以各自文件树为准。
 
 ```text
 Focos/
@@ -38,11 +50,14 @@ Focos/
 │               ├── linker.ld          # 内核加载地址和段布局
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
-│   └── BOOT-001.md                    # QEMU 启动规格
+│   ├── BOOT-001.md                    # QEMU 启动规格与填写示例
+│   ├── REGION-001.md                  # 区域赛唯一交付范围
+│   └── TEMPLATE.md                    # 短 SPEC 模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
 ├── tests/                             # 往届测例清单与来源
-│   ├── catalog.json                   # 测例、优先级与验收状态
+│   ├── catalog.json                   # 2024 起步用 basic 清单
+│   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南
 │   ├── getting-started.md             # 配环境、运行和首次提交
@@ -55,12 +70,15 @@ Focos/
 │   ├── references.md                  # 赛规、测例和技术资料来源
 │   ├── ai-usage.md                    # AI 辅助和人工复核记录
 │   └── reference/                     # 按需查阅的技术细节
-│       ├── delivery-details.md        # 接口、交付边界和阶段目标
+│       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
-├── .github/                           # GitHub 自动检查与保护配置
+├── .github/                           # GitHub 模板、检查与保护配置
+│   ├── ISSUE_TEMPLATE/                # 新建 Issue 的短任务模板
+│   │   └── task.md                    # 目标、第一步与验收
+│   ├── pull_request_template.md       # 改动、验证与限制
 │   ├── main-protection.json           # main 分支保护的可复用配置
 │   └── workflows/                     # GitHub Actions 工作流
 │       └── ci.yml                     # PR 与 main 的构建和启动检查
@@ -71,26 +89,6 @@ Focos/
 └── rust-toolchain.toml                # 固定 Rust 版本、组件与目标
 ```
 
-**随 PR 维护文件树。** 新增、移动或删除纳入版本管理的路径，或改变它的用途时，作者在同一 PR 更新这一节，审阅者对照变更核对路径和说明。
+新增、移动、删除路径或改变用途，作者在同一 PR 更新此树，reviewer 对照 Files changed 核对。
 
-## 做到哪个阶段，再读哪份文档？
-
-| 你现在要做什么 | 阅读入口 |
-| --- | --- |
-| 配环境、第一次提交 | [上手指南](docs/getting-started.md) |
-| 看一次文件读取经过哪些层、如何扩到双板 | [架构图](docs/architecture.md) |
-| 选任务、看依赖 | [任务入口](docs/backlog.md) |
-| 写 spec、提交和审阅 PR | [协作流程](docs/collaboration.md) |
-| 看本周目标和取舍 | [推进路线](docs/roadmap.md) |
-| 接入往届官方测例 | [功能验证](docs/verification.md) |
-| 做性能实验、准备图表 | [性能实验](docs/benchmarks.md) |
-| 查赛规、外部来源 | [来源说明](docs/references.md) |
-
-## 几条固定约定
-
-- 内核用 Rust `no_std`；首块真板是 VisionFive2 / JH7110（RV64GC），全国赛再扩展龙芯 2K1000LA 星云板（LoongArch64）。
-- 基础文件系统是 FAT32。CPU/板卡差异放在 HAL 和 arch，文件系统与 VFS 不写架构条件编译。
-- [MindScrath/Focos](https://github.com/MindScrath/Focos) 是公有上游。成员从个人 fork 提 PR，main 必须可构建，合入需要 CI 和队友批准。
-- 报名资料、邮箱、令牌不放进代码库或日志。`devdoc/` 只用于本地资料，已被 Git 忽略。
-
-GitHub 开发仓库不能替代赛方要求的 GitLab 提交。第三方代码引入前要确认许可证并记录来源；AI 辅助记录见 [ai-usage.md](docs/ai-usage.md)。
+固定约定：Rust 内核；FAT32 基础；硬件差异只进 HAL/arch；公有 upstream + 成员 fork + PR；SPEC 与失败测试先行，main 可构建。GitHub 不能替代赛方 GitLab 提交；个人资料与凭据不入库。

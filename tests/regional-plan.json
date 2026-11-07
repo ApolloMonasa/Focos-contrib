@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-06",
+  "kind": "acceptance_plan_not_execution_results",
+  "spec": "specs/REGION-001.md",
+  "required_environment": "qemu-riscv64",
+  "libcs": [
+    "musl",
+    "glibc"
+  ],
+  "repository": "https://github.com/oscomp/testsuits-for-oskernel",
+  "branch": "pre-2025",
+  "commit": "8b58dd16d26d30f7c74d48d5832d870d3051b703",
+  "excluded_groups": [
+    "ltp"
+  ],
+  "case_inventory_status": "PENDING_IMAGE_AND_JUDGE_AUDIT",
+  "case_count": null,
+  "groups": [
+    {
+      "name": "basic",
+      "script": "scripts/basic/basic_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "busybox",
+      "script": "scripts/busybox/busybox_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "lua",
+      "script": "scripts/lua/lua_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "libctest",
+      "script": "scripts/libctest/libctest_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "iozone",
+      "script": "scripts/iozone/iozone_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "unixbench",
+      "script": "scripts/unixbench/unixbench_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "iperf",
+      "script": "scripts/iperf/iperf_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "libcbench",
+      "script": "scripts/libcbench/libcbench_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "lmbench",
+      "script": "scripts/lmbench/lmbench_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "netperf",
+      "script": "scripts/netperf/netperf_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    },
+    {
+      "name": "cyclictest",
+      "script": "scripts/cyclictest/cyclictest_testcode.sh",
+      "status_by_libc": {
+        "musl": "NOT_RUN",
+        "glibc": "NOT_RUN"
+      }
+    }
+  ],
+  "candidate_images": [
+    {
+      "purpose": "preliminary",
+      "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz",
+      "published_compressed_sha256": "2b59aee4d26681b2d78a8faa615ac216f723a8ea157544e7867bbc8c77aac087",
+      "digest_source": "GitHub release metadata; not locally verified",
+      "image_sha256": null,
+      "source_match": "PENDING: release 20250615 vs source container 20250624"
+    },
+    {
+      "purpose": "tools",
+      "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/on-site-final-2025-rv64-fs/alpine-linux-riscv64-ext4fs.img.xz",
+      "published_compressed_sha256": "0def50e343fa287b86c89346b53a835405c300fe45744a664833a4fbdb378a1c",
+      "digest_source": "GitHub release metadata; not locally verified",
+      "image_sha256": null
+    }
+  ],
+  "locks_pending": [
+    "container_digest",
+    "judge_revision_match",
+    "image_source_script_match",
+    "expanded_case_inventory",
+    "tool_ELF_hashes",
+    "make_source_version_and_hash"
+  ],
+  "tools": {
+    "reference_branch": "on-site-final-2025",
+    "reference_commit": "9ea291d8535774680e88f4e6bf725d7ba156e752",
+    "required_environments": [
+      "qemu-riscv64",
+      "visionfive2"
+    ],
+    "entries": [
+      {
+        "name": "vim",
+        "acceptance": "edit, save, exit, reopen",
+        "status": "NOT_RUN"
+      },
+      {
+        "name": "gcc",
+        "acceptance": "compile and link new C program inside FocOS, then execute",
+        "status": "NOT_RUN"
+      },
+      {
+        "name": "make",
+        "acceptance": "two-source full build, timestamp-based incremental rebuild, clean",
+        "origin": "team-added acceptance; version pending",
+        "status": "NOT_RUN"
+      }
+    ]
+  },
+  "extensions": [
+    {
+      "branch": "final-2025",
+      "role": "optional storage diagnostics"
+    },
+    {
+      "branch": "final-2026",
+      "commit": "b5ec6ef8497e1818cbdec3b54bb722f036e57972",
+      "role": "CAgent/BuildStorm after regional required target; not replacement"
+    }
+  ]
+}
