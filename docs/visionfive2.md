@@ -4,6 +4,8 @@
 
 ## 1. 先确认串口与固件
 
+开发机需要 `picocom`。Ubuntu / Debian 可运行 `sudo apt install picocom`，Fedora 可运行 `sudo dnf install picocom`。
+
 使用 3.3V 信号电平的 USB 转 TTL 模块，板子断电时接线：模块 GND → 物理脚 6；模块 RXD → 物理脚 8（板 TX）；模块 TXD → 物理脚 10（板 RX）。模块 VCC 不接，板子单独用 Type-C 供电；按板上第 1 脚标记确认物理脚编号。
 
 在开发机运行，设备名以实际枚举为准：
@@ -41,7 +43,7 @@ cd Focos-vf2
 git switch --detach c363b1cb3ba121c2c07f0266f52a12f0a4e29227
 ```
 
-这是基于已合入 main 整理后的首次上板实现提交，代码与首次实测版本一致；本指南后续的文档提交不改变该次实现。该版本尚待人工审阅。工具准备见 [上手指南](getting-started.md)。
+这是用于复现 2026-11-05 上板记录的固定源码提交。验证 PR 的新版本时，改用待审阅的提交，并按下文记录该次构建的 SHA 和 ELF 哈希。工具准备见 [上手指南](getting-started.md)。
 
 在 FocOS 仓库根目录执行：
 

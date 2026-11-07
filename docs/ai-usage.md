@@ -13,6 +13,7 @@
 | 11/5 应用定位 | AI 记忆检索动机、HNSW 与两赛段范围；项目外汇报材料 | 文档/展示检查；未实现 AI 或 HNSW，不把论文结果算本项目成绩 |
 | 11/6 目标重塑 | 2025 非 LTP 全套与 vim/gcc/make；重写指南、SPEC、Issue/PR，增加短模板和 SOP | 审官方分支、脚本和发布元数据；检查文档/清单，实际运行记录见 PR #17；未运行历史测试或工具 |
 | 11/5–11/6 VisionFive2 | Codex 查阅 U-Boot 启动与 ELF 装载实现，起草 BOARD-001、单 hart 入口、板级构建、模拟检查与上板指南。用户操作串口和 U-Boot，Codex 整理实测记录和固定复现版本 | `make check` 和模拟 `argc=0/2` 的 `make vf2-check` 通过。用户在真板观察到 SBI 启动标记。队友冷启动复现及 ABI、链接布局人工审阅待完成。[PR #16](https://github.com/MindScrath/Focos/pull/16) · [实测记录](evidence/BOARD-001-20261105.txt) |
+| 11/8 VisionFive2 审阅修复 | Codex 合并新版文档，将启动提示和结束动作移入 HAL，补齐串口工具安装说明 | `make check` 与 `make vf2-check` 通过。新 ELF 待真板冷启动复验。[PR #16](https://github.com/MindScrath/Focos/pull/16) |
 
 初始化提交：`46222643e3c2c2e25521684b0d30d37ab20abee6`。此次规划未导入第三方内核实现。首次真板启动的实现和证据在 [PR #16](https://github.com/MindScrath/Focos/pull/16)独立审阅，不能以本文代替板上日志。
 

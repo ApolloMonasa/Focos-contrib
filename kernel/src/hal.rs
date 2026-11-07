@@ -10,7 +10,20 @@ pub fn shutdown(failed: bool) -> ! {
     crate::arch::shutdown(failed)
 }
 
-#[cfg(feature = "vf2-bootelf")]
-pub fn halt() -> ! {
-    crate::arch::halt()
+/// 输出当前启动路径的成功标记，并执行对应的结束动作。
+pub fn finish_boot() -> ! {
+    #[cfg(feature = "vf2-bootelf")]
+    {
+        console_write(concat!(
+            "FocOS ",
+            env!("CARGO_PKG_VERSION"),
+            ": VisionFive2 bootelf / SBI console\r\nFOCOS_VF2_BOOT_OK\r\n",
+        ));
+        crate::arch::halt()
+    }
+    #[cfg(not(feature = "vf2-bootelf"))]
+    {
+        console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");
+        shutdown(false)
+    }
 }
