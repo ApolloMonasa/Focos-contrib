@@ -26,6 +26,8 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
 
+本分支另增：TEST-001 的输入冻结、427 项子用例清单和参考 Linux 判分基线；FOCOS 的 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[reference-run](docs/reference/reference-run.md)、[TEST-001](specs/TEST-001.md)。
+
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
 **历史测试、开发工具和文件系统性能均无通过成绩。** 本页目标不是已有功能。
@@ -123,7 +125,7 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
-│       └── test-audit.md              # 历史测评分支与测例审计
+│       ├── test-audit.md              # 历史测评分支与测例审计
 │       ├── reference-run.md           # TEST-001 参考 Linux 判分基线与限制
 │       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
 ├── .cargo/                            # Cargo 的仓库级配置
