@@ -124,6 +124,8 @@ Focos/
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       └── test-audit.md              # 历史测评分支与测例审计
+│       ├── reference-run.md           # TEST-001 参考 Linux 判分基线与限制
+│       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
 ├── .github/                           # GitHub 模板、检查与保护配置
