@@ -19,6 +19,7 @@
 | 11/9 页分配审阅调整 | 统一页分配接口与测试注释，测试共用页大小常量并补规格断言，作者已审阅全部代码 | `make check` 与测试代码 Clippy 通过，28 项测试通过；待队友复审 |
 | 11/9 真实内存接入规格 | Codex 按模板起草 [MM-002](../specs/MM-002.md)，核对现有启动代码、QEMU/OpenSBI 固定版本来源；作者已审阅 | 模板、事实与链接检查通过；仅规格草案，待另外两名队友审阅。未实现内存接入，未运行新增测试或 `make check` |
 | 11/9 QEMU 真实内存接入 | Codex 按 [MM-002](../specs/MM-002.md) 实现布局校验、启动页分配和整页读写自检，补开发机与检查器测试；作者已审阅全部代码 | 旧内核专项检查先失败，新增 Rust 测试先有 7 项失败；实现后 `make check`、`make mm-smoke` 与测试代码 Clippy 通过，38 项 Rust 测试、9 项检查器测试通过。环境为 QEMU 8.2.2 / OpenSBI 1.3.1；日志在 `target/evidence/`。待另外两名队友审阅，未做真板验证 |
+| 11/9 review 修正 | 按 Codex review 修正 iozone fallback、423/427 按 libc 分列、官方/团队 5/6 计数；补参考运行 harness 与摘要 | 复核 judge 空输入与真实日志的 dup2 输出名为 `test_dup2`；重建 initramfs 并跑 lua 双 libc 9/9；未改内核 |
 | 11/16 本核临界区 | DeepSeek Harness（deepseek-flash）按 [ARCH-001](../specs/ARCH-001.md) 实现 `with_local_irqs_disabled`，先加 QEMU 单层/两层与初态开/关状态自检，再补 `sstatus.SIE` 保存/恢复、两处编译器屏障、检查器与[参考页](reference/local-irq-critical-section.md)；待作者审阅全部代码。原文误写为 Codex，已更正 | 接口缺失时 `make build` 先失败；两次临时变异（不关中断、恢复时总开）均被 QEMU 自检报告并触发 `FOCOS_PANIC`，已还原。`make check`、`make mm-smoke`、`make irq-smoke` 通过；环境为 QEMU 10.2.2 / OpenSBI 1.7。真实定时中断未验收，待 #2/#5，未做真板 |
 | 11/16 临界区审阅修复 | Codex 核对 PR #42 的三轮审阅与整份差异，将启动自检及其辅助函数标为 `unsafe`，补充调用点前提、SPEC 和调用方编译回归；同时明确恢复函数允许按调用栈嵌套配对。待作者与队友审阅 | 新回归在修复前确认 HAL、架构层的普通调用均意外编译成功；修复后普通调用均报 E0133，显式 `unsafe` 与普通临界区可编译。`make check`（38 项 Rust、15 项 Python）、`make mm-smoke`、`make irq-smoke` 通过；QEMU 10.2.2 / OpenSBI 1.7。未做真实定时中断与真板验收 |
 
