@@ -33,3 +33,9 @@
 - [#11 星云板](https://github.com/MindScrath/Focos/issues/11)、[#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、LTP、2026 参考负载和真实磁盘检索。
 
 交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。
+
+## 平台任务怎样接起来
+
+#2/#3 按 [PLAT-001](../specs/PLAT-001.md) 先核对板级资源，再按 [DRV-001](../specs/DRV-001.md) 接设备；#4/#5 按 [ARCH-001](../specs/ARCH-001.md) 补 CPU 接口。#11 先调查星云板固件与控制器，按 [平台顺序](roadmap.md#多平台怎样推进) 推进全国赛移植。
+
+认领时明确本次改哪一层、向谁要资源、向谁交接口；跨层接口由调用方和实现方一起审 SPEC。三份边界规格当前为草案，具体实现须补接口签名和能先失败的验收入口。

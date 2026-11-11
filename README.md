@@ -32,7 +32,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 | 想了解什么 | 去哪里 |
 | --- | --- |
-| 分层与平台扩展 | [架构图](docs/architecture.md) |
+| 分层与平台扩展 | [架构与职责](docs/architecture.md) · [平台推进顺序](docs/roadmap.md#多平台怎样推进) |
 | 测试版本和通过标准 | [功能验证](docs/verification.md) |
 | 缓存实验与图表 | [性能实验](docs/benchmarks.md) |
 | 赛规、来源与 AI 记录 | [来源](docs/references.md) · [AI 使用](docs/ai-usage.md) |
@@ -65,6 +65,15 @@ Focos/
 │               ├── linker.ld          # 内核加载地址和段布局
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
+│   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（草案）
+│   ├── PLAT-001.md                    # 板型选择、启动资源与装配（草案）
+│   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
+│   ├── HAL-001.md                     # 块设备接口与内存盘
+│   ├── BOOT-001.md                    # QEMU 启动验收
+│   ├── MM-001.md                      # 页分配与回收
+│   ├── MM-002.md                      # QEMU 真实内存接入规格
+│   ├── REGION-001.md                  # 区域赛交付范围
+│   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   └── smoke.py                       # 检查 QEMU 启动标记和退出状态
 ├── tests/                             # 往届测例清单与来源
@@ -103,4 +112,4 @@ Focos/
 
 新增、移动、删除路径或改变用途，作者在同一 PR 更新此树，reviewer 对照 Files changed 核对。
 
-固定约定：Rust 内核；FAT32 基础；硬件差异只进 HAL/arch；公有 upstream + 成员 fork + PR；SPEC 与失败测试先行，main 可构建。GitHub 不能替代赛方 GitLab 提交；个人资料与凭据不入库。
+固定约定：Rust 内核；FAT32 基础；硬件差异按架构、板级、驱动分层，通过统一接口提供给公共内核；公有 upstream + 成员 fork + PR；SPEC 与失败测试先行，main 可构建。GitHub 不能替代赛方 GitLab 提交；个人资料与凭据不入库。

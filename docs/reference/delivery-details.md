@@ -1,11 +1,13 @@
 # 实现时查：模块边界
 
-区域赛范围见 [REGION-001](../../specs/REGION-001.md)，日期和风险见 [路线](../roadmap.md)。此页只回答接口怎么分。
+区域赛范围见 [REGION-001](../../specs/REGION-001.md)，日期和风险见 [路线](../roadmap.md)。此页只回答接口怎么分。CPU、板型和驱动的依赖关系见 [架构](../architecture.md)。
 
 | 模块 | SPEC 先约定什么 | 不能泄漏什么 |
 | --- | --- | --- |
 | BlockDevice | 扇区大小/数量、越界、超时、读写完成与 flush 能力 | MMIO、DMA、控制器细节不进 FS |
-| arch/HAL | 启动、页表权限、TLB、陷入上下文、时钟 | PTE/CSR/板级常量不进 VFS |
+| 架构层 / HAL 接口 | [ARCH-001](../../specs/ARCH-001.md)：页表权限、TLB、异常/上下文、CPU 时钟与 ABI | PTE/CSR 不进入公共策略 |
+| 板级层 | [PLAT-001](../../specs/PLAT-001.md)：启动资源、内存保留区、设备连接与初始化顺序 | 板名、地址、频率不进公共内核 |
+| 驱动层 | [DRV-001](../../specs/DRV-001.md)：控制器、DMA/IRQ、完成/错误与资源释放 | 控制器寄存器不进 FS/VFS |
 | 内存 | 页与堆所有权、OOM、用户复制、mmap 生命周期 | 失败不能留下半映射或泄漏 |
 | 进程 | fork/exec/wait、FD 继承、退出回收、pipe 阻塞 | 错误码和共享偏移不能随实现漂移 |
 | 运行时 | ELF/解释器、auxv、TLS、信号、futex、时钟 | Linux ABI 的布局需按架构核对 |
