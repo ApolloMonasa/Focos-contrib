@@ -13,5 +13,7 @@ SECTIONS {
     .bss (NOLOAD) : { *(.bss .bss.*) *(.sbss .sbss.*) *(COMMON) }
     . = ALIGN(8);
     __bss_end = .;
+    /* 包含启动栈和页分配标记，物理页分配从此地址向上对齐后开始。 */
+    __kernel_end = .;
     /DISCARD/ : { *(.eh_frame .eh_frame_hdr) }
 }
