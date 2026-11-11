@@ -25,8 +25,8 @@ jobs:
         timeout-minutes: 5
         shell: bash
         run: |
-          # Azure HTTP 镜像曾阻塞下载，改用 Ubuntu 官方 HTTPS 源。
-          printf 'https://archive.ubuntu.com/ubuntu/\tpriority:1\nhttps://security.ubuntu.com/ubuntu/\tpriority:2\n' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          # 官方域名曾解析失败，优先独立 HTTPS 镜像；仍由 Ubuntu keyring 验签。
+          printf 'https://mirrors.edge.kernel.org/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
           apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
           sudo apt "${apt_options[@]}" -o APT::Update::Error-Mode=any update
           sudo apt "${apt_options[@]}" install -y --no-install-recommends qemu-system-misc
