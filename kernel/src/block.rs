@@ -57,8 +57,9 @@ pub trait BlockDevice {
     /// 成功返回 `Ok(())`，不修改输入缓冲区；持久化保证由设备的 `flush` 实现提供。
     /// 长度错误返回 [`BlockError::InvalidBufferLength`]，块编号越界返回
     /// [`BlockError::OutOfBounds`]，设备写入失败返回 [`BlockError::Io`]。
-    /// 参数错误（长度或越界被拒）时目标块保持不变；硬件写入失败时，
-    /// 目标块可能已被部分修改。
+    /// 参数错误（长度或越界被拒）时介质数据保持不变——越界写入没有
+    /// 目标块，校验须在访问硬件前完成；硬件写入失败时，目标块可能已被
+    /// 部分修改。
     fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError>;
 
     /// 请求同步当前设备此前的写入，无额外参数。

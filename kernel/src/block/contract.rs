@@ -59,7 +59,7 @@ pub enum FailureKind {
         expected: u8,
         actual: u8,
     },
-    /// 参数错误的操作修改了调用者缓冲区。
+    /// 操作修改了调用者缓冲区（参数错误后改动、或成功写入改动输入缓冲区）。
     BufferMutated,
 }
 
@@ -128,13 +128,23 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
     write_probe_baseline(device, scenario, 1..count)?;
     let mut buffer = [0; BLOCK_SIZE];
     for pattern in [first, second] {
+        // 写入前留存快照：既作读回期望，也验证成功写入不改动输入缓冲区
+        // （真实 DMA 后端可能回写调用者内存，用调用后的同一数组比对会被
+        // 一致性掩盖）。
+        let snapshot = pattern;
         device
             .write_block(0, &pattern)
             .map_err(unexpected(scenario, "write_block"))?;
+        if pattern != snapshot {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
         device
             .read_block(0, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
-        compare_block(scenario, 0, &buffer, &pattern)?;
+        compare_block(scenario, 0, &buffer, &snapshot)?;
     }
     verify_probe_baseline(device, scenario, 1..count)
 }
@@ -368,7 +378,29 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
         "write_block",
         BlockError::OutOfBounds,
         device.write_block(0, &buffer),
-    )
+    )?;
+    // 空盘上任何块编号都越界，含非零块与巨大块号（HAL-001 空盘场景）。
+    for block in [1, u64::MAX] {
+        expect_error(
+            scenario,
+            "read_block",
+            BlockError::OutOfBounds,
+            device.read_block(block, &mut buffer),
+        )?;
+        if buffer != [sentinel; BLOCK_SIZE] {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
+        expect_error(
+            scenario,
+            "write_block",
+            BlockError::OutOfBounds,
+            device.write_block(block, &buffer),
+        )?;
+    }
+    Ok(())
 }
 
 /// 同步成功语义：写入后 `flush` 成功，重读数据一致，其余块保持基线

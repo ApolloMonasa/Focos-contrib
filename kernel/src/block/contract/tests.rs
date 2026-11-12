@@ -113,16 +113,22 @@ impl BlockDevice for WriteOnlyCacheDisk<'_> {
 
 #[test]
 fn known_data_rejects_cache_only_reads() {
-    // 只回放会话内写入的假后端能骗过写后读检查，
-    // 必须在破坏性写入前的已知数据检查处失败。
+    // 两个全新实例分离证明：只回放会话内写入的假后端能通过写后读，
+    // 但在读取介质原有内容的已知数据检查处失败——顺序不可互换。
     let original: [u8; BLOCK_SIZE] = core::array::from_fn(|i| (i ^ (i >> 8)) as u8);
-    let mut storage = original;
-    let mut disk = WriteOnlyCacheDisk {
-        inner: MemoryDisk::new(&mut storage).unwrap(),
+    let mut fresh = original;
+    let mut fresh_disk = WriteOnlyCacheDisk {
+        inner: MemoryDisk::new(&mut fresh).unwrap(),
         cached: None,
     };
-    check_read_write_roundtrip(&mut disk).unwrap();
-    assert!(check_known_data(&mut disk, 0, &original).is_err());
+    assert!(check_known_data(&mut fresh_disk, 0, &original).is_err());
+
+    let mut written = original;
+    let mut written_disk = WriteOnlyCacheDisk {
+        inner: MemoryDisk::new(&mut written).unwrap(),
+        cached: None,
+    };
+    check_read_write_roundtrip(&mut written_disk).unwrap();
 }
 
 /// 非合规设备：写首块时把垃圾数据串写到末块，模拟地址回绕式跨块破坏。
@@ -344,5 +350,40 @@ impl BlockDevice for EmptyBlockFirstDisk {
 fn empty_device_check_covers_length_priority() {
     // 空盘上长度错误仍须优先于块号错误，"先查块号"的实现在此必须被拒收。
     let mut disk = EmptyBlockFirstDisk;
+    assert!(check_empty_device(&mut disk).is_err());
+}
+
+/// 非合规设备：容量为 0，块 0 被拒但错误接受其他块号的读写。
+struct EmptyAcceptsMaxDisk;
+
+impl BlockDevice for EmptyAcceptsMaxDisk {
+    fn block_count(&self) -> u64 {
+        0
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block == 0 {
+            return Err(BlockError::OutOfBounds);
+        }
+        buffer.fill(0xEE);
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block == 0 {
+            return Err(BlockError::OutOfBounds);
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn empty_device_check_rejects_nonzero_blocks() {
+    // 空盘上任何块编号都越界：只拒块 0 却接受 u64::MAX 的实现必须被检出。
+    let mut disk = EmptyAcceptsMaxDisk;
     assert!(check_empty_device(&mut disk).is_err());
 }
