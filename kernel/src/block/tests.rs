@@ -1,4 +1,7 @@
-use super::contract::{check_buffer_length_validation, check_read_write_roundtrip};
+use super::contract::{
+    check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
+    check_out_of_bounds_rejected, check_read_write_roundtrip,
+};
 use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
 #[test]
@@ -14,39 +17,19 @@ fn memory_contract_read_write_roundtrip() {
 }
 
 #[test]
-fn writes_first_and_last_blocks_without_changing_neighbors() {
+fn memory_contract_first_last_write_preserves_neighbors() {
     let mut storage = [0x33; BLOCK_SIZE * 3];
     let mut disk = MemoryDisk::new(&mut storage).unwrap();
-    let device: &mut dyn BlockDevice = &mut disk;
-    assert_eq!(device.block_count(), 3);
-    device.write_block(0, &[0x11; BLOCK_SIZE]).unwrap();
-    device.write_block(2, &[0x22; BLOCK_SIZE]).unwrap();
-    let mut buffer = [0; BLOCK_SIZE];
-    for (block, expected) in [(0, 0x11), (1, 0x33), (2, 0x22)] {
-        device.read_block(block, &mut buffer).unwrap();
-        assert_eq!(buffer, [expected; BLOCK_SIZE]);
-    }
+    assert_eq!(disk.block_count(), 3);
+    check_first_last_write_preserves_neighbors(&mut disk).unwrap();
 }
 
 #[test]
-fn rejects_out_of_bounds_and_huge_indices_without_changes() {
+fn memory_contract_out_of_bounds_rejected() {
     let mut storage = [0x33; BLOCK_SIZE * 2];
-    {
-        let mut disk = MemoryDisk::new(&mut storage).unwrap();
-        for block in [2, u64::MAX] {
-            let mut buffer = [0x77; BLOCK_SIZE];
-            assert_eq!(
-                disk.read_block(block, &mut buffer),
-                Err(BlockError::OutOfBounds)
-            );
-            assert_eq!(buffer, [0x77; BLOCK_SIZE]);
-            assert_eq!(
-                disk.write_block(block, &[0x99; BLOCK_SIZE]),
-                Err(BlockError::OutOfBounds)
-            );
-        }
-    }
-    assert_eq!(storage, [0x33; BLOCK_SIZE * 2]);
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    // 两块测试盘上契约探针覆盖全部块，等价于原先的全盘直查。
+    check_out_of_bounds_rejected(&mut disk).unwrap();
 }
 
 #[test]
@@ -73,18 +56,12 @@ fn rejects_unaligned_capacity_without_modifying_storage() {
 }
 
 #[test]
-fn empty_disk_has_no_valid_blocks() {
+fn memory_contract_empty_device_has_no_valid_blocks() {
     let mut storage = [];
     let mut disk = MemoryDisk::new(&mut storage).unwrap();
-    assert_eq!(disk.block_count(), 0);
-    let mut buffer = [0x77; BLOCK_SIZE];
-    assert_eq!(
-        disk.read_block(0, &mut buffer),
-        Err(BlockError::OutOfBounds)
-    );
-    assert_eq!(buffer, [0x77; BLOCK_SIZE]);
-    assert_eq!(disk.write_block(0, &buffer), Err(BlockError::OutOfBounds));
-    assert_eq!(disk.flush(), Ok(()));
+    check_empty_device(&mut disk).unwrap();
+    // 空盘 flush 恒成功是内存盘语义，留在后端侧。
+    disk.flush().unwrap();
 }
 
 #[test]
