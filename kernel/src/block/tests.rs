@@ -1,17 +1,16 @@
+use super::contract::{check_buffer_length_validation, check_read_write_roundtrip};
 use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
 #[test]
-fn preserves_existing_data_and_byte_order() {
+fn memory_contract_read_write_roundtrip() {
     let original: [u8; BLOCK_SIZE] = core::array::from_fn(|i| (i ^ (i >> 8)) as u8);
-    let replacement: [u8; BLOCK_SIZE] = core::array::from_fn(|i| (i.wrapping_mul(17) >> 1) as u8);
     let mut storage = original;
     let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    // 构造保留已有内容是内存盘专属判据（HAL-001 容量与借用场景），留在后端侧。
     let mut buffer = [0; BLOCK_SIZE];
     disk.read_block(0, &mut buffer).unwrap();
     assert_eq!(buffer, original);
-    disk.write_block(0, &replacement).unwrap();
-    disk.read_block(0, &mut buffer).unwrap();
-    assert_eq!(buffer, replacement);
+    check_read_write_roundtrip(&mut disk).unwrap();
 }
 
 #[test]
@@ -51,27 +50,13 @@ fn rejects_out_of_bounds_and_huge_indices_without_changes() {
 }
 
 #[test]
-fn rejects_short_long_and_empty_buffers_without_changes() {
+fn memory_contract_buffer_length_validation() {
     let mut storage = [0x33; BLOCK_SIZE];
     {
         let mut disk = MemoryDisk::new(&mut storage).unwrap();
-        for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
-            let mut buffer = [0x77; BLOCK_SIZE + 1];
-            assert_eq!(
-                disk.read_block(0, &mut buffer[..length]),
-                Err(BlockError::InvalidBufferLength)
-            );
-            assert_eq!(buffer, [0x77; BLOCK_SIZE + 1]);
-            assert_eq!(
-                disk.write_block(0, &buffer[..length]),
-                Err(BlockError::InvalidBufferLength)
-            );
-        }
-        assert_eq!(
-            disk.write_block(u64::MAX, &[]),
-            Err(BlockError::InvalidBufferLength)
-        );
+        check_buffer_length_validation(&mut disk).unwrap();
     }
+    // 底层存储未被参数错误的操作改动（后端侧直查，契约层看不到存储）。
     assert_eq!(storage, [0x33; BLOCK_SIZE]);
 }
 
