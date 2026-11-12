@@ -1,6 +1,28 @@
-//! 跨后端复用的 `BlockDevice` 契约检查，判据沿用 HAL-001。
+//! 跨后端复用的 `BlockDevice` 契约检查，判据沿用 HAL-001，
+//! 供内存盘、QEMU VirtIO 块设备与真板 SD 共用（DRV-001「共享接口验收」）。
+//!
+//! 后端适配步骤：
+//! 1. 实现 [`BlockDevice`]，写清 `flush` 的真实语义与保证范围。
+//! 2. 准备专用测试盘/镜像（勿用生产盘或含个人数据的卡）并确定已知容量；
+//!    故障场景用本模块包装设备注入，不需要真实损坏的硬件。
+//! 3. host 侧逐项调用 `check_*`，保持每个场景独立的失败定位；
+//!    上板自检或 CI 汇总改用 [`run_block_contract`] 并传入后端名。
+//! 4. 按 `flush` 实际语义选择检查：成功走 [`check_flush_ok`]（汇总入口即此
+//!    路径），不支持走 [`check_flush_unsupported`]（通过只说明如实上报），
+//!    会失败走 [`check_flush_failure_retry`]；不支持被跳过不算成功。
+//! 5. 硬件专项（超时、DMA 生命周期、中断、重启持久化、真实故障）留在各
+//!    驱动模块按 DRV-001 验收；共享测试通过不替代真实驱动或真板验收。
 
 use super::{BLOCK_SIZE, BlockDevice, BlockError};
+
+/// 带后端名的契约失败，用于汇总入口的失败定位。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BlockContractError {
+    /// 失败的后端名，如 `"memory-disk"`、`"virtio-mmio"`、`"sd-jh7110"`。
+    pub backend: &'static str,
+    /// 失败场景与细节。
+    pub failure: ContractFailure,
+}
 
 /// 单项契约检查失败：场景名加失败细节，便于定位后端与失败场景。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -320,6 +342,50 @@ pub fn check_io_failures_recoverable(device: &mut FaultyDevice<'_>) -> Result<()
         .read_block(0, &mut buffer)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &buffer, &pattern)
+}
+
+/// 汇总入口：校验已知容量后顺序执行全部契约检查，首个失败带后端名返回。
+///
+/// 供上板自检或 CI 汇总使用；host 单测建议逐项调用 `check_*` 保留
+/// 每个场景的原生失败定位。本入口要求设备 `flush` 成功且容量至少 3 块；
+/// 不支持或会失败的同步、以及 0 容量空盘，请逐项调用对应检查。
+///
+/// # 参数
+/// - `backend`：后端名，用于失败定位。
+/// - `device`：被测设备。
+/// - `expected_blocks`：专用测试盘的已知容量，单位为块。
+///
+/// # 返回与错误
+/// 全部场景通过返回 `Ok(())`；容量不符或任一场景失败返回
+/// 带后端名与场景的 [`BlockContractError`]。
+pub fn run_block_contract(
+    backend: &'static str,
+    device: &mut dyn BlockDevice,
+    expected_blocks: u64,
+) -> Result<(), BlockContractError> {
+    let wrap = |failure| BlockContractError { backend, failure };
+    let actual = device.block_count();
+    if actual != expected_blocks {
+        return Err(wrap(ContractFailure {
+            scenario: "block_count",
+            kind: FailureKind::WrongBlockCount {
+                expected: expected_blocks,
+                actual,
+            },
+        }));
+    }
+    check_read_write_roundtrip(device).map_err(wrap)?;
+    check_first_last_write_preserves_neighbors(device).map_err(wrap)?;
+    check_out_of_bounds_rejected(device).map_err(wrap)?;
+    check_buffer_length_validation(device).map_err(wrap)?;
+    check_flush_ok(device).map_err(wrap)?;
+    {
+        let mut no_sync = NoSyncDevice::new(&mut *device);
+        check_flush_unsupported(&mut no_sync).map_err(wrap)?;
+    }
+    let mut faulty = FaultyDevice::new(&mut *device);
+    check_flush_failure_retry(&mut faulty).map_err(wrap)?;
+    check_io_failures_recoverable(&mut faulty).map_err(wrap)
 }
 
 /// 仅转发读写、刻意不覆盖默认 `flush` 的包装设备，用于验证

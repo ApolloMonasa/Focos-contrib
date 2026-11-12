@@ -110,3 +110,29 @@ fn memory_contract_failed_sync_reaches_caller_and_can_be_retried() {
     let mut faulty = contract::FaultyDevice::new(device);
     check_flush_failure_retry(&mut faulty).unwrap();
 }
+
+#[test]
+fn memory_contract_run_block_contract_passes_all_scenarios() {
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    contract::run_block_contract("memory-disk", &mut disk, 3).unwrap();
+}
+
+#[test]
+fn memory_contract_run_block_contract_reports_backend_on_count_mismatch() {
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    assert_eq!(
+        contract::run_block_contract("memory-disk", &mut disk, 4),
+        Err(contract::BlockContractError {
+            backend: "memory-disk",
+            failure: contract::ContractFailure {
+                scenario: "block_count",
+                kind: contract::FailureKind::WrongBlockCount {
+                    expected: 4,
+                    actual: 3
+                }
+            }
+        })
+    );
+}
