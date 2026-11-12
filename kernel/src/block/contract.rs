@@ -232,6 +232,23 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
     )
 }
 
+/// 同步成功语义：写入后 `flush` 成功，重读数据一致。
+///
+/// 通过本检查不代表断电持久化；持久化与重启读回按环境在硬件专项验证。
+/// 前置：设备（或其包装）的 `flush` 返回成功；设备至少 1 块。
+pub fn check_flush_ok(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
+    let scenario = "flush_ok";
+    device
+        .write_block(0, &[0x55; BLOCK_SIZE])
+        .map_err(unexpected(scenario, "write_block"))?;
+    device.flush().map_err(unexpected(scenario, "flush"))?;
+    let mut buffer = [0; BLOCK_SIZE];
+    device
+        .read_block(0, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, 0, &buffer, &[0x55; BLOCK_SIZE])
+}
+
 /// 同步不支持语义：有未同步写入时请求 `flush` 必须收到
 /// [`BlockError::Unsupported`]，不得返回成功。
 ///

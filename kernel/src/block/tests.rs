@@ -1,7 +1,7 @@
 use super::contract::{
     check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
-    check_flush_failure_retry, check_flush_unsupported, check_io_failures_recoverable,
-    check_out_of_bounds_rejected, check_read_write_roundtrip,
+    check_flush_failure_retry, check_flush_ok, check_flush_unsupported,
+    check_io_failures_recoverable, check_out_of_bounds_rejected, check_read_write_roundtrip,
 };
 use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk, contract};
 
@@ -66,16 +66,21 @@ fn memory_contract_empty_device_has_no_valid_blocks() {
 }
 
 #[test]
-fn memory_flush_preserves_data_and_releasing_disk_returns_storage() {
+fn memory_contract_flush_ok_preserves_data() {
+    let mut storage = [0x33; BLOCK_SIZE];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    check_flush_ok(&mut disk).unwrap();
+}
+
+#[test]
+fn memory_flush_releases_storage_with_written_data() {
     let mut storage = [0x33; BLOCK_SIZE];
     {
         let mut disk = MemoryDisk::new(&mut storage).unwrap();
         disk.write_block(0, &[0x55; BLOCK_SIZE]).unwrap();
         disk.flush().unwrap();
-        let mut buffer = [0; BLOCK_SIZE];
-        disk.read_block(0, &mut buffer).unwrap();
-        assert_eq!(buffer, [0x55; BLOCK_SIZE]);
     }
+    // 借用归还是内存盘专属判据：释放后写入仍在原缓冲区（HAL-001 容量与借用）。
     assert_eq!(storage, [0x55; BLOCK_SIZE]);
 }
 
