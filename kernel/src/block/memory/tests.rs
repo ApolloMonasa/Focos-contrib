@@ -44,8 +44,10 @@ fn contract_buffer_length_validation() {
         let mut disk = MemoryDisk::new(&mut storage).unwrap();
         check_buffer_length_validation(&mut disk).unwrap();
     }
-    // 底层存储未被参数错误的操作改动（后端侧直查，契约层看不到存储）。
-    assert_eq!(storage, [0x33; BLOCK_SIZE]);
+    // 底层存储保持契约预置的探针基线（probe_pattern(0) 恒等图样），
+    // 参数错误的操作未改动盘内任何字节（后端侧直查，契约层看不到存储）。
+    let baseline: [u8; BLOCK_SIZE] = core::array::from_fn(|i| i as u8);
+    assert_eq!(storage, baseline);
 }
 
 #[test]

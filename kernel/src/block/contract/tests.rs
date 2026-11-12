@@ -3,7 +3,7 @@
 
 use super::{
     check_buffer_length_validation, check_first_last_write_preserves_neighbors, check_known_data,
-    check_read_write_roundtrip,
+    check_out_of_bounds_rejected, check_read_write_roundtrip,
 };
 use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
@@ -226,4 +226,71 @@ fn length_priority_covers_all_illegal_lengths() {
         inner: MemoryDisk::new(&mut storage).unwrap(),
     };
     assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 非合规设备：越界访问被拒时误写第 1 块（模拟越界偏移换算错误）。
+struct OobSpillDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for OobSpillDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            let _ = self.inner.write_block(1, &[0xEE; BLOCK_SIZE]);
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            let _ = self.inner.write_block(1, &[0xEE; BLOCK_SIZE]);
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn out_of_bounds_check_covers_every_block() {
+    // 4 块盘上采样探针会漏掉第 1 块，越界被拒时写坏它必须被检出。
+    let mut storage = [0x33; BLOCK_SIZE * 4];
+    let mut disk = OobSpillDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
+
+/// 非合规设备：写首块或末块时误写中间的第 2 块（模拟跨块地址串扰）。
+struct MidSpillDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for MidSpillDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        let count = self.block_count();
+        if block == 0 || block == count - 1 {
+            self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn neighbor_check_covers_every_block() {
+    // 6 块盘上采样探针会漏掉第 2 块，写首末块时写坏它必须被检出。
+    let mut storage = [0x33; BLOCK_SIZE * 6];
+    let mut disk = MidSpillDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_first_last_write_preserves_neighbors(&mut disk).is_err());
 }
