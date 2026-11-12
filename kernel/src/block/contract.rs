@@ -5,8 +5,8 @@
 //! 1. 实现 [`BlockDevice`]，写清 `flush` 的真实语义与保证范围。
 //! 2. 准备专用测试盘/镜像（勿用生产盘或含个人数据的卡），确定已知容量，
 //!    并保留至少一块的已知初始内容；各检查会全盘预置基线并逐块重读，
-//!    写隔离检查的复核开销随容量平方增长，测试盘应只暴露极少量块
-//!    （建议百块以内，即几十 KB），MB 级镜像会让契约测试超时。故障
+//!    写隔离检查的复核开销随容量平方增长且快照栈内存有界，测试盘
+//!    应至多 33 块（即十几 KB），MB 级镜像会让契约测试超时。故障
 //!    场景用本模块包装设备注入，不需要真实损坏的硬件。
 //! 3. 先用 [`check_block_count`] 校验已知容量、[`check_known_data`] 校验
 //!    已知块（两者都以调用方掌握的真实信息为准，须在任何破坏性写入之前
@@ -65,6 +65,8 @@ pub enum FailureKind {
     BufferMutated,
     /// 首写探针前后其余块状态摘要不符（写侧串扰破坏了其他块）。
     OtherBlocksMutated,
+    /// 测试盘块数超出写隔离快照上限（夹具/资源限制，非设备容量错误）。
+    FixtureLimitExceeded { limit: u64, actual: u64 },
 }
 
 /// 容量校验：设备报告的总块数与专用测试盘的已知容量一致。
@@ -114,8 +116,8 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
     if (count - 1) as usize > MAX_ISOLATION_OTHERS {
         return Err(ContractFailure {
             scenario,
-            kind: FailureKind::WrongBlockCount {
-                expected: (MAX_ISOLATION_OTHERS + 1) as u64,
+            kind: FailureKind::FixtureLimitExceeded {
+                limit: (MAX_ISOLATION_OTHERS + 1) as u64,
                 actual: count,
             },
         });
@@ -196,6 +198,8 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
 /// 用于在任何破坏性写入之前确认设备读取的是介质原有内容（DRV-001
 /// 「先读固定镜像的已知扇区并校验内容」）：只会回放会话内写入的
 /// 缓存型假后端能骗过全部先写后读的检查，只有本检查能将其拒收。
+/// 缓冲区按期望值逐字节取反预填：返回成功却不填充缓冲区的后端
+/// 留下取反值，全零扇区也无法靠零初值蒙混。
 ///
 /// 前置：`block` 为有效块号，`expected` 为测试镜像中该块的已知内容。
 pub fn check_known_data(
@@ -204,7 +208,7 @@ pub fn check_known_data(
     expected: &[u8; BLOCK_SIZE],
 ) -> Result<(), ContractFailure> {
     let scenario = "known_data_read";
-    let mut buffer = [0; BLOCK_SIZE];
+    let mut buffer: [u8; BLOCK_SIZE] = core::array::from_fn(|i| !expected[i]);
     device
         .read_block(block, &mut buffer)
         .map_err(unexpected(scenario, "read_block"))?;
@@ -250,15 +254,17 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
             .read_block(0, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
         compare_block(scenario, 0, &buffer, &snapshot)?;
+        // 每次写入后立即全盘两遍复核（第 0 块期望当前图样）：按图样
+        // 触发的两阶段缓存缺陷必须在下一次写入恢复破坏之前暴露。
+        verify_block_state(device, scenario, 0..count, |block| {
+            if block == 0 {
+                snapshot
+            } else {
+                probe_pattern(block)
+            }
+        })?;
     }
-    // 终态复核含第 0 块的当前期望值，读取侧对目标块的破坏也能被检出。
-    verify_block_state(device, scenario, 0..count, |block| {
-        if block == 0 {
-            second
-        } else {
-            probe_pattern(block)
-        }
-    })
+    Ok(())
 }
 
 /// 长度校验：0、`BLOCK_SIZE-1`、`BLOCK_SIZE+1` 字节的缓冲区被拒绝并返回
@@ -701,8 +707,9 @@ pub fn check_io_failures_recoverable(device: &mut FaultyDevice<'_>) -> Result<()
 /// 供上板自检或 CI 汇总使用；host 单测建议逐项调用 `check_*` 保留
 /// 每个场景的原生失败定位。已知数据读取（[`check_known_data`]）须在
 /// 进入本入口之前自行完成——本入口从破坏性写入开始。本入口要求设备
-/// `flush` 成功且容量至少 3 块；不支持或会失败的同步、以及 0 容量空盘，
-/// 请逐项调用对应检查。
+/// `flush` 成功且容量至少 3 块、至多 33 块（写隔离快照上限，超出报
+/// [`FailureKind::FixtureLimitExceeded`]）；不支持或会失败的同步、以及
+/// 0 容量空盘，请逐项调用对应检查。
 ///
 /// # 参数
 /// - `backend`：后端名，用于失败定位。

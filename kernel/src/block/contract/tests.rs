@@ -2,9 +2,9 @@
 //! 验证检查能在对应场景下拒绝它。
 
 use super::{
-    check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
-    check_flush_ok, check_known_data, check_out_of_bounds_rejected, check_read_write_roundtrip,
-    check_write_isolation,
+    ContractFailure, FailureKind, check_buffer_length_validation, check_empty_device,
+    check_first_last_write_preserves_neighbors, check_flush_ok, check_known_data,
+    check_out_of_bounds_rejected, check_read_write_roundtrip, check_write_isolation,
 };
 use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
@@ -733,4 +733,102 @@ fn write_isolation_probes_with_lossless_snapshot() {
         first_write_done: false,
     };
     assert!(check_write_isolation(&mut disk).is_err());
+}
+
+/// 非合规设备：读取返回成功但不填充调用者缓冲区。
+struct LeavesBufferUntouchedDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for LeavesBufferUntouchedDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn known_data_prefills_buffer_with_complement() {
+    // 全零扇区 + 返回成功却不填缓冲区的后端，靠零初值恰好相等蒙混；
+    // 缓冲区按期望值取反预填后必须被检出。
+    let mut storage = [0u8; BLOCK_SIZE];
+    let mut disk = LeavesBufferUntouchedDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    let expected = [0u8; BLOCK_SIZE];
+    assert!(check_known_data(&mut disk, 0, &expected).is_err());
+}
+
+/// 非合规设备：首次写块 0 时破坏块 1，第二次写块 0 时恢复块 1
+/// （按写入次序触发的两阶段缓存缺陷）。
+struct TwoPhaseCacheDisk<'a> {
+    inner: MemoryDisk<'a>,
+    saved: Option<[u8; BLOCK_SIZE]>,
+}
+
+impl BlockDevice for TwoPhaseCacheDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 0 {
+            match self.saved {
+                None => {
+                    let mut current = [0u8; BLOCK_SIZE];
+                    self.inner.read_block(1, &mut current)?;
+                    self.saved = Some(current);
+                    self.inner.write_block(1, &[0xEE; BLOCK_SIZE])?;
+                }
+                Some(saved) => {
+                    self.inner.write_block(1, &saved)?;
+                    self.saved = None;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn roundtrip_verifies_full_state_after_each_write() {
+    // 两阶段缓存缺陷：写 first 破坏块 1、写 second 恢复，两次目标读回
+    // 都正确；每次写入后的全盘复核必须在恢复发生前暴露破坏。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = TwoPhaseCacheDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        saved: None,
+    };
+    assert!(check_read_write_roundtrip(&mut disk).is_err());
+}
+
+#[test]
+fn write_isolation_reports_fixture_limit_beyond_capacity() {
+    // 超出快照上限是夹具/资源限制，不是设备容量错误，须用专属变体报告。
+    let mut storage = [0u8; BLOCK_SIZE * 40];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    assert_eq!(
+        check_write_isolation(&mut disk),
+        Err(ContractFailure {
+            scenario: "write_isolation",
+            kind: FailureKind::FixtureLimitExceeded {
+                limit: 33,
+                actual: 40
+            }
+        })
+    );
 }
