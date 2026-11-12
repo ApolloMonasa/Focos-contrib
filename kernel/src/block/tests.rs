@@ -1,8 +1,9 @@
 use super::contract::{
     check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
+    check_flush_failure_retry, check_flush_unsupported, check_io_failures_recoverable,
     check_out_of_bounds_rejected, check_read_write_roundtrip,
 };
-use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
+use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk, contract};
 
 #[test]
 fn memory_contract_read_write_roundtrip() {
@@ -78,100 +79,29 @@ fn memory_flush_preserves_data_and_releasing_disk_returns_storage() {
     assert_eq!(storage, [0x55; BLOCK_SIZE]);
 }
 
-/// 仅提供读写，刻意不覆盖默认 flush。
-struct NoSyncDisk<'a>(MemoryDisk<'a>);
-
-impl BlockDevice for NoSyncDisk<'_> {
-    fn block_count(&self) -> u64 {
-        self.0.block_count()
-    }
-    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
-        self.0.read_block(block, buffer)
-    }
-    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
-        self.0.write_block(block, buffer)
-    }
-}
-
 #[test]
-fn unsupported_sync_reaches_caller() {
+fn memory_contract_unsupported_sync_reaches_caller() {
     let mut storage = [0; BLOCK_SIZE];
-    let mut disk = NoSyncDisk(MemoryDisk::new(&mut storage).unwrap());
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
     let device: &mut dyn BlockDevice = &mut disk;
-    device.write_block(0, &[0x55; BLOCK_SIZE]).unwrap();
-    assert_eq!(device.flush(), Err(BlockError::Unsupported));
-}
-
-/// 故障只用于验证接口调用者能观察到错误，不模拟真实硬件持久化。
-struct FaultDisk<'a> {
-    inner: MemoryDisk<'a>,
-    fail_read: bool,
-    fail_write: bool,
-    fail_sync: bool,
-}
-
-impl BlockDevice for FaultDisk<'_> {
-    fn block_count(&self) -> u64 {
-        self.inner.block_count()
-    }
-    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
-        if self.fail_read {
-            return Err(BlockError::Io);
-        }
-        self.inner.read_block(block, buffer)
-    }
-    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
-        if self.fail_write {
-            return Err(BlockError::Io);
-        }
-        self.inner.write_block(block, buffer)
-    }
-    fn flush(&mut self) -> Result<(), BlockError> {
-        if self.fail_sync {
-            return Err(BlockError::Io);
-        }
-        self.inner.flush()
-    }
+    let mut no_sync = contract::NoSyncDevice::new(device);
+    check_flush_unsupported(&mut no_sync).unwrap();
 }
 
 #[test]
-fn read_and_write_failures_reach_caller() {
+fn memory_contract_io_failures_reach_caller() {
     let mut storage = [0x33; BLOCK_SIZE];
-    let mut disk = FaultDisk {
-        inner: MemoryDisk::new(&mut storage).unwrap(),
-        fail_read: true,
-        fail_write: true,
-        fail_sync: false,
-    };
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
     let device: &mut dyn BlockDevice = &mut disk;
-    let mut buffer = [0x77; BLOCK_SIZE];
-    assert_eq!(device.read_block(0, &mut buffer), Err(BlockError::Io));
-    assert_eq!(buffer, [0x77; BLOCK_SIZE]);
-    assert_eq!(
-        device.write_block(0, &[0x55; BLOCK_SIZE]),
-        Err(BlockError::Io)
-    );
-    disk.fail_read = false;
-    disk.read_block(0, &mut buffer).unwrap();
-    assert_eq!(buffer, [0x33; BLOCK_SIZE]);
+    let mut faulty = contract::FaultyDevice::new(device);
+    check_io_failures_recoverable(&mut faulty).unwrap();
 }
 
 #[test]
-fn failed_sync_reaches_caller_and_can_be_retried() {
+fn memory_contract_failed_sync_reaches_caller_and_can_be_retried() {
     let mut storage = [0; BLOCK_SIZE];
-    let mut disk = FaultDisk {
-        inner: MemoryDisk::new(&mut storage).unwrap(),
-        fail_read: false,
-        fail_write: false,
-        fail_sync: true,
-    };
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
     let device: &mut dyn BlockDevice = &mut disk;
-    device.write_block(0, &[0x55; BLOCK_SIZE]).unwrap();
-    assert_eq!(device.flush(), Err(BlockError::Io));
-    disk.fail_sync = false;
-    let device: &mut dyn BlockDevice = &mut disk;
-    device.flush().unwrap();
-    let mut buffer = [0; BLOCK_SIZE];
-    device.read_block(0, &mut buffer).unwrap();
-    assert_eq!(buffer, [0x55; BLOCK_SIZE]);
+    let mut faulty = contract::FaultyDevice::new(device);
+    check_flush_failure_retry(&mut faulty).unwrap();
 }

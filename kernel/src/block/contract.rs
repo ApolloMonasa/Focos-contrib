@@ -232,6 +232,152 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
     )
 }
 
+/// 同步不支持语义：有未同步写入时请求 `flush` 必须收到
+/// [`BlockError::Unsupported`]，不得返回成功。
+///
+/// 前置：被测设备（或其包装）不提供同步能力；设备至少 1 块。
+/// 通过本检查只说明不支持被如实上报，不代表设备支持同步。
+pub fn check_flush_unsupported(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
+    let scenario = "flush_unsupported";
+    device
+        .write_block(0, &[0x55; BLOCK_SIZE])
+        .map_err(unexpected(scenario, "write_block"))?;
+    expect_error(scenario, "flush", BlockError::Unsupported, device.flush())
+}
+
+/// 同步失败语义：`flush` 失败向调用者返回 [`BlockError::Io`]，不吞错、
+/// 不返回成功；清除故障后重试成功且数据仍在。
+///
+/// 检查自行注入和清除同步故障；前置：设备至少 1 块。
+pub fn check_flush_failure_retry(device: &mut FaultyDevice<'_>) -> Result<(), ContractFailure> {
+    let scenario = "flush_failure_retry";
+    device
+        .write_block(0, &[0x55; BLOCK_SIZE])
+        .map_err(unexpected(scenario, "write_block"))?;
+    device.fail_flush = true;
+    expect_error(scenario, "flush", BlockError::Io, device.flush())?;
+    device.fail_flush = false;
+    device.flush().map_err(unexpected(scenario, "flush"))?;
+    let mut buffer = [0; BLOCK_SIZE];
+    device
+        .read_block(0, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, 0, &buffer, &[0x55; BLOCK_SIZE])
+}
+
+/// 读写失败语义：设备错误以 [`BlockError::Io`] 传给调用者，失败的读取
+/// 不修改缓冲区；清除故障后恢复正常读写，原数据未受失败写影响。
+///
+/// 检查自行注入和清除读写故障；前置：设备至少 1 块。
+pub fn check_io_failures_recoverable(device: &mut FaultyDevice<'_>) -> Result<(), ContractFailure> {
+    let scenario = "io_failures_recoverable";
+    let pattern = probe_pattern(0);
+    device
+        .write_block(0, &pattern)
+        .map_err(unexpected(scenario, "write_block"))?;
+    device.fail_read = true;
+    device.fail_write = true;
+    let sentinel = 0x77;
+    let mut buffer = [sentinel; BLOCK_SIZE];
+    expect_error(
+        scenario,
+        "read_block",
+        BlockError::Io,
+        device.read_block(0, &mut buffer),
+    )?;
+    if buffer != [sentinel; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
+    expect_error(
+        scenario,
+        "write_block",
+        BlockError::Io,
+        device.write_block(0, &buffer),
+    )?;
+    device.fail_read = false;
+    device.fail_write = false;
+    device
+        .read_block(0, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, 0, &buffer, &pattern)
+}
+
+/// 仅转发读写、刻意不覆盖默认 `flush` 的包装设备，用于验证
+/// [`BlockError::Unsupported`] 能到达调用者。
+pub struct NoSyncDevice<'a> {
+    inner: &'a mut dyn BlockDevice,
+}
+
+impl<'a> NoSyncDevice<'a> {
+    /// 包装任意块设备；包装后的设备 `flush` 返回 [`BlockError::Unsupported`]。
+    pub fn new(inner: &'a mut dyn BlockDevice) -> Self {
+        Self { inner }
+    }
+}
+
+impl BlockDevice for NoSyncDevice<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+/// 可按开关注入读、写、同步故障的包装设备，用于验证失败分支；
+/// 故障只验证接口错误可见性，不模拟真实硬件持久化。
+pub struct FaultyDevice<'a> {
+    inner: &'a mut dyn BlockDevice,
+    /// 令 `read_block` 返回 [`BlockError::Io`]。
+    pub fail_read: bool,
+    /// 令 `write_block` 返回 [`BlockError::Io`]。
+    pub fail_write: bool,
+    /// 令 `flush` 返回 [`BlockError::Io`]。
+    pub fail_flush: bool,
+}
+
+impl<'a> FaultyDevice<'a> {
+    /// 包装任意块设备，初始不注入故障，调用方按场景打开开关。
+    pub fn new(inner: &'a mut dyn BlockDevice) -> Self {
+        Self {
+            inner,
+            fail_read: false,
+            fail_write: false,
+            fail_flush: false,
+        }
+    }
+}
+
+impl BlockDevice for FaultyDevice<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if self.fail_read {
+            return Err(BlockError::Io);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if self.fail_write {
+            return Err(BlockError::Io);
+        }
+        self.inner.write_block(block, buffer)
+    }
+    fn flush(&mut self) -> Result<(), BlockError> {
+        if self.fail_flush {
+            return Err(BlockError::Io);
+        }
+        self.inner.flush()
+    }
+}
+
 /// 生成随块编号变化的探针图样，使跨块串扰可被检出。
 fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
     core::array::from_fn(|i| (i as u8).wrapping_add(block as u8))
