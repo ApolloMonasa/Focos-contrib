@@ -585,9 +585,24 @@ impl BlockDevice for FaultyDevice<'_> {
     }
 }
 
-/// 生成随块编号变化的探针图样，使跨块串扰可被检出。
-fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
-    core::array::from_fn(|i| (i as u8).wrapping_add(block as u8))
+/// 生成随块编号变化的探针图样：前 8 字节小端编码完整块号，其余字节随
+/// 块号全部字节与块内偏移变化，任意两个块号的图样互不相同——否则相差
+/// 256 整数倍的块图样碰撞，读混这些块的全盘校验自身无法检出。
+pub(crate) fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
+    let mut pattern = [0; BLOCK_SIZE];
+    pattern[..8].copy_from_slice(&block.to_le_bytes());
+    let mixed = block as u8
+        ^ (block >> 8) as u8
+        ^ (block >> 16) as u8
+        ^ (block >> 24) as u8
+        ^ (block >> 32) as u8
+        ^ (block >> 40) as u8
+        ^ (block >> 48) as u8
+        ^ (block >> 56) as u8;
+    for (i, byte) in pattern.iter_mut().enumerate().skip(8) {
+        *byte = (i as u8) ^ mixed;
+    }
+    pattern
 }
 
 /// 用探针图样预置给定块区间的基线，供写入类检查在操作前建立全盘已知状态。

@@ -294,3 +294,33 @@ fn neighbor_check_covers_every_block() {
     };
     assert!(check_first_last_write_preserves_neighbors(&mut disk).is_err());
 }
+
+/// 非合规设备：读取路径丢失块号 bit 8，把第 257 块读成第 1 块。
+struct AliasingReadDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for AliasingReadDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block == 257 {
+            return self.inner.read_block(1, buffer);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn probe_patterns_distinguish_all_block_numbers() {
+    // 块 1 与块 257 的图样必须不同，读混相差 256 整数倍块的实现才能被检出。
+    let mut storage = [0x33; BLOCK_SIZE * 259];
+    let mut disk = AliasingReadDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
