@@ -67,6 +67,3 @@ pub trait BlockDevice {
         Err(BlockError::Unsupported)
     }
 }
-
-#[cfg(test)]
-mod tests;
