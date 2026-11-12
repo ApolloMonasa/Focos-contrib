@@ -516,3 +516,37 @@ fn write_isolation_rewrites_each_block_with_immediate_verify() {
     };
     assert!(check_write_isolation(&mut disk).is_err());
 }
+
+/// 非合规设备：静默丢弃对块 1 的写入但返回成功。
+struct MirrorDropMiddleDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for MirrorDropMiddleDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if block == 1 {
+            return Ok(());
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn write_isolation_rewrites_with_distinct_pattern_and_verifies_target() {
+    // 测试盘预置成契约基线的镜像：静默丢弃块 1 写入的后端，靠"重写图样
+    // 与基线不同 + 目标块纳入即时复核"才能被检出。
+    let mut storage = [0u8; BLOCK_SIZE * 4];
+    for (index, chunk) in storage.chunks_exact_mut(BLOCK_SIZE).enumerate() {
+        chunk.copy_from_slice(&super::probe_pattern(index as u64));
+    }
+    let mut disk = MirrorDropMiddleDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}

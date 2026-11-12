@@ -5,8 +5,9 @@
 //! 1. 实现 [`BlockDevice`]，写清 `flush` 的真实语义与保证范围。
 //! 2. 准备专用测试盘/镜像（勿用生产盘或含个人数据的卡），确定已知容量，
 //!    并保留至少一块的已知初始内容；各检查会全盘预置基线并逐块重读，
-//!    开销随容量线性增长，测试盘应保持小型（几 MB 即可）。故障场景用
-//!    本模块包装设备注入，不需要真实损坏的硬件。
+//!    写隔离检查的复核开销随容量平方增长，测试盘应只暴露极少量块
+//!    （建议百块以内，即几十 KB），MB 级镜像会让契约测试超时。故障
+//!    场景用本模块包装设备注入，不需要真实损坏的硬件。
 //! 3. 先用 [`check_block_count`] 校验已知容量、[`check_known_data`] 校验
 //!    已知块（两者都以调用方掌握的真实信息为准，须在任何破坏性写入之前
 //!    执行），再用 [`check_write_isolation`] 验证写隔离，然后逐项调用
@@ -87,10 +88,11 @@ pub fn check_block_count(
     Ok(())
 }
 
-/// 写隔离：全盘基线建立后逐块重写，每次写入后立即两遍验证其余块——
-/// 顺序基线写入会治愈先前写入的串扰（后写的块覆盖被破坏的内容），
-/// 逐块重写并即时验证使任何写侧跨块破坏无法被后续写入掩盖。
-/// 开销随容量平方增长，请使用小型专用测试盘（几千块以内）。
+/// 写隔离：全盘基线建立后用独立图样（逐字节取反）逐块重写，每次写入
+/// 后立即两遍复核全盘（已重写块期望独立图样、未重写块期望基线，目标块
+/// 亦在其内）——顺序基线写入会治愈先前写入的串扰，逐块重写并即时复核
+/// 使写侧跨块破坏与静默丢写（含测试盘预置为基线镜像的情况）都无法掩盖。
+/// 开销随容量平方增长，请仅用百块以内的小型专用测试盘。
 ///
 /// 前置：设备至少 1 块，且写入专用测试盘。
 pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
@@ -107,12 +109,18 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
     }
     write_probe_baseline(device, scenario, 0..count)?;
     for block in 0..count {
-        let pattern = probe_pattern(block);
+        let pattern = isolation_pattern(block);
         device
             .write_block(block, &pattern)
             .map_err(unexpected(scenario, "write_block"))?;
-        verify_block_state(device, scenario, 0..block, probe_pattern)?;
-        verify_block_state(device, scenario, block + 1..count, probe_pattern)?;
+        let rewritten = block;
+        verify_block_state(device, scenario, 0..count, |probed| {
+            if probed <= rewritten {
+                isolation_pattern(probed)
+            } else {
+                probe_pattern(probed)
+            }
+        })?;
     }
     Ok(())
 }
@@ -704,6 +712,12 @@ pub(crate) fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
         *byte = (i as u8) ^ mixed;
     }
     pattern
+}
+
+/// 写隔离重写用的独立图样：基线图样逐字节取反，保证与同块基线每个字节
+/// 都不同，使重写必然可观测，静默丢写无法靠内容巧合躲过复核。
+fn isolation_pattern(block: u64) -> [u8; BLOCK_SIZE] {
+    probe_pattern(block).map(|byte| !byte)
 }
 
 /// 用探针图样预置给定块区间的基线，供写入类检查在操作前建立全盘已知状态。
