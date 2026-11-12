@@ -63,6 +63,8 @@ pub enum FailureKind {
     },
     /// 操作修改了调用者缓冲区（参数错误后改动、或成功写入改动输入缓冲区）。
     BufferMutated,
+    /// 首写探针前后其余块状态摘要不符（写侧串扰破坏了其他块）。
+    OtherBlocksMutated,
 }
 
 /// 容量校验：设备报告的总块数与专用测试盘的已知容量一致。
@@ -109,20 +111,40 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
     }
     // 首写可观测探针：读块 0 现值、写入逐字节取反图样并立即读回——
     // 只丢弃启动后第一次写入的后端在基线建立前就被拒收，不会被子序列
-    // 重写抹去证据（DRV-001「读写成功意味着规定传输已完成」）。
+    // 重写抹去证据（DRV-001「读写成功意味着规定传输已完成」）。写入
+    // 前留存独立快照校验输入缓冲区未被回写，前后各取一次其余块状态
+    // 摘要捕捉首写的跨块串扰。
     let mut probe = [0; BLOCK_SIZE];
     device
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
+    let other_blocks_before = block_range_digest(device, scenario, 1..count)?;
     let first_write = probe.map(|byte| !byte);
+    let snapshot = first_write;
     device
         .write_block(0, &first_write)
         .map_err(unexpected(scenario, "write_block"))?;
+    if first_write != snapshot {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     device
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, 0, &probe, &first_write)?;
+    compare_block(scenario, 0, &probe, &snapshot)?;
+    let other_blocks_after = block_range_digest(device, scenario, 1..count)?;
+    if other_blocks_before != other_blocks_after {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::OtherBlocksMutated,
+        });
+    }
     write_probe_baseline(device, scenario, 0..count)?;
+    // 基线建立后、覆盖前先整盘复核：静默丢弃任一基线写入的后端在此
+    // 暴露，不会被子序列重写抹去证据。
+    verify_probe_baseline(device, scenario, 0..count)?;
     for block in 0..count {
         let pattern = isolation_pattern(block);
         device
@@ -733,6 +755,30 @@ pub(crate) fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
 /// 都不同，使重写必然可观测，静默丢写无法靠内容巧合躲过复核。
 fn isolation_pattern(block: u64) -> [u8; BLOCK_SIZE] {
     probe_pattern(block).map(|byte| !byte)
+}
+
+/// 其余块状态的紧凑摘要：字节按位异或进 8 条轮转通道并累加轮转总和，
+/// 任何改变若干字节的误写几乎必然改变摘要。不分配内存即可在首写前后
+/// 比对其余块是否被串扰破坏。
+fn block_range_digest(
+    device: &mut dyn BlockDevice,
+    scenario: &'static str,
+    blocks: core::ops::Range<u64>,
+) -> Result<([u64; 8], u64), ContractFailure> {
+    let mut lanes = [0u64; 8];
+    let mut total = 0u64;
+    let mut buffer = [0; BLOCK_SIZE];
+    for block in blocks {
+        device
+            .read_block(block, &mut buffer)
+            .map_err(unexpected(scenario, "read_block"))?;
+        for (i, byte) in buffer.iter().enumerate() {
+            let lane = (i % 8) as u32;
+            lanes[lane as usize] ^= (*byte as u64).rotate_left(lane * 8);
+            total = total.wrapping_add((*byte as u64).rotate_right(lane * 8));
+        }
+    }
+    Ok((lanes, total))
 }
 
 /// 用探针图样预置给定块区间的基线，供写入类检查在操作前建立全盘已知状态。

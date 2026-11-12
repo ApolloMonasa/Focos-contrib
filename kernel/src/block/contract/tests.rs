@@ -584,3 +584,72 @@ fn write_isolation_probes_first_write_before_baseline() {
     };
     assert!(check_write_isolation(&mut disk).is_err());
 }
+
+/// 非合规设备：只静默丢弃第二次写入，其余写入正常。
+struct DropSecondWriteDisk<'a> {
+    inner: MemoryDisk<'a>,
+    writes_done: u32,
+}
+
+impl BlockDevice for DropSecondWriteDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.writes_done += 1;
+        if self.writes_done == 2 {
+            return Ok(());
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn write_isolation_verifies_baseline_before_rewrite() {
+    // 基线写入被静默丢弃时，重写循环会抹掉证据；进入重写前必须整盘
+    // 复核已建立的基线。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = DropSecondWriteDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        writes_done: 0,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}
+
+/// 非合规设备：首次成功写入时正确落盘目标块，同时误写块 2。
+struct FirstWriteClobbersTwoDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_done: bool,
+}
+
+impl BlockDevice for FirstWriteClobbersTwoDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if !self.first_write_done {
+            self.first_write_done = true;
+            self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn write_isolation_probes_other_blocks_around_first_write() {
+    // 首次写入的跨块串扰会被随后的基线写入治愈：首写前后取其余块
+    // 状态摘要并比对，串扰必须在基线建立前暴露。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = FirstWriteClobbersTwoDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_done: false,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}
