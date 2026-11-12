@@ -653,3 +653,45 @@ fn write_isolation_probes_other_blocks_around_first_write() {
     };
     assert!(check_write_isolation(&mut disk).is_err());
 }
+
+/// 非合规设备：首次成功写入时交换块 1 和块 2 的介质内容。
+struct FirstWriteSwapsOneTwoDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_done: bool,
+}
+
+impl BlockDevice for FirstWriteSwapsOneTwoDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if !self.first_write_done {
+            self.first_write_done = true;
+            let mut first = [0u8; BLOCK_SIZE];
+            let mut second = [0u8; BLOCK_SIZE];
+            self.inner.read_block(1, &mut first)?;
+            self.inner.read_block(2, &mut second)?;
+            self.inner.write_block(1, &second)?;
+            self.inner.write_block(2, &first)?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn write_isolation_digest_is_order_sensitive() {
+    // 块 1、2 初始内容不同：首次写入交换两块时，纯异或与求和的摘要
+    // 保持不变；混入块号的摘要必须能检出整块置换。
+    let mut storage = [0u8; BLOCK_SIZE * 3];
+    storage[BLOCK_SIZE..BLOCK_SIZE * 2].fill(0x44);
+    storage[BLOCK_SIZE * 2..].fill(0x55);
+    let mut disk = FirstWriteSwapsOneTwoDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_done: false,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}

@@ -147,9 +147,16 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
     verify_probe_baseline(device, scenario, 0..count)?;
     for block in 0..count {
         let pattern = isolation_pattern(block);
+        let snapshot = pattern;
         device
             .write_block(block, &pattern)
             .map_err(unexpected(scenario, "write_block"))?;
+        if pattern != snapshot {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
         let rewritten = block;
         verify_block_state(device, scenario, 0..count, |probed| {
             if probed <= rewritten {
@@ -757,9 +764,10 @@ fn isolation_pattern(block: u64) -> [u8; BLOCK_SIZE] {
     probe_pattern(block).map(|byte| !byte)
 }
 
-/// 其余块状态的紧凑摘要：字节按位异或进 8 条轮转通道并累加轮转总和，
-/// 任何改变若干字节的误写几乎必然改变摘要。不分配内存即可在首写前后
-/// 比对其余块是否被串扰破坏。
+/// 其余块状态的紧凑摘要：逐块生成迷你摘要，按块号旋转并进不同通道后
+/// 异或、再累加总和——纯异或与求和对块顺序可交换，混入块号后任何改变
+/// 字节、交换整块或移动内容的误写几乎必然改变摘要。不分配内存即可在
+/// 首写前后比对其余块是否被串扰破坏。
 fn block_range_digest(
     device: &mut dyn BlockDevice,
     scenario: &'static str,
@@ -772,11 +780,14 @@ fn block_range_digest(
         device
             .read_block(block, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
+        // 逐块迷你摘要按块号旋转并进不同通道：异或与求和虽可交换，
+        // 但块内容随块号改变旋转后，整块置换与顺序变化必然改变摘要。
+        let mut block_digest = 0u64;
         for (i, byte) in buffer.iter().enumerate() {
-            let lane = (i % 8) as u32;
-            lanes[lane as usize] ^= (*byte as u64).rotate_left(lane * 8);
-            total = total.wrapping_add((*byte as u64).rotate_right(lane * 8));
+            block_digest = block_digest.wrapping_add((*byte as u64) << (((i % 8) * 8) as u32));
         }
+        lanes[(block % 8) as usize] ^= block_digest.rotate_left(((block % 63) + 1) as u32);
+        total = total.wrapping_add(block_digest);
     }
     Ok((lanes, total))
 }
@@ -789,9 +800,16 @@ fn write_probe_baseline(
 ) -> Result<(), ContractFailure> {
     for block in blocks {
         let pattern = probe_pattern(block);
+        let snapshot = pattern;
         device
             .write_block(block, &pattern)
             .map_err(unexpected(scenario, "write_block"))?;
+        if pattern != snapshot {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
     }
     Ok(())
 }
