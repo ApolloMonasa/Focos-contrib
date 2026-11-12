@@ -832,3 +832,168 @@ fn write_isolation_reports_fixture_limit_beyond_capacity() {
         })
     );
 }
+
+/// 非合规设备：识别契约探针图样（头部为块号小端编码）的写入，
+/// 并把下一块串写为垃圾。
+struct ProbeSpillToNextDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for ProbeSpillToNextDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        let header_matches =
+            buffer.len() == BLOCK_SIZE && buffer[..8] == (block as u64).to_le_bytes();
+        if header_matches && block + 1 < self.block_count() {
+            self.inner.write_block(block + 1, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn baseline_rewrites_verify_immediately_against_healing() {
+    // 顺序基线写入会治愈"探针写入串写下一块"的破坏：基线第二遍逐块
+    // 重写并在每次写入后整盘复核，破坏在治愈前暴露。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = ProbeSpillToNextDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
+
+/// 非合规设备：非法长度读取时保存块 1 并写入垃圾，非法长度写入时
+/// 把块 1 恢复（破坏/恢复跨操作配对）。
+struct IllegalReadSaveRestoreDisk<'a> {
+    inner: MemoryDisk<'a>,
+    armed: bool,
+    saved: Option<[u8; BLOCK_SIZE]>,
+}
+
+impl BlockDevice for IllegalReadSaveRestoreDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            if self.armed {
+                self.armed = false;
+                let mut current = [0u8; BLOCK_SIZE];
+                self.inner.read_block(1, &mut current)?;
+                self.saved = Some(current);
+                self.inner.write_block(1, &[0xEE; BLOCK_SIZE])?;
+            }
+            return Err(BlockError::InvalidBufferLength);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            if let Some(saved) = self.saved.take() {
+                self.inner.write_block(1, &saved)?;
+            }
+            return Err(BlockError::InvalidBufferLength);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn length_check_verifies_media_after_each_rejected_op() {
+    // 非法读取破坏块 1、非法写入恢复的两阶段缺陷：每个被拒操作返回后
+    // 立即整盘复核，恢复发生前就暴露破坏。
+    let mut storage = [0x33; BLOCK_SIZE * 2];
+    let mut disk = IllegalReadSaveRestoreDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        armed: true,
+        saved: None,
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 非合规设备：仅对块 0 与巨大块号先校验长度，其他块号先返回越界。
+struct BlockCountFirstDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for BlockCountFirstDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE && (block == 0 || block == u64::MAX) {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE && (block == 0 || block == u64::MAX) {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn length_priority_covers_first_out_of_bounds_block() {
+    // 长度优先探针必须包含首个越界块 count：只对块 0 与巨大块号
+    // 先查长度的实现不能绕过优先级约定。
+    let mut storage = [0x33; BLOCK_SIZE * 2];
+    let mut disk = BlockCountFirstDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 空盘设备：首次非空非法长度读取向缓冲区写垃圾，巨大块号的非法
+/// 读取恢复哨兵值，其余不触碰——恢复恰好发生在循环末次读取。
+struct EmptyRestoreAtMaxDisk {
+    junked: bool,
+}
+
+impl BlockDevice for EmptyRestoreAtMaxDisk {
+    fn block_count(&self) -> u64 {
+        0
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            if !buffer.is_empty() {
+                if block == u64::MAX && self.junked {
+                    buffer.fill(0x77);
+                    self.junked = false;
+                } else if !self.junked {
+                    buffer.fill(0x11);
+                    self.junked = true;
+                }
+            }
+            return Err(BlockError::InvalidBufferLength);
+        }
+        Err(BlockError::OutOfBounds)
+    }
+    fn write_block(&mut self, _block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        Err(BlockError::OutOfBounds)
+    }
+}
+
+#[test]
+fn empty_device_checks_buffer_after_each_rejected_read() {
+    // 探针缓冲区的哨兵比对必须在每次非法读取返回后立即进行：
+    // 块 0 写垃圾、块 1 恢复的翻转后端不能等到循环结束才被发现。
+    let mut disk = EmptyRestoreAtMaxDisk { junked: false };
+    assert!(check_empty_device(&mut disk).is_err());
+}

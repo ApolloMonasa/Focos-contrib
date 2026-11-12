@@ -271,11 +271,11 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
 /// [`BlockError::InvalidBufferLength`]，且长度错误优先于块号错误；
 /// 参数错误的操作不得修改调用者缓冲区。
 ///
-/// 全盘预置探针基线，每次被拒写入后重读目标块，全部探针结束后全盘重读：
-/// 先部分写入目标块或溢出到其他块、再返回长度错误的实现会被本检查拒收
-/// （HAL-001「长度错误时数据不变」指整盘数据）。长度优先探针把三种非法
-/// 长度分别与 `u64::MAX` 组合，读写两条路径都验证，只特判空切片的实现
-/// 无法绕过。
+/// 全盘预置探针基线，每个被拒操作返回后立即校验探针缓冲区并整盘复核：
+/// 先部分写入目标块或溢出到其他块、再返回长度错误，或破坏后恢复的
+/// 两阶段缺陷都会被本检查拒收（HAL-001「长度错误时数据不变」指整盘
+/// 数据）。长度优先探针把三种非法长度分别与块 0、首个越界块和 `u64::MAX`
+/// 组合，读写两条路径都验证，只特判部分块号的实现无法绕过。
 ///
 /// 前置：设备至少 1 块，且写入专用测试盘。
 pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
@@ -291,56 +291,42 @@ pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<()
         });
     }
     write_probe_baseline(device, scenario, 0..count)?;
-    let block_zero = probe_pattern(0);
     let sentinel = 0x77;
     let mut probe = [sentinel; BLOCK_SIZE + 1];
-    let mut readback = [0; BLOCK_SIZE];
+    // 每个被拒操作返回后立即校验探针缓冲区并整盘复核：非法读取破坏
+    // 其他块、随后写入恢复的两阶段缺陷无法跨操作隐藏（HAL-001「数据
+    // 不变」）。长度错误优先于块号错误的约定对块 0、首个越界块与
+    // 巨大块号全部成立。
     for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
-        expect_error(
-            scenario,
-            "read_block",
-            BlockError::InvalidBufferLength,
-            device.read_block(0, &mut probe[..length]),
-        )?;
-        expect_error(
-            scenario,
-            "write_block",
-            BlockError::InvalidBufferLength,
-            device.write_block(0, &probe[..length]),
-        )?;
-        device
-            .read_block(0, &mut readback)
-            .map_err(unexpected(scenario, "read_block"))?;
-        compare_block(scenario, 0, &readback, &block_zero)?;
-        if probe != [sentinel; BLOCK_SIZE + 1] {
-            return Err(ContractFailure {
+        for block in [0, count, u64::MAX] {
+            expect_error(
                 scenario,
-                kind: FailureKind::BufferMutated,
-            });
+                "read_block",
+                BlockError::InvalidBufferLength,
+                device.read_block(block, &mut probe[..length]),
+            )?;
+            if probe != [sentinel; BLOCK_SIZE + 1] {
+                return Err(ContractFailure {
+                    scenario,
+                    kind: FailureKind::BufferMutated,
+                });
+            }
+            verify_probe_baseline(device, scenario, 0..count)?;
+            expect_error(
+                scenario,
+                "write_block",
+                BlockError::InvalidBufferLength,
+                device.write_block(block, &probe[..length]),
+            )?;
+            if probe != [sentinel; BLOCK_SIZE + 1] {
+                return Err(ContractFailure {
+                    scenario,
+                    kind: FailureKind::BufferMutated,
+                });
+            }
+            verify_probe_baseline(device, scenario, 0..count)?;
         }
     }
-    // 长度错误必须优先于块号错误：全部非法长度配巨大块号，读写两条路径。
-    for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
-        expect_error(
-            scenario,
-            "write_block",
-            BlockError::InvalidBufferLength,
-            device.write_block(u64::MAX, &probe[..length]),
-        )?;
-        expect_error(
-            scenario,
-            "read_block",
-            BlockError::InvalidBufferLength,
-            device.read_block(u64::MAX, &mut probe[..length]),
-        )?;
-        if probe != [sentinel; BLOCK_SIZE + 1] {
-            return Err(ContractFailure {
-                scenario,
-                kind: FailureKind::BufferMutated,
-            });
-        }
-    }
-    // 全盘重读：被拒写入溢出到任何块都会被检出。
     verify_probe_baseline(device, scenario, 0..count)
 }
 
@@ -378,6 +364,7 @@ pub fn check_out_of_bounds_rejected(device: &mut dyn BlockDevice) -> Result<(), 
                 kind: FailureKind::BufferMutated,
             });
         }
+        verify_probe_baseline(device, scenario, 0..count)?;
         expect_error(
             scenario,
             "write_block",
@@ -390,8 +377,9 @@ pub fn check_out_of_bounds_rejected(device: &mut dyn BlockDevice) -> Result<(), 
                 kind: FailureKind::BufferMutated,
             });
         }
+        verify_probe_baseline(device, scenario, 0..count)?;
     }
-    verify_probe_baseline(device, scenario, 0..count)
+    Ok(())
 }
 
 /// 邻块保持：首末写入拆为两个独立阶段——除首块外全盘预置探针基线（含
@@ -488,6 +476,12 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
                 BlockError::InvalidBufferLength,
                 device.read_block(block, &mut probe[..length]),
             )?;
+            if probe != [sentinel; BLOCK_SIZE + 1] {
+                return Err(ContractFailure {
+                    scenario,
+                    kind: FailureKind::BufferMutated,
+                });
+            }
             expect_error(
                 scenario,
                 "write_block",
@@ -850,7 +844,10 @@ fn write_probe_baseline(
     scenario: &'static str,
     blocks: core::ops::Range<u64>,
 ) -> Result<(), ContractFailure> {
-    for block in blocks {
+    // 第一遍顺序写入基线；随后逐块重写并在每次写入返回后立即整盘复核
+    // 同区间——顺序写入会治愈"写入块 b 时串写块 b+1"的破坏，重写加
+    // 即时复核使基线阶段的跨块串扰无法被后续写入掩盖。
+    for block in blocks.clone() {
         let pattern = probe_pattern(block);
         let snapshot = pattern;
         device
@@ -862,6 +859,23 @@ fn write_probe_baseline(
                 kind: FailureKind::BufferMutated,
             });
         }
+        // 每块写入后立即复核已写前缀：静默丢弃的基线写入留下原内容，
+        // 不会拖到第二遍重写时被治愈抹掉。
+        verify_block_state(device, scenario, blocks.start..block + 1, probe_pattern)?;
+    }
+    for block in blocks.clone() {
+        let pattern = probe_pattern(block);
+        let snapshot = pattern;
+        device
+            .write_block(block, &pattern)
+            .map_err(unexpected(scenario, "write_block"))?;
+        if pattern != snapshot {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
+        verify_block_state(device, scenario, blocks.clone(), probe_pattern)?;
     }
     Ok(())
 }
