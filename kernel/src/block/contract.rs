@@ -106,44 +106,71 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
 /// [`BlockError::InvalidBufferLength`]，且长度错误优先于块号错误；
 /// 参数错误的操作不得修改调用者缓冲区。
 ///
-/// 前置：设备至少 1 块。
+/// 第 0 块先写入基线，每次被拒写入后重读比对：先部分写入目标块、
+/// 再返回长度错误的实现会被本检查拒收（HAL-001「长度错误时数据不变」）。
+/// 长度优先探针把三种非法长度分别与 `u64::MAX` 组合，读写两条路径都验证，
+/// 只特判空切片的实现无法绕过。
+///
+/// 前置：设备至少 1 块，且写入专用测试盘。
 pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
     let scenario = "buffer_length_validation";
+    let baseline = [0x33; BLOCK_SIZE];
+    device
+        .write_block(0, &baseline)
+        .map_err(unexpected(scenario, "write_block"))?;
     let sentinel = 0x77;
-    let mut buffer = [sentinel; BLOCK_SIZE + 1];
+    let mut probe = [sentinel; BLOCK_SIZE + 1];
+    let mut readback = [0; BLOCK_SIZE];
     for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
         expect_error(
             scenario,
             "read_block",
             BlockError::InvalidBufferLength,
-            device.read_block(0, &mut buffer[..length]),
+            device.read_block(0, &mut probe[..length]),
         )?;
         expect_error(
             scenario,
             "write_block",
             BlockError::InvalidBufferLength,
-            device.write_block(0, &buffer[..length]),
+            device.write_block(0, &probe[..length]),
         )?;
-        if buffer != [sentinel; BLOCK_SIZE + 1] {
+        device
+            .read_block(0, &mut readback)
+            .map_err(unexpected(scenario, "read_block"))?;
+        compare_block(scenario, 0, &readback, &baseline)?;
+        if probe != [sentinel; BLOCK_SIZE + 1] {
             return Err(ContractFailure {
                 scenario,
                 kind: FailureKind::BufferMutated,
             });
         }
     }
-    // 巨大块编号配非法长度：长度错误必须优先于块号错误，读写两条路径都要成立。
-    expect_error(
-        scenario,
-        "write_block",
-        BlockError::InvalidBufferLength,
-        device.write_block(u64::MAX, &[]),
-    )?;
-    expect_error(
-        scenario,
-        "read_block",
-        BlockError::InvalidBufferLength,
-        device.read_block(u64::MAX, &mut []),
-    )
+    // 长度错误必须优先于块号错误：全部非法长度配巨大块号，读写两条路径。
+    for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
+        expect_error(
+            scenario,
+            "write_block",
+            BlockError::InvalidBufferLength,
+            device.write_block(u64::MAX, &probe[..length]),
+        )?;
+        expect_error(
+            scenario,
+            "read_block",
+            BlockError::InvalidBufferLength,
+            device.read_block(u64::MAX, &mut probe[..length]),
+        )?;
+        if probe != [sentinel; BLOCK_SIZE + 1] {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
+    }
+    // 越界探针后确认第 0 块仍是基线，防回绕式写入破坏。
+    device
+        .read_block(0, &mut readback)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, 0, &readback, &baseline)
 }
 
 /// 越界校验：第 N 块与 `u64::MAX` 的读写被拒绝并返回
@@ -202,8 +229,10 @@ pub fn check_out_of_bounds_rejected(device: &mut dyn BlockDevice) -> Result<(), 
     Ok(())
 }
 
-/// 邻块保持：写入首块与末块后，首尾各自的实际相邻块与中间块内容不变
-/// （HAL-001「其他块不受影响」与最后一块场景）。
+/// 邻块保持：首末写入拆为两个独立阶段——预置基线（含末块）后先写首块，
+/// 立即确认相邻块与末块未被破坏，再写末块并确认首块与相邻块未被破坏
+/// （HAL-001「其他块不受影响」与最后一块场景）。两阶段分离使首块写入
+/// 对末块的破坏无法被随后的末块写入治愈。
 ///
 /// 前置：设备至少 3 块，且写入专用测试盘。
 pub fn check_first_last_write_preserves_neighbors(
@@ -221,8 +250,7 @@ pub fn check_first_last_write_preserves_neighbors(
         });
     }
     let (first, last) = (0, count - 1);
-    // 首块的后一块、末块的前一块与中间块统一预置基线并重读，
-    // 使首尾写入向相邻块的串扰必然被检出；容量为 3 时三者同一块。
+    // 首块的后一块、末块的前一块与中间块统一预置基线；容量为 3 时三者同一块。
     let inner = [1, count / 2, count - 2];
     let base = [0x33; BLOCK_SIZE];
     for block in inner {
@@ -231,25 +259,45 @@ pub fn check_first_last_write_preserves_neighbors(
             .map_err(unexpected(scenario, "write_block"))?;
     }
     device
+        .write_block(last, &base)
+        .map_err(unexpected(scenario, "write_block"))?;
+    let mut buffer = [0; BLOCK_SIZE];
+    // 阶段一：写首块后立即确认自身与全部基线块（含末块）未被破坏。
+    device
         .write_block(first, &[0x11; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
     device
-        .write_block(last, &[0x22; BLOCK_SIZE])
-        .map_err(unexpected(scenario, "write_block"))?;
-    let mut buffer = [0; BLOCK_SIZE];
-    for (block, expected) in [
-        (first, [0x11; BLOCK_SIZE]),
-        (inner[0], base),
-        (inner[1], base),
-        (inner[2], base),
-        (last, [0x22; BLOCK_SIZE]),
-    ] {
+        .read_block(first, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, first, &buffer, &[0x11; BLOCK_SIZE])?;
+    for block in inner {
         device
             .read_block(block, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
-        compare_block(scenario, block, &buffer, &expected)?;
+        compare_block(scenario, block, &buffer, &base)?;
     }
-    Ok(())
+    device
+        .read_block(last, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, last, &buffer, &base)?;
+    // 阶段二：写末块后确认首块与基线块未被破坏，末块读回新值。
+    device
+        .write_block(last, &[0x22; BLOCK_SIZE])
+        .map_err(unexpected(scenario, "write_block"))?;
+    device
+        .read_block(first, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, first, &buffer, &[0x11; BLOCK_SIZE])?;
+    for block in inner {
+        device
+            .read_block(block, &mut buffer)
+            .map_err(unexpected(scenario, "read_block"))?;
+        compare_block(scenario, block, &buffer, &base)?;
+    }
+    device
+        .read_block(last, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, last, &buffer, &[0x22; BLOCK_SIZE])
 }
 
 /// 空设备校验：容量为 0 时任何块编号的读写都被拒绝并返回

@@ -253,3 +253,106 @@ fn memory_contract_known_data_rejects_cache_only_reads() {
     check_read_write_roundtrip(&mut disk).unwrap();
     assert!(check_known_data(&mut disk, 0, &original).is_err());
 }
+
+/// 非合规设备：写首块时把垃圾数据串写到末块，模拟地址回绕式跨块破坏。
+struct FirstWriteClobbersLastDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for FirstWriteClobbersLastDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 0 && self.block_count() > 1 {
+            let last = self.block_count() - 1;
+            self.inner.write_block(last, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn memory_contract_neighbor_check_catches_clobber_before_healing() {
+    // 写末块会治愈首块造成的破坏，检查必须在写末块之前发现它。
+    let mut storage = [0x33; BLOCK_SIZE * 4];
+    let mut disk = FirstWriteClobbersLastDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_first_last_write_preserves_neighbors(&mut disk).is_err());
+}
+
+/// 非合规设备：被拒的非法长度写入先把垃圾写进第 0 块，再返回长度错误。
+struct DestructiveRejectDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for DestructiveRejectDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            self.inner.write_block(0, &[0xEE; BLOCK_SIZE])?;
+            return Err(BlockError::InvalidBufferLength);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn memory_contract_length_validation_rejects_destructive_errors() {
+    // 只查调用者缓冲区发现不了"先破坏再报错"的后端，必须重读目标块。
+    let mut storage = [0x33; BLOCK_SIZE];
+    let mut disk = DestructiveRejectDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 非合规设备：对空切片特判返回长度错误，对非空长度却先查块号。
+struct EmptySpecialCaseDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for EmptySpecialCaseDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.is_empty() {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.is_empty() {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn memory_contract_length_priority_covers_all_illegal_lengths() {
+    // 非空非法长度也必须与非法块号组合验证长度优先，
+    // 否则"只特判空切片"的后端能绕过优先级约定。
+    let mut storage = [0x33; BLOCK_SIZE];
+    let mut disk = EmptySpecialCaseDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
