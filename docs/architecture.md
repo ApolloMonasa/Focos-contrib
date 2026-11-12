@@ -1,45 +1,88 @@
-# 一次程序运行会经过哪些层
+# 架构：公共内核与平台适配
 
-这是目标架构，图中的兼容层与存储层仍待实现。已验证的启动能力见 README 的当前状态；图不表示完成度。
+这是目标设计，尚未全部实现。当前能力见 [README](../README.md)，区域赛交付范围以 [REGION-001](../specs/REGION-001.md) 为准。
+
+## 各层怎样协作
+
+实线表示使用接口或其实现，虚线表示启动时配置或装配；图省略异常回调等反向控制流。HAL 是公共内核使用的平台接口；架构层、板级层和驱动层共同实现这些能力。
 
 ```mermaid
 flowchart TB
-    accTitle: FocOS 的区域赛与全国赛目标架构
-    accDescr: 区域赛运行 2025 测试和开发工具，经 Linux 系统调用访问共享内核。VFS 下同时有 FAT32 和 Ext4。HAL 隔离硬件；全国赛扩展 LoongArch 与磁盘检索。
-    APP["区域赛用户态<br/>2025 非 LTP 测试 · vim / gcc / make"]
-    ANN["全国赛用户态<br/>按需读盘的 HNSW 查询"]
-    ABI["Linux 系统调用接口<br/>musl / glibc 兼容"]
-    CORE["内存 · 进程 · 线程<br/>ELF 装载 · 信号 · 时钟"]
-    VFS["VFS<br/>路径 · 文件描述符 · 挂载"]
-    IO["终端 · 管道 · socket<br/>TCP / UDP loopback"]
-    FAT["FAT32<br/>基础文件系统与优化"]
-    EXT["Ext4<br/>2025 原版镜像兼容"]
-    CACHE["块设备接口与缓存<br/>可关闭策略做对照"]
-    HAL["HAL / arch<br/>CPU 操作与设备驱动"]
-    RV["区域赛 RISC-V<br/>QEMU virt · VisionFive2"]
-    LA["全国赛 LoongArch<br/>QEMU · 2K1000LA 星云板"]
-    APP --> ABI
-    ANN --> ABI
+    accTitle: FocOS 多架构与多平台职责
+    accDescr: 公共内核通过 HAL 和设备接口使用架构及驱动实现，板级层负责启动资源和装配。
+    USER["用户态程序 · musl / glibc"]
+    ABI["Linux 系统调用与 ABI 适配"]
+    CORE["公共内核<br/>内存 · 调度 · 进程<br/>VFS · 文件系统 · 缓存<br/>网络协议"]
+    HAL["HAL 接口<br/>上下文 · 地址空间 · 时钟 · 中断 · 平台服务"]
+    DEV["设备接口<br/>BlockDevice<br/>字符设备 · 网卡"]
+    ARCH["架构层 arch<br/>RISC-V / LoongArch 的 CPU 机制与 ABI"]
+    DRV["驱动层 drivers<br/>UART · 存储 · 中断控制器 · 总线控制器"]
+    PLAT["板级层 platform<br/>启动信息 · 资源描述<br/>初始化与装配"]
+    USER --> ABI
     ABI --> CORE
-    ABI --> VFS
-    ABI --> IO
-    VFS --> FAT
-    VFS --> EXT
-    FAT --> CACHE
-    EXT --> CACHE
-    CACHE --> HAL
+    ABI --> HAL
     CORE --> HAL
-    IO --> HAL
-    HAL --> RV
-    HAL --> LA
-    classDef later stroke-dasharray: 5 3;
-    class ANN,LA later;
+    CORE --> DEV
+    HAL --> ARCH
+    DEV --> DRV
+    SERVICE["平台服务实现<br/>固件适配 · 定时器 · 中断控制器"]
+    HAL --> SERVICE
+    SUPPORT["驱动支撑接口<br/>MMIO · DMA · IRQ"]
+    MEMORY["公共内存模块<br/>页与 DMA 缓冲区所有权"]
+    DRV --> SUPPORT
+    SUPPORT --> ARCH
+    SUPPORT --> MEMORY
+    SUPPORT --> SERVICE
+    PLAT -.-> ARCH
+    PLAT -.-> DRV
+    PLAT -.-> HAL
+    PLAT -.-> SERVICE
 ```
 
-## 读图的三个要点
+驱动支撑接口也是 HAL 的一部分。公共内存模块拥有页和 DMA 缓冲区；平台服务按实际硬件由架构内的固件适配或控制器驱动提供。底层控制器先用映射和轮询时钟初始化，再提供 IRQ 等服务给普通设备，不能依赖自己尚未提供的服务。
 
-- **程序兼容**：gcc 能运行需要加载器、进程、文件和内存共同正确；网络组还需要真实 socket 与回环收发。
-- **文件系统**：FAT32 负责基础与优化实验，Ext4 读取并写回历史原版镜像；二者共享 VFS，分别验收格式行为。
-- **平台移植**：页表、陷入与设备差异收敛到 HAL/arch；FS/VFS 无架构条件编译。全国赛将同一套上层实现搬到星云板。
+| 层 | 负责什么 | 交给其他层什么 |
+| --- | --- | --- |
+| 公共内核 | 分配/调度策略、进程生命周期、VFS、文件系统、缓存、协议栈 | 页表操作交架构层，硬件 I/O 交设备接口 |
+| 架构层 | 寄存器、页表格式、TLB、异常入口、上下文、用户态 ABI 布局 | 板级地址与设备拓扑交板级层；调度决策交公共内核 |
+| 板级层 | 固件入口、RAM/保留区、设备资源、启动顺序，选择并装配驱动 | 控制器寄存器操作交驱动；页表机制交架构层 |
+| 驱动层 | 控制器协议、收发、完成与错误处理 | 从板级层取得资源，通过 HAL 申请映射/DMA/IRQ 服务 |
 
-AI 记忆检索提供后续压力负载。先测真实访问，再决定缓存或布局优化；全索引驻留内存的查询不能证明文件 I/O 收益。接口细节见 [模块边界](reference/delivery-details.md)。
+中断入口与 CPU 开关属于架构层；PLIC 等外部中断控制器属于驱动层；IRQ 连接关系属于板级层。时钟频率与来源由板级层描述，定时器访问由对应架构实现或设备驱动承担。设备时钟、复位、引脚由板级层编排，具体寄存器操作放相应驱动。
+
+通用块缓存位于具体驱动之上，通过 `BlockDevice` 访问设备，VirtIO 与 SD 共用同一套策略。驱动内部的额外缓存/预读须记录开关和内存开销；实验统计位置见 [实验细则](reference/experiment-protocol.md#缓存与请求怎样统计)。
+
+## 接口与装配怎样分开
+
+- `hal` 定义 CPU/平台服务和驱动支撑接口，设备接口沿用 `block` 等公共模块。接口类型不依赖具体板型；各层可用静态分派或注入的服务句柄实现，不要求统一使用动态 trait 对象。
+- `arch` 实现 CPU 机制及 ABI 转换，不导入具体板级或驱动模块；驱动使用资源描述和服务接口，不回调 `platform`。公共内核经统一入口使用它们。
+- `platform` 是启动时的装配入口，可以选择架构、驱动和服务实现；运行时资源交公共内存模块、设备注册表或驱动持有。HAL 和板级层不再建第二套资源管理器。
+
+谁向谁交付资源、谁负责释放，见 [接口交接表](reference/delivery-details.md#平台接口怎样交接)。跨层任务先共同确定输入、输出和失败状态，再各自实现。
+
+## 架构和板型分别选择
+
+以下路径均相对 `kernel/src/`，是拟采用的模块归属，`platform/`、`drivers/` 尚待创建；实际文件树仍以 README 为准。
+
+| 拟定位置 | 适配单位 |
+| --- | --- |
+| `arch/riscv64/`、`arch/loongarch64/` | CPU 架构；包含架构相关的 Linux ABI 转换 |
+| `platform/qemu_riscv64/`、`platform/visionfive2/` | 同一 RISC-V 架构的两种机器 |
+| `platform/qemu_loongarch64/`、`platform/xingyun_2k1000la/` | 同一 LoongArch 架构的两种机器 |
+| `drivers/` | 按控制器/协议组织；同一驱动可被多个平台复用 |
+
+每次构建选择一个 Rust 目标和一个板型，非法组合在构建阶段报错。架构选择集中在 `arch` 入口，板型选择集中在 `platform` 和构建配置；公共模块不判断板名。FS/VFS/缓存不得含架构条件编译，也不得直接依赖具体驱动或架构实现。
+
+设备树、固件表或固定配置先转成统一启动/设备描述，再交给公共内核和驱动。早期可以静态装配，当前不要求动态总线框架；必须写清支持的固件、加载方式和资源来源。MM-002 的固定 QEMU 布局只适用于其约定环境，不能直接用于真板。
+
+## 成员从哪里开始
+
+| 要实现的能力 | 先读 | 第一份交付 |
+| --- | --- | --- |
+| 页表、异常、上下文 | [ARCH-001](../specs/ARCH-001.md) | 先实现可嵌套的本核临界区，页表/上下文另拆专项 |
+| 新板启动与资源交接 | [PLAT-001](../specs/PLAT-001.md) | 先做 QEMU 启动资源 host 校验，再接 MM-002 |
+| UART、VirtIO、SD 等设备 | [DRV-001](../specs/DRV-001.md) | 先接一个 QEMU 块设备，验证已知扇区及失败清理 |
+
+这三份是待审的边界规格；具体接口冻结在对应实现 SPEC 中，跨层变更由调用方和实现方共同审阅。移植顺序与环境验收见 [路线](roadmap.md#多平台怎样推进)。
+
+分层参考 KernelX 的固定快照，借鉴范围及差异见 [来源](references.md#多平台设计参考)。

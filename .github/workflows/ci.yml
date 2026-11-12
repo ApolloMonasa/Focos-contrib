@@ -22,7 +22,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Install QEMU
-        run: sudo apt-get update && sudo apt-get install -y qemu-system-misc
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          # 官方域名曾解析失败，优先独立 HTTPS 镜像；仍由 Ubuntu keyring 验签。
+          printf 'https://mirrors.edge.kernel.org/ubuntu/\tpriority:1\nhttps://archive.ubuntu.com/ubuntu/\tpriority:2\nhttps://security.ubuntu.com/ubuntu/\tpriority:3\n' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+          apt_options=(-o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15)
+          sudo apt "${apt_options[@]}" -o APT::Update::Error-Mode=any update
+          sudo apt "${apt_options[@]}" install -y --no-install-recommends qemu-system-misc
       - name: Install pinned Rust
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target riscv64gc-unknown-none-elf --no-self-update
       - name: Verify build and boot

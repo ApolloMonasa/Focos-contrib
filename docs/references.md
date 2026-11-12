@@ -32,3 +32,14 @@
 - [HNSW](https://arxiv.org/abs/1603.09320)、[DiskANN](https://papers.neurips.cc/paper/2019/hash/09853c7fb1d3f8ee67a61b6bf4a7f8e6-Abstract.html)、[MemGPT](https://arxiv.org/abs/2310.08560)：算法与应用动机；论文性能不是 FocOS 数据。
 
 引入第三方代码前核对许可证，在源码和设计/答辩材料注明来源。AI 辅助与人工复核见 [记录](ai-usage.md)。
+
+## 多平台设计参考
+
+[KernelX 固定快照](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/tree/12ac84b6401cbddf75ca937ad485f8437cb3dc1d)（2026-11-11 源码检查）：
+
+- [架构入口与统一类型](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/arch/mod.rs)、[CPU/页表/上下文接口](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/arch/arch.rs)：参考编译时架构选择与 ABI 隔离。
+- [设备匹配](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/driver/matcher.rs)、[VirtIO 传输适配](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/driver/virtio/matcher.rs)、[DMA 适配](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/driver/virtio/hal.rs)：参考统一设备接口与底层资源适配。
+
+- [VirtIO 驱动内缓存](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/kernelx/src/driver/block/virtio.rs)、[双架构构建及启动配置](https://gitlab.eduxiji.net/educg-group-48535-3229427/T2026103369910030-2889/-/blob/12ac84b6401cbddf75ca937ad485f8437cb3dc1d/build-kernel.sh)：据此补充 FocOS 的公共缓存边界与平台运行配置要求。
+
+本次借鉴设计思路，未引入代码。FocOS 另行明确板级层，保留 HAL-001 的错误及同步语义；早期静态装配，按需扩展。上述源码路径存在不代表两块真板均已验证，本次未运行 KernelX。
