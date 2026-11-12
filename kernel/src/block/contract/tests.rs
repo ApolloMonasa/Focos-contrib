@@ -387,3 +387,64 @@ fn empty_device_check_rejects_nonzero_blocks() {
     let mut disk = EmptyAcceptsMaxDisk;
     assert!(check_empty_device(&mut disk).is_err());
 }
+
+/// 非合规设备：读某块时先正确填充缓冲区，随后破坏编号低一块的介质内容。
+struct ReadCorruptsPreviousDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for ReadCorruptsPreviousDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)?;
+        if block >= 1 {
+            let previous = block - 1;
+            self.inner.write_block(previous, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn baseline_verify_rechecks_after_full_pass() {
+    // 单次升序遍历会在副作用发生前比对低块，"读高块破坏低块"的后端
+    // 必须被第二遍遍历检出。
+    let mut storage = [0x33; BLOCK_SIZE * 4];
+    let mut disk = ReadCorruptsPreviousDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
+
+/// 非合规设备：容量为 0，仅对块 0 先校验长度，其他块号先返回越界。
+struct EmptyBlockFirstOtherDisk;
+
+impl BlockDevice for EmptyBlockFirstOtherDisk {
+    fn block_count(&self) -> u64 {
+        0
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE && block == 0 {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        Err(BlockError::OutOfBounds)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE && block == 0 {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        Err(BlockError::OutOfBounds)
+    }
+}
+
+#[test]
+fn empty_device_length_priority_covers_all_blocks() {
+    // 长度优先约定适用于全部块号：非法长度与非零、巨大块号也须组合验证。
+    let mut disk = EmptyBlockFirstOtherDisk;
+    assert!(check_empty_device(&mut disk).is_err());
+}

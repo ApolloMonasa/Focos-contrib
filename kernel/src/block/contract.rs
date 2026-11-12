@@ -339,20 +339,23 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
     }
     let sentinel = 0x77;
     let mut probe = [sentinel; BLOCK_SIZE + 1];
-    // 非法长度配越界块 0：长度错误必须优先于块号错误。
+    // 非法长度与块 0、非零块、巨大块号全部交叉组合：长度错误优先于块号
+    // 错误的约定适用于任何块编号，仅对块 0 先查长度的实现必须被拒收。
     for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
-        expect_error(
-            scenario,
-            "read_block",
-            BlockError::InvalidBufferLength,
-            device.read_block(0, &mut probe[..length]),
-        )?;
-        expect_error(
-            scenario,
-            "write_block",
-            BlockError::InvalidBufferLength,
-            device.write_block(0, &probe[..length]),
-        )?;
+        for block in [0, 1, u64::MAX] {
+            expect_error(
+                scenario,
+                "read_block",
+                BlockError::InvalidBufferLength,
+                device.read_block(block, &mut probe[..length]),
+            )?;
+            expect_error(
+                scenario,
+                "write_block",
+                BlockError::InvalidBufferLength,
+                device.write_block(block, &probe[..length]),
+            )?;
+        }
         if probe != [sentinel; BLOCK_SIZE + 1] {
             return Err(ContractFailure {
                 scenario,
@@ -361,26 +364,8 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
         }
     }
     let mut buffer = [sentinel; BLOCK_SIZE];
-    expect_error(
-        scenario,
-        "read_block",
-        BlockError::OutOfBounds,
-        device.read_block(0, &mut buffer),
-    )?;
-    if buffer != [sentinel; BLOCK_SIZE] {
-        return Err(ContractFailure {
-            scenario,
-            kind: FailureKind::BufferMutated,
-        });
-    }
-    expect_error(
-        scenario,
-        "write_block",
-        BlockError::OutOfBounds,
-        device.write_block(0, &buffer),
-    )?;
-    // 空盘上任何块编号都越界，含非零块与巨大块号（HAL-001 空盘场景）。
-    for block in [1, u64::MAX] {
+    // 合法长度配各探针块号：全部越界且缓冲区保持不变（HAL-001 空盘场景）。
+    for block in [0, 1, u64::MAX] {
         expect_error(
             scenario,
             "read_block",
@@ -692,15 +677,24 @@ fn write_probe_baseline(
     Ok(())
 }
 
-/// 逐块重读并比对探针基线，报告首个被破坏的块；任何采样式复核都存在
-/// 盲区，检查必须覆盖全部块（HAL-001「其他块不受影响」）。
+/// 逐块重读并比对探针基线，报告首个被破坏的块；升序一遍后按降序再
+/// 遍历一遍——读取路径可能在正确填充缓冲区后破坏其他块，单次遍历会
+/// 在副作用发生前比对低块，第二遍才能读到被破坏的内容（任何采样式
+/// 复核都存在盲区，检查必须覆盖全部块两次，HAL-001「其他块不受影响」）。
 fn verify_probe_baseline(
     device: &mut dyn BlockDevice,
     scenario: &'static str,
     blocks: core::ops::Range<u64>,
 ) -> Result<(), ContractFailure> {
     let mut buffer = [0; BLOCK_SIZE];
-    for block in blocks {
+    for block in blocks.clone() {
+        let pattern = probe_pattern(block);
+        device
+            .read_block(block, &mut buffer)
+            .map_err(unexpected(scenario, "read_block"))?;
+        compare_block(scenario, block, &buffer, &pattern)?;
+    }
+    for block in blocks.rev() {
         let pattern = probe_pattern(block);
         device
             .read_block(block, &mut buffer)
