@@ -552,6 +552,9 @@ fn probe_pattern(block: u64) -> [u8; BLOCK_SIZE] {
     core::array::from_fn(|i| (i as u8).wrapping_add(block as u8))
 }
 
+#[cfg(test)]
+mod tests;
+
 /// 把预期成功操作的错误包装为契约失败。
 fn unexpected(scenario: &'static str, op: &'static str) -> impl Fn(BlockError) -> ContractFailure {
     move |error| ContractFailure {
