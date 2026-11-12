@@ -3,9 +3,11 @@
 //!
 //! 后端适配步骤：
 //! 1. 实现 [`BlockDevice`]，写清 `flush` 的真实语义与保证范围。
-//! 2. 准备专用测试盘/镜像（勿用生产盘或含个人数据的卡）并确定已知容量；
-//!    故障场景用本模块包装设备注入，不需要真实损坏的硬件。
-//! 3. host 侧逐项调用 `check_*`，保持每个场景独立的失败定位；
+//! 2. 准备专用测试盘/镜像（勿用生产盘或含个人数据的卡），确定已知容量，
+//!    并保留至少一块的已知初始内容；故障场景用本模块包装设备注入，
+//!    不需要真实损坏的硬件。
+//! 3. 先用 [`check_known_data`] 校验已知块（在任何破坏性写入之前执行），
+//!    再逐项调用其余 `check_*` 保持每个场景独立的失败定位；
 //!    上板自检或 CI 汇总改用 [`run_block_contract`] 并传入后端名。
 //! 4. 按 `flush` 实际语义选择检查：成功走 [`check_flush_ok`]（汇总入口即此
 //!    路径），不支持走 [`check_flush_unsupported`]（通过只说明如实上报），
@@ -59,6 +61,26 @@ pub enum FailureKind {
     BufferMutated,
 }
 
+/// 已知数据读取：不做任何写入，直接读取专用测试盘的已知块并逐字节比对。
+///
+/// 用于在任何破坏性写入之前确认设备读取的是介质原有内容（DRV-001
+/// 「先读固定镜像的已知扇区并校验内容」）：只会回放会话内写入的
+/// 缓存型假后端能骗过全部先写后读的检查，只有本检查能将其拒收。
+///
+/// 前置：`block` 为有效块号，`expected` 为测试镜像中该块的已知内容。
+pub fn check_known_data(
+    device: &mut dyn BlockDevice,
+    block: u64,
+    expected: &[u8; BLOCK_SIZE],
+) -> Result<(), ContractFailure> {
+    let scenario = "known_data_read";
+    let mut buffer = [0; BLOCK_SIZE];
+    device
+        .read_block(block, &mut buffer)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, block, &buffer, expected)
+}
+
 /// 写后读：向第 0 块先后写入两种随偏移变化的图样并整块读回，
 /// 逐字节比对，覆盖 HAL-001 的正常读写场景（含字节顺序不变）。
 ///
@@ -109,12 +131,18 @@ pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<()
             });
         }
     }
-    // 巨大块编号配非法长度：长度错误必须优先于块号错误。
+    // 巨大块编号配非法长度：长度错误必须优先于块号错误，读写两条路径都要成立。
     expect_error(
         scenario,
         "write_block",
         BlockError::InvalidBufferLength,
         device.write_block(u64::MAX, &[]),
+    )?;
+    expect_error(
+        scenario,
+        "read_block",
+        BlockError::InvalidBufferLength,
+        device.read_block(u64::MAX, &mut []),
     )
 }
 
@@ -174,7 +202,8 @@ pub fn check_out_of_bounds_rejected(device: &mut dyn BlockDevice) -> Result<(), 
     Ok(())
 }
 
-/// 邻块保持：写入首块与末块后，中间块内容不变（HAL-001 最后一块场景）。
+/// 邻块保持：写入首块与末块后，首尾各自的实际相邻块与中间块内容不变
+/// （HAL-001「其他块不受影响」与最后一块场景）。
 ///
 /// 前置：设备至少 3 块，且写入专用测试盘。
 pub fn check_first_last_write_preserves_neighbors(
@@ -191,11 +220,16 @@ pub fn check_first_last_write_preserves_neighbors(
             },
         });
     }
-    let (first, last, neighbor) = (0, count - 1, count / 2);
+    let (first, last) = (0, count - 1);
+    // 首块的后一块、末块的前一块与中间块统一预置基线并重读，
+    // 使首尾写入向相邻块的串扰必然被检出；容量为 3 时三者同一块。
+    let inner = [1, count / 2, count - 2];
     let base = [0x33; BLOCK_SIZE];
-    device
-        .write_block(neighbor, &base)
-        .map_err(unexpected(scenario, "write_block"))?;
+    for block in inner {
+        device
+            .write_block(block, &base)
+            .map_err(unexpected(scenario, "write_block"))?;
+    }
     device
         .write_block(first, &[0x11; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
@@ -205,7 +239,9 @@ pub fn check_first_last_write_preserves_neighbors(
     let mut buffer = [0; BLOCK_SIZE];
     for (block, expected) in [
         (first, [0x11; BLOCK_SIZE]),
-        (neighbor, base),
+        (inner[0], base),
+        (inner[1], base),
+        (inner[2], base),
         (last, [0x22; BLOCK_SIZE]),
     ] {
         device
@@ -347,8 +383,10 @@ pub fn check_io_failures_recoverable(device: &mut FaultyDevice<'_>) -> Result<()
 /// 汇总入口：校验已知容量后顺序执行全部契约检查，首个失败带后端名返回。
 ///
 /// 供上板自检或 CI 汇总使用；host 单测建议逐项调用 `check_*` 保留
-/// 每个场景的原生失败定位。本入口要求设备 `flush` 成功且容量至少 3 块；
-/// 不支持或会失败的同步、以及 0 容量空盘，请逐项调用对应检查。
+/// 每个场景的原生失败定位。已知数据读取（[`check_known_data`]）须在
+/// 进入本入口之前自行完成——本入口从破坏性写入开始。本入口要求设备
+/// `flush` 成功且容量至少 3 块；不支持或会失败的同步、以及 0 容量空盘，
+/// 请逐项调用对应检查。
 ///
 /// # 参数
 /// - `backend`：后端名，用于失败定位。

@@ -1,7 +1,8 @@
 use super::contract::{
     check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
     check_flush_failure_retry, check_flush_ok, check_flush_unsupported,
-    check_io_failures_recoverable, check_out_of_bounds_rejected, check_read_write_roundtrip,
+    check_io_failures_recoverable, check_known_data, check_out_of_bounds_rejected,
+    check_read_write_roundtrip,
 };
 use super::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk, contract};
 
@@ -10,10 +11,8 @@ fn memory_contract_read_write_roundtrip() {
     let original: [u8; BLOCK_SIZE] = core::array::from_fn(|i| (i ^ (i >> 8)) as u8);
     let mut storage = original;
     let mut disk = MemoryDisk::new(&mut storage).unwrap();
-    // 构造保留已有内容是内存盘专属判据（HAL-001 容量与借用场景），留在后端侧。
-    let mut buffer = [0; BLOCK_SIZE];
-    disk.read_block(0, &mut buffer).unwrap();
-    assert_eq!(buffer, original);
+    // 破坏性写入前先确认设备读回镜像已有内容（已知数据读取）。
+    check_known_data(&mut disk, 0, &original).unwrap();
     check_read_write_roundtrip(&mut disk).unwrap();
 }
 
@@ -135,4 +134,122 @@ fn memory_contract_run_block_contract_reports_backend_on_count_mismatch() {
             }
         })
     );
+}
+
+/// 非合规设备：读路径先查块号再查长度，违反长度错误优先约定。
+struct BlockFirstReadDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for BlockFirstReadDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn memory_contract_length_priority_covers_read_path() {
+    let mut storage = [0x33; BLOCK_SIZE];
+    let mut disk = BlockFirstReadDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 非合规设备：写入某块时把相同数据串写到下一块。
+struct SpillingWriteDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for SpillingWriteDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        let next = block + 1;
+        if next < self.block_count() {
+            self.inner.write_block(next, buffer)?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn memory_contract_neighbor_check_covers_adjacent_blocks() {
+    let mut storage = [0x33; BLOCK_SIZE * 4];
+    let mut disk = SpillingWriteDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_first_last_write_preserves_neighbors(&mut disk).is_err());
+}
+
+/// 非合规设备：读只回放会话内最后写入的缓存，未写块返回伪造内容，
+/// 从不读取介质原有数据。
+struct WriteOnlyCacheDisk<'a> {
+    inner: MemoryDisk<'a>,
+    cached: Option<(u64, [u8; BLOCK_SIZE])>,
+}
+
+impl BlockDevice for WriteOnlyCacheDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        match self.cached {
+            Some((cached_block, data)) if cached_block == block => {
+                buffer.copy_from_slice(&data);
+            }
+            _ => {
+                buffer.fill(0xAA);
+            }
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        let data: [u8; BLOCK_SIZE] = buffer.try_into().unwrap();
+        self.cached = Some((block, data));
+        Ok(())
+    }
+    fn flush(&mut self) -> Result<(), BlockError> {
+        Ok(())
+    }
+}
+
+#[test]
+fn memory_contract_known_data_rejects_cache_only_reads() {
+    // 只回放会话内写入的假后端能骗过写后读检查，
+    // 必须在破坏性写入前的已知数据检查处失败。
+    let original: [u8; BLOCK_SIZE] = core::array::from_fn(|i| (i ^ (i >> 8)) as u8);
+    let mut storage = original;
+    let mut disk = WriteOnlyCacheDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        cached: None,
+    };
+    check_read_write_roundtrip(&mut disk).unwrap();
+    assert!(check_known_data(&mut disk, 0, &original).is_err());
 }
