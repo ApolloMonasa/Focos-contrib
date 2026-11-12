@@ -9,7 +9,8 @@
 //!    本模块包装设备注入，不需要真实损坏的硬件。
 //! 3. 先用 [`check_block_count`] 校验已知容量、[`check_known_data`] 校验
 //!    已知块（两者都以调用方掌握的真实信息为准，须在任何破坏性写入之前
-//!    执行），再逐项调用其余 `check_*` 保持每个场景独立的失败定位；
+//!    执行），再用 [`check_write_isolation`] 验证写隔离，然后逐项调用
+//!    其余 `check_*` 保持每个场景独立的失败定位；
 //!    上板自检或 CI 汇总改用 [`run_block_contract`] 并传入后端名。
 //! 4. 按 `flush` 实际语义选择检查：成功走 [`check_flush_ok`]（汇总入口即此
 //!    路径），不支持走 [`check_flush_unsupported`]（通过只说明如实上报），
@@ -86,6 +87,36 @@ pub fn check_block_count(
     Ok(())
 }
 
+/// 写隔离：全盘基线建立后逐块重写，每次写入后立即两遍验证其余块——
+/// 顺序基线写入会治愈先前写入的串扰（后写的块覆盖被破坏的内容），
+/// 逐块重写并即时验证使任何写侧跨块破坏无法被后续写入掩盖。
+/// 开销随容量平方增长，请使用小型专用测试盘（几千块以内）。
+///
+/// 前置：设备至少 1 块，且写入专用测试盘。
+pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
+    let scenario = "write_isolation";
+    let count = device.block_count();
+    if count == 0 {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::WrongBlockCount {
+                expected: 1,
+                actual: count,
+            },
+        });
+    }
+    write_probe_baseline(device, scenario, 0..count)?;
+    for block in 0..count {
+        let pattern = probe_pattern(block);
+        device
+            .write_block(block, &pattern)
+            .map_err(unexpected(scenario, "write_block"))?;
+        verify_block_state(device, scenario, 0..block, probe_pattern)?;
+        verify_block_state(device, scenario, block + 1..count, probe_pattern)?;
+    }
+    Ok(())
+}
+
 /// 已知数据读取：不做任何写入，直接读取专用测试盘的已知块并逐字节比对。
 ///
 /// 用于在任何破坏性写入之前确认设备读取的是介质原有内容（DRV-001
@@ -146,7 +177,14 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
             .map_err(unexpected(scenario, "read_block"))?;
         compare_block(scenario, 0, &buffer, &snapshot)?;
     }
-    verify_probe_baseline(device, scenario, 1..count)
+    // 终态复核含第 0 块的当前期望值，读取侧对目标块的破坏也能被检出。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            second
+        } else {
+            probe_pattern(block)
+        }
+    })
 }
 
 /// 长度校验：0、`BLOCK_SIZE-1`、`BLOCK_SIZE+1` 字节的缓冲区被拒绝并返回
@@ -293,29 +331,30 @@ pub fn check_first_last_write_preserves_neighbors(
     }
     let (first, last) = (0, count - 1);
     write_probe_baseline(device, scenario, 1..count)?;
-    let mut buffer = [0; BLOCK_SIZE];
-    // 阶段一：写首块后立即确认自身与全部基线块（含末块）未被破坏。
+    // 阶段一：写首块后整盘两遍复核（首块期望 0x11，其余块含末块为基线）。
     device
         .write_block(first, &[0x11; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
-    device
-        .read_block(first, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, first, &buffer, &[0x11; BLOCK_SIZE])?;
-    verify_probe_baseline(device, scenario, 1..count)?;
-    // 阶段二：写末块后确认首块与其余基线块未被破坏，末块读回新值。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == first {
+            [0x11; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })?;
+    // 阶段二：写末块后整盘两遍复核（首块 0x11、末块 0x22，其余为基线）。
     device
         .write_block(last, &[0x22; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
-    device
-        .read_block(first, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, first, &buffer, &[0x11; BLOCK_SIZE])?;
-    verify_probe_baseline(device, scenario, 1..last)?;
-    device
-        .read_block(last, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, last, &buffer, &[0x22; BLOCK_SIZE])
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == first {
+            [0x11; BLOCK_SIZE]
+        } else if block == last {
+            [0x22; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })
 }
 
 /// 空设备校验：容量为 0 时任何块编号的读写都被拒绝并返回
@@ -410,12 +449,14 @@ pub fn check_flush_ok(device: &mut dyn BlockDevice) -> Result<(), ContractFailur
         .write_block(0, &[0x55; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
     device.flush().map_err(unexpected(scenario, "flush"))?;
-    let mut buffer = [0; BLOCK_SIZE];
-    device
-        .read_block(0, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, 0, &buffer, &[0x55; BLOCK_SIZE])?;
-    verify_probe_baseline(device, scenario, 1..count)
+    // 终态复核含第 0 块的当前期望值（0x55），读取侧对目标块的破坏也能被检出。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })
 }
 
 /// 同步不支持语义：有未同步写入时请求 `flush` 必须收到
@@ -441,12 +482,13 @@ pub fn check_flush_unsupported(device: &mut dyn BlockDevice) -> Result<(), Contr
         .write_block(0, &[0x55; BLOCK_SIZE])
         .map_err(unexpected(scenario, "write_block"))?;
     expect_error(scenario, "flush", BlockError::Unsupported, device.flush())?;
-    let mut buffer = [0; BLOCK_SIZE];
-    device
-        .read_block(0, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, 0, &buffer, &[0x55; BLOCK_SIZE])?;
-    verify_probe_baseline(device, scenario, 1..count)
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })
 }
 
 /// 同步失败语义：`flush` 失败向调用者返回 [`BlockError::Io`]，不吞错、
@@ -473,12 +515,13 @@ pub fn check_flush_failure_retry(device: &mut FaultyDevice<'_>) -> Result<(), Co
     expect_error(scenario, "flush", BlockError::Io, device.flush())?;
     device.fail_flush = false;
     device.flush().map_err(unexpected(scenario, "flush"))?;
-    let mut buffer = [0; BLOCK_SIZE];
-    device
-        .read_block(0, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, 0, &buffer, &[0x55; BLOCK_SIZE])?;
-    verify_probe_baseline(device, scenario, 1..count)
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })
 }
 
 /// 读写失败语义：设备错误以 [`BlockError::Io`] 传给调用者，失败的读取
@@ -529,7 +572,7 @@ pub fn check_io_failures_recoverable(device: &mut FaultyDevice<'_>) -> Result<()
         .read_block(0, &mut buffer)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &buffer, &pattern)?;
-    verify_probe_baseline(device, scenario, 1..count)
+    verify_block_state(device, scenario, 0..count, probe_pattern)
 }
 
 /// 汇总入口：校验已知容量后顺序执行全部契约检查，首个失败带后端名返回。
@@ -555,6 +598,7 @@ pub fn run_block_contract(
 ) -> Result<(), BlockContractError> {
     let wrap = |failure| BlockContractError { backend, failure };
     check_block_count(device, expected_blocks).map_err(wrap)?;
+    check_write_isolation(device).map_err(wrap)?;
     check_read_write_roundtrip(device).map_err(wrap)?;
     check_first_last_write_preserves_neighbors(device).map_err(wrap)?;
     check_out_of_bounds_rejected(device).map_err(wrap)?;
@@ -677,31 +721,42 @@ fn write_probe_baseline(
     Ok(())
 }
 
-/// 逐块重读并比对探针基线，报告首个被破坏的块；升序一遍后按降序再
+/// 逐块重读并比对期望图样，报告首个被破坏的块；升序一遍后按降序再
 /// 遍历一遍——读取路径可能在正确填充缓冲区后破坏其他块，单次遍历会
 /// 在副作用发生前比对低块，第二遍才能读到被破坏的内容（任何采样式
-/// 复核都存在盲区，检查必须覆盖全部块两次，HAL-001「其他块不受影响」）。
-fn verify_probe_baseline(
+/// 复核都存在盲区，终态复核必须覆盖全部块两次，HAL-001「其他块不受
+/// 影响」）。复核区间应包含写入目标块的当前期望值。
+fn verify_block_state(
     device: &mut dyn BlockDevice,
     scenario: &'static str,
     blocks: core::ops::Range<u64>,
+    expected: impl Fn(u64) -> [u8; BLOCK_SIZE],
 ) -> Result<(), ContractFailure> {
     let mut buffer = [0; BLOCK_SIZE];
     for block in blocks.clone() {
-        let pattern = probe_pattern(block);
+        let pattern = expected(block);
         device
             .read_block(block, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
         compare_block(scenario, block, &buffer, &pattern)?;
     }
     for block in blocks.rev() {
-        let pattern = probe_pattern(block);
+        let pattern = expected(block);
         device
             .read_block(block, &mut buffer)
             .map_err(unexpected(scenario, "read_block"))?;
         compare_block(scenario, block, &buffer, &pattern)?;
     }
     Ok(())
+}
+
+/// 以探针图样为期望图样重读并比对给定块区间。
+fn verify_probe_baseline(
+    device: &mut dyn BlockDevice,
+    scenario: &'static str,
+    blocks: core::ops::Range<u64>,
+) -> Result<(), ContractFailure> {
+    verify_block_state(device, scenario, blocks, probe_pattern)
 }
 
 #[cfg(test)]

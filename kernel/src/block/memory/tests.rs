@@ -159,3 +159,10 @@ fn contract_block_count_matches_expected() {
         })
     );
 }
+
+#[test]
+fn contract_write_isolation_passes() {
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    contract::check_write_isolation(&mut disk).unwrap();
+}

@@ -3,7 +3,8 @@
 
 use super::{
     check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
-    check_known_data, check_out_of_bounds_rejected, check_read_write_roundtrip,
+    check_flush_ok, check_known_data, check_out_of_bounds_rejected, check_read_write_roundtrip,
+    check_write_isolation,
 };
 use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
@@ -447,4 +448,71 @@ fn empty_device_length_priority_covers_all_blocks() {
     // 长度优先约定适用于全部块号：非法长度与非零、巨大块号也须组合验证。
     let mut disk = EmptyBlockFirstOtherDisk;
     assert!(check_empty_device(&mut disk).is_err());
+}
+
+/// 非合规设备：读块 0 以外的块时先正确填充缓冲区，随后破坏块 0。
+struct FlushReadClobbersZeroDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for FlushReadClobbersZeroDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)?;
+        if block >= 1 {
+            self.inner.write_block(0, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+    fn flush(&mut self) -> Result<(), BlockError> {
+        self.inner.flush()
+    }
+}
+
+#[test]
+fn flush_check_rechecks_target_after_baseline_verify() {
+    // 终态复核必须包含写入目标块（0x55）的当前期望值：读取路径在
+    // 目标块比对之后破坏它时，排除目标块的复核发现不了。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = FlushReadClobbersZeroDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_flush_ok(&mut disk).is_err());
+}
+
+/// 非合规设备：写块 1 时把垃圾串写到块 2（后续基线写入会治愈它）。
+struct WriteClobbersLaterDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for WriteClobbersLaterDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 1 {
+            self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn write_isolation_rewrites_each_block_with_immediate_verify() {
+    // 顺序基线写入会治愈先前写入的串扰：逐块重写并即时验证其余块，
+    // 使写侧跨块破坏无法被后续写入掩盖。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = WriteClobbersLaterDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
 }
