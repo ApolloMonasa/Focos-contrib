@@ -2,8 +2,8 @@
 //! 验证检查能在对应场景下拒绝它。
 
 use super::{
-    check_buffer_length_validation, check_first_last_write_preserves_neighbors, check_known_data,
-    check_out_of_bounds_rejected, check_read_write_roundtrip,
+    check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
+    check_known_data, check_out_of_bounds_rejected, check_read_write_roundtrip,
 };
 use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
@@ -323,4 +323,26 @@ fn probe_patterns_distinguish_all_block_numbers() {
         inner: MemoryDisk::new(&mut storage).unwrap(),
     };
     assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
+
+/// 非合规设备：容量为 0，参数校验先查块号再查长度。
+struct EmptyBlockFirstDisk;
+
+impl BlockDevice for EmptyBlockFirstDisk {
+    fn block_count(&self) -> u64 {
+        0
+    }
+    fn read_block(&mut self, _block: u64, _buffer: &mut [u8]) -> Result<(), BlockError> {
+        Err(BlockError::OutOfBounds)
+    }
+    fn write_block(&mut self, _block: u64, _buffer: &[u8]) -> Result<(), BlockError> {
+        Err(BlockError::OutOfBounds)
+    }
+}
+
+#[test]
+fn empty_device_check_covers_length_priority() {
+    // 空盘上长度错误仍须优先于块号错误，"先查块号"的实现在此必须被拒收。
+    let mut disk = EmptyBlockFirstDisk;
+    assert!(check_empty_device(&mut disk).is_err());
 }

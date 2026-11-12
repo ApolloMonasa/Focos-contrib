@@ -4,10 +4,10 @@
 
 use super::MemoryDisk;
 use crate::block::contract::{
-    check_buffer_length_validation, check_empty_device, check_first_last_write_preserves_neighbors,
-    check_flush_failure_retry, check_flush_ok, check_flush_unsupported,
-    check_io_failures_recoverable, check_known_data, check_out_of_bounds_rejected,
-    check_read_write_roundtrip,
+    check_block_count, check_buffer_length_validation, check_empty_device,
+    check_first_last_write_preserves_neighbors, check_flush_failure_retry, check_flush_ok,
+    check_flush_unsupported, check_io_failures_recoverable, check_known_data,
+    check_out_of_bounds_rejected, check_read_write_roundtrip,
 };
 use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, contract};
 
@@ -138,6 +138,23 @@ fn contract_run_block_contract_reports_backend_on_count_mismatch() {
                     expected: 4,
                     actual: 3
                 }
+            }
+        })
+    );
+}
+
+#[test]
+fn contract_block_count_matches_expected() {
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = MemoryDisk::new(&mut storage).unwrap();
+    check_block_count(&mut disk, 3).unwrap();
+    assert_eq!(
+        check_block_count(&mut disk, 4),
+        Err(contract::ContractFailure {
+            scenario: "block_count",
+            kind: contract::FailureKind::WrongBlockCount {
+                expected: 4,
+                actual: 3
             }
         })
     );

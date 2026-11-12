@@ -7,8 +7,9 @@
 //!    并保留至少一块的已知初始内容；各检查会全盘预置基线并逐块重读，
 //!    开销随容量线性增长，测试盘应保持小型（几 MB 即可）。故障场景用
 //!    本模块包装设备注入，不需要真实损坏的硬件。
-//! 3. 先用 [`check_known_data`] 校验已知块（在任何破坏性写入之前执行），
-//!    再逐项调用其余 `check_*` 保持每个场景独立的失败定位；
+//! 3. 先用 [`check_block_count`] 校验已知容量、[`check_known_data`] 校验
+//!    已知块（两者都以调用方掌握的真实信息为准，须在任何破坏性写入之前
+//!    执行），再逐项调用其余 `check_*` 保持每个场景独立的失败定位；
 //!    上板自检或 CI 汇总改用 [`run_block_contract`] 并传入后端名。
 //! 4. 按 `flush` 实际语义选择检查：成功走 [`check_flush_ok`]（汇总入口即此
 //!    路径），不支持走 [`check_flush_unsupported`]（通过只说明如实上报），
@@ -60,6 +61,29 @@ pub enum FailureKind {
     },
     /// 参数错误的操作修改了调用者缓冲区。
     BufferMutated,
+}
+
+/// 容量校验：设备报告的总块数与专用测试盘的已知容量一致。
+///
+/// 防止后端稳定少报容量（如把 4 块测试盘报成 3 块）而把不可访问的
+/// 尾部扇区漏报为合规；逐项调用破坏性检查前应先执行本检查与
+/// [`check_known_data`]，两者都以调用方掌握的真实信息为准。
+pub fn check_block_count(
+    device: &mut dyn BlockDevice,
+    expected_blocks: u64,
+) -> Result<(), ContractFailure> {
+    let scenario = "block_count";
+    let actual = device.block_count();
+    if actual != expected_blocks {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::WrongBlockCount {
+                expected: expected_blocks,
+                actual,
+            },
+        });
+    }
+    Ok(())
 }
 
 /// 已知数据读取：不做任何写入，直接读取专用测试盘的已知块并逐字节比对。
@@ -285,7 +309,10 @@ pub fn check_first_last_write_preserves_neighbors(
 }
 
 /// 空设备校验：容量为 0 时任何块编号的读写都被拒绝并返回
-/// [`BlockError::OutOfBounds`]，读取缓冲区保持不变。
+/// [`BlockError::OutOfBounds`]，读取缓冲区保持不变；0、`BLOCK_SIZE-1`、
+/// `BLOCK_SIZE+1` 字节的非法长度仍须优先返回
+/// [`BlockError::InvalidBufferLength`]——先查块号的实现会在空盘上
+/// 把长度优先约定漏掉。
 ///
 /// 前置：后端提供容量为 0 的专用测试设备。
 pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
@@ -301,6 +328,28 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
         });
     }
     let sentinel = 0x77;
+    let mut probe = [sentinel; BLOCK_SIZE + 1];
+    // 非法长度配越界块 0：长度错误必须优先于块号错误。
+    for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
+        expect_error(
+            scenario,
+            "read_block",
+            BlockError::InvalidBufferLength,
+            device.read_block(0, &mut probe[..length]),
+        )?;
+        expect_error(
+            scenario,
+            "write_block",
+            BlockError::InvalidBufferLength,
+            device.write_block(0, &probe[..length]),
+        )?;
+        if probe != [sentinel; BLOCK_SIZE + 1] {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
+    }
     let mut buffer = [sentinel; BLOCK_SIZE];
     expect_error(
         scenario,
@@ -488,16 +537,7 @@ pub fn run_block_contract(
     expected_blocks: u64,
 ) -> Result<(), BlockContractError> {
     let wrap = |failure| BlockContractError { backend, failure };
-    let actual = device.block_count();
-    if actual != expected_blocks {
-        return Err(wrap(ContractFailure {
-            scenario: "block_count",
-            kind: FailureKind::WrongBlockCount {
-                expected: expected_blocks,
-                actual,
-            },
-        }));
-    }
+    check_block_count(device, expected_blocks).map_err(wrap)?;
     check_read_write_roundtrip(device).map_err(wrap)?;
     check_first_last_write_preserves_neighbors(device).map_err(wrap)?;
     check_out_of_bounds_rejected(device).map_err(wrap)?;
