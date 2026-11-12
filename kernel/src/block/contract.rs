@@ -94,9 +94,11 @@ pub fn check_block_count(
 /// 后立即两遍复核全盘（已重写块期望独立图样、未重写块期望基线，目标块
 /// 亦在其内）——顺序基线写入会治愈先前写入的串扰，逐块重写并即时复核
 /// 使写侧跨块破坏与静默丢写（含测试盘预置为基线镜像的情况）都无法掩盖。
-/// 开销随容量平方增长，请仅用百块以内的小型专用测试盘。
+/// 首写探针用整块快照无损比对，栈内存随块数线性增长，其余块数量
+/// 不得超过 [`MAX_ISOLATION_OTHERS`]，超出返回 [`FailureKind::WrongBlockCount`]。
 ///
-/// 前置：设备至少 1 块，且写入专用测试盘。
+/// 前置：设备至少 1 块且不超过 [`MAX_ISOLATION_OTHERS`] + 1 块，并写入
+/// 专用测试盘。
 pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
     let scenario = "write_isolation";
     let count = device.block_count();
@@ -109,16 +111,31 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
             },
         });
     }
+    if (count - 1) as usize > MAX_ISOLATION_OTHERS {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::WrongBlockCount {
+                expected: (MAX_ISOLATION_OTHERS + 1) as u64,
+                actual: count,
+            },
+        });
+    }
     // 首写可观测探针：读块 0 现值、写入逐字节取反图样并立即读回——
-    // 只丢弃启动后第一次写入的后端在基线建立前就被拒收，不会被子序列
-    // 重写抹去证据（DRV-001「读写成功意味着规定传输已完成」）。写入
-    // 前留存独立快照校验输入缓冲区未被回写，前后各取一次其余块状态
-    // 摘要捕捉首写的跨块串扰。
+    // 只丢弃启动后第一次写入的后端在基线建立前就被拒收（DRV-001
+    // 「读写成功意味着规定传输已完成」）。写入前留存独立快照校验输入
+    // 缓冲区未被回写；其余块先整块快照、写后逐块无损比对——有损摘要
+    // 存在同权字节抵消的盲区，首写隔离必须逐字节等。
     let mut probe = [0; BLOCK_SIZE];
     device
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
-    let other_blocks_before = block_range_digest(device, scenario, 1..count)?;
+    let others_len = (count - 1) as usize;
+    let mut others = [[0u8; BLOCK_SIZE]; MAX_ISOLATION_OTHERS];
+    for (i, slot) in others.iter_mut().enumerate().take(others_len) {
+        device
+            .read_block(i as u64 + 1, slot)
+            .map_err(unexpected(scenario, "read_block"))?;
+    }
     let first_write = probe.map(|byte| !byte);
     let snapshot = first_write;
     device
@@ -134,12 +151,17 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &probe, &snapshot)?;
-    let other_blocks_after = block_range_digest(device, scenario, 1..count)?;
-    if other_blocks_before != other_blocks_after {
-        return Err(ContractFailure {
-            scenario,
-            kind: FailureKind::OtherBlocksMutated,
-        });
+    let mut recheck = [0u8; BLOCK_SIZE];
+    for (i, slot) in others.iter().enumerate().take(others_len) {
+        device
+            .read_block(i as u64 + 1, &mut recheck)
+            .map_err(unexpected(scenario, "read_block"))?;
+        if *slot != recheck {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::OtherBlocksMutated,
+            });
+        }
     }
     write_probe_baseline(device, scenario, 0..count)?;
     // 基线建立后、覆盖前先整盘复核：静默丢弃任一基线写入的后端在此
@@ -356,6 +378,12 @@ pub fn check_out_of_bounds_rejected(device: &mut dyn BlockDevice) -> Result<(), 
             BlockError::OutOfBounds,
             device.write_block(block, &buffer),
         )?;
+        if buffer != [sentinel; BLOCK_SIZE] {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
     }
     verify_probe_baseline(device, scenario, 0..count)
 }
@@ -384,9 +412,16 @@ pub fn check_first_last_write_preserves_neighbors(
     let (first, last) = (0, count - 1);
     write_probe_baseline(device, scenario, 1..count)?;
     // 阶段一：写首块后整盘两遍复核（首块期望 0x11，其余块含末块为基线）。
+    let first_pattern = [0x11; BLOCK_SIZE];
     device
-        .write_block(first, &[0x11; BLOCK_SIZE])
+        .write_block(first, &first_pattern)
         .map_err(unexpected(scenario, "write_block"))?;
+    if first_pattern != [0x11; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     verify_block_state(device, scenario, 0..count, |block| {
         if block == first {
             [0x11; BLOCK_SIZE]
@@ -395,9 +430,16 @@ pub fn check_first_last_write_preserves_neighbors(
         }
     })?;
     // 阶段二：写末块后整盘两遍复核（首块 0x11、末块 0x22，其余为基线）。
+    let last_pattern = [0x22; BLOCK_SIZE];
     device
-        .write_block(last, &[0x22; BLOCK_SIZE])
+        .write_block(last, &last_pattern)
         .map_err(unexpected(scenario, "write_block"))?;
+    if last_pattern != [0x22; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     verify_block_state(device, scenario, 0..count, |block| {
         if block == first {
             [0x11; BLOCK_SIZE]
@@ -475,6 +517,12 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
             BlockError::OutOfBounds,
             device.write_block(block, &buffer),
         )?;
+        if buffer != [sentinel; BLOCK_SIZE] {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::BufferMutated,
+            });
+        }
     }
     Ok(())
 }
@@ -497,9 +545,16 @@ pub fn check_flush_ok(device: &mut dyn BlockDevice) -> Result<(), ContractFailur
         });
     }
     write_probe_baseline(device, scenario, 1..count)?;
+    let target = [0x55; BLOCK_SIZE];
     device
-        .write_block(0, &[0x55; BLOCK_SIZE])
+        .write_block(0, &target)
         .map_err(unexpected(scenario, "write_block"))?;
+    if target != [0x55; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     device.flush().map_err(unexpected(scenario, "flush"))?;
     // 终态复核含第 0 块的当前期望值（0x55），读取侧对目标块的破坏也能被检出。
     verify_block_state(device, scenario, 0..count, |block| {
@@ -530,9 +585,16 @@ pub fn check_flush_unsupported(device: &mut dyn BlockDevice) -> Result<(), Contr
         });
     }
     write_probe_baseline(device, scenario, 1..count)?;
+    let target = [0x55; BLOCK_SIZE];
     device
-        .write_block(0, &[0x55; BLOCK_SIZE])
+        .write_block(0, &target)
         .map_err(unexpected(scenario, "write_block"))?;
+    if target != [0x55; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     expect_error(scenario, "flush", BlockError::Unsupported, device.flush())?;
     verify_block_state(device, scenario, 0..count, |block| {
         if block == 0 {
@@ -560,9 +622,16 @@ pub fn check_flush_failure_retry(device: &mut FaultyDevice<'_>) -> Result<(), Co
         });
     }
     write_probe_baseline(device, scenario, 1..count)?;
+    let target = [0x55; BLOCK_SIZE];
     device
-        .write_block(0, &[0x55; BLOCK_SIZE])
+        .write_block(0, &target)
         .map_err(unexpected(scenario, "write_block"))?;
+    if target != [0x55; BLOCK_SIZE] {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::BufferMutated,
+        });
+    }
     device.fail_flush = true;
     expect_error(scenario, "flush", BlockError::Io, device.flush())?;
     device.fail_flush = false;
@@ -764,33 +833,9 @@ fn isolation_pattern(block: u64) -> [u8; BLOCK_SIZE] {
     probe_pattern(block).map(|byte| !byte)
 }
 
-/// 其余块状态的紧凑摘要：逐块生成迷你摘要，按块号旋转并进不同通道后
-/// 异或、再累加总和——纯异或与求和对块顺序可交换，混入块号后任何改变
-/// 字节、交换整块或移动内容的误写几乎必然改变摘要。不分配内存即可在
-/// 首写前后比对其余块是否被串扰破坏。
-fn block_range_digest(
-    device: &mut dyn BlockDevice,
-    scenario: &'static str,
-    blocks: core::ops::Range<u64>,
-) -> Result<([u64; 8], u64), ContractFailure> {
-    let mut lanes = [0u64; 8];
-    let mut total = 0u64;
-    let mut buffer = [0; BLOCK_SIZE];
-    for block in blocks {
-        device
-            .read_block(block, &mut buffer)
-            .map_err(unexpected(scenario, "read_block"))?;
-        // 逐块迷你摘要按块号旋转并进不同通道：异或与求和虽可交换，
-        // 但块内容随块号改变旋转后，整块置换与顺序变化必然改变摘要。
-        let mut block_digest = 0u64;
-        for (i, byte) in buffer.iter().enumerate() {
-            block_digest = block_digest.wrapping_add((*byte as u64) << (((i % 8) * 8) as u32));
-        }
-        lanes[(block % 8) as usize] ^= block_digest.rotate_left(((block % 63) + 1) as u32);
-        total = total.wrapping_add(block_digest);
-    }
-    Ok((lanes, total))
-}
+/// 写隔离首写探针可快照的其余块数量上限；32 块 × [`BLOCK_SIZE`] 字节
+/// = 16 KiB 栈内存，测试盘超过该容量时首写隔离无法做无损逐块比对。
+const MAX_ISOLATION_OTHERS: usize = 32;
 
 /// 用探针图样预置给定块区间的基线，供写入类检查在操作前建立全盘已知状态。
 fn write_probe_baseline(

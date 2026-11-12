@@ -695,3 +695,42 @@ fn write_isolation_digest_is_order_sensitive() {
     };
     assert!(check_write_isolation(&mut disk).is_err());
 }
+
+/// 非合规设备：首次成功写入时把块 2 的偏移 0 改为 0x34、偏移 8 改为
+/// 0x32（同通道等权字节相抵消），其余字节不变。
+struct FirstWriteOffsettingClobberDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_done: bool,
+}
+
+impl BlockDevice for FirstWriteOffsettingClobberDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if !self.first_write_done {
+            self.first_write_done = true;
+            let mut junk = [0x33u8; BLOCK_SIZE];
+            junk[0] = 0x34;
+            junk[8] = 0x32;
+            self.inner.write_block(2, &junk)?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn write_isolation_probes_with_lossless_snapshot() {
+    // 加法摘要存在同通道等权字节抵消盲区：首写隔离必须整块快照逐块
+    // 无损比对，偏移 0 与 8 的一加一减也要被检出。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = FirstWriteOffsettingClobberDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_done: false,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}
