@@ -107,6 +107,21 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
             },
         });
     }
+    // 首写可观测探针：读块 0 现值、写入逐字节取反图样并立即读回——
+    // 只丢弃启动后第一次写入的后端在基线建立前就被拒收，不会被子序列
+    // 重写抹去证据（DRV-001「读写成功意味着规定传输已完成」）。
+    let mut probe = [0; BLOCK_SIZE];
+    device
+        .read_block(0, &mut probe)
+        .map_err(unexpected(scenario, "read_block"))?;
+    let first_write = probe.map(|byte| !byte);
+    device
+        .write_block(0, &first_write)
+        .map_err(unexpected(scenario, "write_block"))?;
+    device
+        .read_block(0, &mut probe)
+        .map_err(unexpected(scenario, "read_block"))?;
+    compare_block(scenario, 0, &probe, &first_write)?;
     write_probe_baseline(device, scenario, 0..count)?;
     for block in 0..count {
         let pattern = isolation_pattern(block);

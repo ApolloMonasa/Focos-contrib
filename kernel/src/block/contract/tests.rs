@@ -550,3 +550,37 @@ fn write_isolation_rewrites_with_distinct_pattern_and_verifies_target() {
     };
     assert!(check_write_isolation(&mut disk).is_err());
 }
+
+/// 非合规设备：静默丢弃启动后的第一次写入，后续写入正常。
+struct DropFirstWriteDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_dropped: bool,
+}
+
+impl BlockDevice for DropFirstWriteDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if self.first_write_dropped {
+            self.first_write_dropped = false;
+            return Ok(());
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn write_isolation_probes_first_write_before_baseline() {
+    // 只丢第一次写入的后端：基线写块 0 被丢且未验证，随后的隔离重写
+    // 会抹去证据；首写可观测探针（读现值、写取反、立即读回）必须先拒收它。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = DropFirstWriteDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_dropped: true,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}

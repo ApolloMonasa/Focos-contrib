@@ -43,8 +43,8 @@ pub trait BlockDevice {
     /// 成功返回 `Ok(())`，并填满 `buffer`。长度错误返回
     /// [`BlockError::InvalidBufferLength`]，块编号越界返回
     /// [`BlockError::OutOfBounds`]，设备读取失败返回 [`BlockError::Io`]。
-    /// 参数错误（长度或越界被拒）时缓冲区保持不变；硬件读取失败时，
-    /// 缓冲区可能已被部分修改。
+    /// 参数错误（长度或越界被拒）时缓冲区保持不变，且校验须在访问
+    /// 硬件前完成；硬件读取失败时，缓冲区可能已被部分修改。
     fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError>;
 
     /// 将调用者提供的数据写入指定块。
