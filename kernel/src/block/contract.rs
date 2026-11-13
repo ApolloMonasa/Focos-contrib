@@ -488,6 +488,12 @@ pub fn check_empty_device(device: &mut dyn BlockDevice) -> Result<(), ContractFa
                 BlockError::InvalidBufferLength,
                 device.write_block(block, &probe[..length]),
             )?;
+            if probe != [sentinel; BLOCK_SIZE + 1] {
+                return Err(ContractFailure {
+                    scenario,
+                    kind: FailureKind::BufferMutated,
+                });
+            }
         }
         if probe != [sentinel; BLOCK_SIZE + 1] {
             return Err(ContractFailure {
@@ -555,6 +561,14 @@ pub fn check_flush_ok(device: &mut dyn BlockDevice) -> Result<(), ContractFailur
             kind: FailureKind::BufferMutated,
         });
     }
+    // 同步前整盘复核：一次性串扰若恰好被随后的同步治愈，在此暴露。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })?;
     device.flush().map_err(unexpected(scenario, "flush"))?;
     // 终态复核含第 0 块的当前期望值（0x55），读取侧对目标块的破坏也能被检出。
     verify_block_state(device, scenario, 0..count, |block| {
@@ -595,6 +609,14 @@ pub fn check_flush_unsupported(device: &mut dyn BlockDevice) -> Result<(), Contr
             kind: FailureKind::BufferMutated,
         });
     }
+    // 同步前整盘复核：一次性串扰若恰好被随后的同步治愈，在此暴露。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })?;
     expect_error(scenario, "flush", BlockError::Unsupported, device.flush())?;
     verify_block_state(device, scenario, 0..count, |block| {
         if block == 0 {
@@ -632,6 +654,14 @@ pub fn check_flush_failure_retry(device: &mut FaultyDevice<'_>) -> Result<(), Co
             kind: FailureKind::BufferMutated,
         });
     }
+    // 同步前整盘复核：一次性串扰若恰好被随后的同步治愈，在此暴露。
+    verify_block_state(device, scenario, 0..count, |block| {
+        if block == 0 {
+            [0x55; BLOCK_SIZE]
+        } else {
+            probe_pattern(block)
+        }
+    })?;
     device.fail_flush = true;
     expect_error(scenario, "flush", BlockError::Io, device.flush())?;
     device.fail_flush = false;
@@ -838,12 +868,34 @@ fn isolation_pattern(block: u64) -> [u8; BLOCK_SIZE] {
 /// = 16 KiB 栈内存，测试盘超过该容量时首写隔离无法做无损逐块比对。
 const MAX_ISOLATION_OTHERS: usize = 32;
 
+/// 基线建立时可快照原始内容的块数量上限；33 块 × [`BLOCK_SIZE`] 字节
+/// ≈ 16.5 KiB 栈内存，与写隔离的容量门控一致。
+const BASELINE_SNAPSHOT_BLOCKS: usize = 33;
+
 /// 用探针图样预置给定块区间的基线，供写入类检查在操作前建立全盘已知状态。
 fn write_probe_baseline(
     device: &mut dyn BlockDevice,
     scenario: &'static str,
     blocks: core::ops::Range<u64>,
 ) -> Result<(), ContractFailure> {
+    let span = blocks.end - blocks.start;
+    if span > BASELINE_SNAPSHOT_BLOCKS as u64 {
+        return Err(ContractFailure {
+            scenario,
+            kind: FailureKind::FixtureLimitExceeded {
+                limit: BASELINE_SNAPSHOT_BLOCKS as u64,
+                actual: span,
+            },
+        });
+    }
+    // 首写前整盘快照：第一遍写入对尚未初始化块的破坏，靠未写后缀与
+    // 快照的无损比对在治愈前暴露（有损判据存在抵消盲区）。
+    let mut originals = [[0u8; BLOCK_SIZE]; BASELINE_SNAPSHOT_BLOCKS];
+    for (i, block) in blocks.clone().enumerate() {
+        device
+            .read_block(block, &mut originals[i])
+            .map_err(unexpected(scenario, "read_block"))?;
+    }
     // 第一遍顺序写入基线；随后逐块重写并在每次写入返回后立即整盘复核
     // 同区间——顺序写入会治愈"写入块 b 时串写块 b+1"的破坏，重写加
     // 即时复核使基线阶段的跨块串扰无法被后续写入掩盖。
@@ -859,9 +911,23 @@ fn write_probe_baseline(
                 kind: FailureKind::BufferMutated,
             });
         }
-        // 每块写入后立即复核已写前缀：静默丢弃的基线写入留下原内容，
-        // 不会拖到第二遍重写时被治愈抹掉。
+        // 每块写入后立即复核已写前缀（静默丢弃的基线写入留下原内容，
+        // 不会拖到第二遍重写时被治愈抹掉），并对照快照复核未写后缀
+        // （写入对未初始化块的破坏在治愈前暴露）。
         verify_block_state(device, scenario, blocks.start..block + 1, probe_pattern)?;
+        for suspect in block + 1..blocks.end {
+            let slot = &originals[(suspect - blocks.start) as usize];
+            let mut recheck = [0u8; BLOCK_SIZE];
+            device
+                .read_block(suspect, &mut recheck)
+                .map_err(unexpected(scenario, "read_block"))?;
+            if *slot != recheck {
+                return Err(ContractFailure {
+                    scenario,
+                    kind: FailureKind::OtherBlocksMutated,
+                });
+            }
+        }
     }
     for block in blocks.clone() {
         let pattern = probe_pattern(block);

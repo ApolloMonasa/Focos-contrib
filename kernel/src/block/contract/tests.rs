@@ -997,3 +997,87 @@ fn empty_device_checks_buffer_after_each_rejected_read() {
     let mut disk = EmptyRestoreAtMaxDisk { junked: false };
     assert!(check_empty_device(&mut disk).is_err());
 }
+
+/// 非合规设备：首次成功写入时正确落盘目标块，同时把尚未初始化的
+/// 块 2 改坏（随后块 2 的基线写入会治愈它）。
+struct FirstWriteClobbersSuffixDisk<'a> {
+    inner: MemoryDisk<'a>,
+    armed: bool,
+}
+
+impl BlockDevice for FirstWriteClobbersSuffixDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if self.armed {
+            self.armed = false;
+            self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn baseline_suffix_snapshot_catches_first_write_clobber() {
+    // 前缀复核排除了未写后缀：首写对未初始化块的破坏必须靠基线前的
+    // 整盘快照在治愈前暴露。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = FirstWriteClobbersSuffixDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        armed: true,
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
+
+/// 非合规设备：首次写块 0 正确落盘并破坏块 1，随后的 flush 修复块 1
+/// （同步治愈一次性串扰）。
+struct FlushRepairsClobberDisk<'a> {
+    inner: MemoryDisk<'a>,
+    armed: bool,
+    saved: Option<[u8; BLOCK_SIZE]>,
+}
+
+impl BlockDevice for FlushRepairsClobberDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 0 && self.armed {
+            self.armed = false;
+            let mut current = [0u8; BLOCK_SIZE];
+            self.inner.read_block(1, &mut current)?;
+            self.saved = Some(current);
+            self.inner.write_block(1, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+    fn flush(&mut self) -> Result<(), BlockError> {
+        self.inner.flush()?;
+        if let Some(saved) = self.saved.take() {
+            self.inner.write_block(1, &saved)?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn flush_check_verifies_state_before_sync() {
+    // 写入与同步之间必须整盘复核：被 flush 治愈的一次性串扰要在
+    // 同步发生前暴露。
+    let mut storage = [0x33; BLOCK_SIZE * 2];
+    let mut disk = FlushRepairsClobberDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        armed: true,
+        saved: None,
+    };
+    assert!(check_flush_ok(&mut disk).is_err());
+}
