@@ -220,9 +220,11 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
 /// 用于在任何破坏性写入之前确认设备读取的是介质原有内容（DRV-001
 /// 「先读固定镜像的已知扇区并校验内容」）：只会回放会话内写入的
 /// 缓存型假后端能骗过全部先写后读的检查，只有本检查能将其拒收。
-/// 缓冲区按期望值逐字节取反预填：返回成功却不填充缓冲区的后端
-/// 留下取反值，全零扇区也无法靠零初值蒙混。本检查运行在基线建立
-/// 之前，读取时对其他块的一次性破坏无参照真值可比对，归硬件专项。
+/// 缓冲区按期望值异或不同常数预填、各读一次并比对：返回成功却不填充
+/// 缓冲区的后端留下预填值（全零扇区无法靠零初值蒙混），只对缓冲区做
+/// 固定变换（如逐字节取反）的伪读取无法同时命中两种期望。本检查运行
+/// 在基线建立之前，读取时对其他块的一次性破坏无参照真值可比对，归
+/// 硬件专项。
 ///
 /// 前置：`block` 为有效块号，`expected` 为测试镜像中该块的已知内容。
 pub fn check_known_data(
@@ -231,11 +233,14 @@ pub fn check_known_data(
     expected: &[u8; BLOCK_SIZE],
 ) -> Result<(), ContractFailure> {
     let scenario = "known_data_read";
-    let mut buffer: [u8; BLOCK_SIZE] = core::array::from_fn(|i| !expected[i]);
-    device
-        .read_block(block, &mut buffer)
-        .map_err(unexpected(scenario, "read_block"))?;
-    compare_block(scenario, block, &buffer, expected)
+    for prefill_xor in [0xFF, 0xA5] {
+        let mut buffer: [u8; BLOCK_SIZE] = core::array::from_fn(|i| expected[i] ^ prefill_xor);
+        device
+            .read_block(block, &mut buffer)
+            .map_err(unexpected(scenario, "read_block"))?;
+        compare_block(scenario, block, &buffer, expected)?;
+    }
+    Ok(())
 }
 
 /// 写后读：向第 0 块先后写入两种随偏移变化的图样并整块读回，

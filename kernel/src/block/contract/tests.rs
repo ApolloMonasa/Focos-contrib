@@ -302,34 +302,15 @@ fn neighbor_check_covers_every_block() {
     assert!(check_first_last_write_preserves_neighbors(&mut disk).is_err());
 }
 
-/// 非合规设备：读取路径丢失块号 bit 8，把第 257 块读成第 1 块。
-struct AliasingReadDisk<'a> {
-    inner: MemoryDisk<'a>,
-}
-
-impl BlockDevice for AliasingReadDisk<'_> {
-    fn block_count(&self) -> u64 {
-        self.inner.block_count()
-    }
-    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
-        if block == 257 {
-            return self.inner.read_block(1, buffer);
-        }
-        self.inner.read_block(block, buffer)
-    }
-    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
-        self.inner.write_block(block, buffer)
-    }
-}
-
 #[test]
 fn probe_patterns_distinguish_all_block_numbers() {
-    // 块 1 与块 257 的图样必须不同，读混相差 256 整数倍块的实现才能被检出。
-    let mut storage = [0x33; BLOCK_SIZE * 259];
-    let mut disk = AliasingReadDisk {
-        inner: MemoryDisk::new(&mut storage).unwrap(),
-    };
-    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+    // 头部编码完整块号：相差 256 整数倍的块图样必须不同（旧实现把块号
+    // 截断为 u8 时块 1 与块 257 同型，读混后端能骗过全盘校验）。
+    assert_ne!(super::probe_pattern(1), super::probe_pattern(257));
+    assert_ne!(super::probe_pattern(0), super::probe_pattern(256));
+    assert_ne!(super::probe_pattern(2), super::probe_pattern(258));
+    assert_ne!(super::probe_pattern(5), super::probe_pattern(6));
+    assert_ne!(super::probe_pattern(4096), super::probe_pattern(4352));
 }
 
 /// 非合规设备：容量为 0，参数校验先查块号再查长度。
@@ -1200,4 +1181,73 @@ fn length_priority_covers_valid_nonzero_block() {
         inner: MemoryDisk::new(&mut storage).unwrap(),
     };
     assert!(check_buffer_length_validation(&mut disk).is_err());
+}
+
+/// 非合规设备：读取只把传入缓冲区逐字节取反，不访问介质。
+struct ComplementOnlyReadDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for ComplementOnlyReadDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if block >= self.block_count() {
+            return Err(BlockError::OutOfBounds);
+        }
+        if buffer.len() != BLOCK_SIZE {
+            return Err(BlockError::InvalidBufferLength);
+        }
+        for byte in buffer.iter_mut() {
+            *byte = !*byte;
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn known_data_rejects_buffer_transform_reads() {
+    // 只对缓冲区做固定变换（逐字节取反）的假后端能命中单一取反预填；
+    // 两种不同预填各读一次，变换无法同时命中两种期望。
+    let mut storage = [0u8; BLOCK_SIZE];
+    let mut disk = ComplementOnlyReadDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    let expected = [0u8; BLOCK_SIZE];
+    assert!(check_known_data(&mut disk, 0, &expected).is_err());
+}
+
+/// 非合规设备：首次写入后，块 1 的第二次读取先正确填充缓冲区、
+/// 随后破坏块 2。
+struct SecondReadOneClobbersTwoDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_done: bool,
+    reads_of_one: u32,
+}
+
+impl BlockDevice for SecondReadOneClobbersTwoDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)?;
+        if block == 1 && self.first_write_done {
+            self.reads_of_one += 1;
+            if self.reads_of_one == 2 {
+                self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+            }
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 0 {
+            self.first_write_done = true;
+        }
+        Ok(())
+    }
 }
