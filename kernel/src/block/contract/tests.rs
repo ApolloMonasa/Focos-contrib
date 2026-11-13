@@ -1251,3 +1251,16 @@ impl BlockDevice for SecondReadOneClobbersTwoDisk<'_> {
         Ok(())
     }
 }
+
+#[test]
+fn write_isolation_probe_covers_second_read_clobber() {
+    // 正反两遍复核后，副作用落在第二遍最后一次读取（降序遍历的块 1）
+    // 仍会残留：写入基线前的后缀对照会把破坏暴露在治愈之前。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = SecondReadOneClobbersTwoDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_done: false,
+        reads_of_one: 0,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}

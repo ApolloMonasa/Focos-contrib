@@ -24,9 +24,10 @@
 //! 基线尚未建立的块没有参照真值：读取侧对这类块的一次性破坏（例如读
 //! 块 1 时改写尚未写入的块 2）无法在基线建立前检出——快照与对照都取自
 //! 同一设备，会被一起污染而自洽通过；依赖自愈读取（正确填充后自行恢复
-//! 破坏）的实现同理不可检测。此类缺陷与已知数据读取阶段（[`check_known_data`]）
-//! 的同步读取副作用归硬件专项，按 DRV-001 验收；共享契约覆盖基线建立
-//! 之后的状态。
+//! 破坏）的实现同理不可检测。此外，按操作序号触发的破坏（例如仅在
+//! 第二次读取某块时串写邻块）只有在序号对应的复核遍之内才能被观察，
+//! 当前正-反-正三遍覆盖序号 1..=3，序号更高的触发与上述两类同归
+//! 硬件专项，按 DRV-001 验收；共享契约覆盖基线建立之后的状态。
 
 use super::{BLOCK_SIZE, BlockDevice, BlockError};
 
@@ -162,30 +163,31 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &probe, &snapshot)?;
-    // 其余块正反两遍复核：任一方向的读取触发的破坏都会在反方向的遍历
-    // 中暴露，单方向复核总会留下镜像盲区（升序漏高目标、降序漏低目标）。
+    // 其余块正反两遍复核，再正向兜底一遍：单方向复核总有镜像盲区
+    // （升序漏高目标、降序漏低目标），而落在第二遍最后一次读取上的
+    // 副作用两侧比对都已过去，第三遍使它在治愈前暴露。按读取序号
+    // 触发、序号超过遍数的缺陷归硬件专项（见模块文档原理性边界）。
     let mut recheck = [0u8; BLOCK_SIZE];
-    for (i, slot) in others.iter().enumerate().take(others_len) {
+    let mut recheck_once = |i: usize| -> Result<(), ContractFailure> {
         device
             .read_block(i as u64 + 1, &mut recheck)
             .map_err(unexpected(scenario, "read_block"))?;
-        if *slot != recheck {
+        if others[i] != recheck {
             return Err(ContractFailure {
                 scenario,
                 kind: FailureKind::OtherBlocksMutated,
             });
         }
+        Ok(())
+    };
+    for i in 0..others_len {
+        recheck_once(i)?;
     }
-    for (i, slot) in others.iter().enumerate().take(others_len).rev() {
-        device
-            .read_block(i as u64 + 1, &mut recheck)
-            .map_err(unexpected(scenario, "read_block"))?;
-        if *slot != recheck {
-            return Err(ContractFailure {
-                scenario,
-                kind: FailureKind::OtherBlocksMutated,
-            });
-        }
+    for i in (0..others_len).rev() {
+        recheck_once(i)?;
+    }
+    for i in 0..others_len {
+        recheck_once(i)?;
     }
     write_probe_baseline(device, scenario, 0..count)?;
     // 基线建立后、覆盖前先整盘复核：静默丢弃任一基线写入的后端在此
