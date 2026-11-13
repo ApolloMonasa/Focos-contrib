@@ -153,8 +153,11 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &probe, &snapshot)?;
+    // 其余块按降序复核：读取较低块才触发的破坏在最低块的最后一次读取
+    // 处暴露，升序会让它落在自身比对之后逃过检查。
     let mut recheck = [0u8; BLOCK_SIZE];
-    for (i, slot) in others.iter().enumerate().take(others_len) {
+    for i in (0..others_len).rev() {
+        let slot = &others[i];
         device
             .read_block(i as u64 + 1, &mut recheck)
             .map_err(unexpected(scenario, "read_block"))?;
@@ -915,7 +918,9 @@ fn write_probe_baseline(
         // 不会拖到第二遍重写时被治愈抹掉），并对照快照复核未写后缀
         // （写入对未初始化块的破坏在治愈前暴露）。
         verify_block_state(device, scenario, blocks.start..block + 1, probe_pattern)?;
-        for suspect in block + 1..blocks.end {
+        // 未写后缀按降序复核：读取较低块才触发的破坏在最低块的最后一次
+        // 读取处暴露，升序会让它落在自身比对之后逃过检查。
+        for suspect in (block + 1..blocks.end).rev() {
             let slot = &originals[(suspect - blocks.start) as usize];
             let mut recheck = [0u8; BLOCK_SIZE];
             device

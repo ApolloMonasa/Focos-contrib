@@ -1081,3 +1081,41 @@ fn flush_check_verifies_state_before_sync() {
     };
     assert!(check_flush_ok(&mut disk).is_err());
 }
+
+/// 非合规设备：读取块 2 时先正确填充缓冲区，随后一次性破坏块 1。
+struct BaselineReadTwoClobbersOneDisk<'a> {
+    inner: MemoryDisk<'a>,
+    reads_of_two: u32,
+}
+
+impl BlockDevice for BaselineReadTwoClobbersOneDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)?;
+        if block == 2 {
+            self.reads_of_two += 1;
+            if self.reads_of_two == 2 {
+                self.inner.write_block(1, &[0xEE; BLOCK_SIZE])?;
+            }
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn baseline_suffix_recheck_reads_in_reverse() {
+    // 后缀快照复核升序进行时，"读块 2 破坏块 1（仅一次）"发生在块 1
+    // 比对之后，下一基线写入将其治愈；逆序复核使最低块的比对成为
+    // 最后一次读取，破坏即被检出。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = BaselineReadTwoClobbersOneDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        reads_of_two: 0,
+    };
+    assert!(check_out_of_bounds_rejected(&mut disk).is_err());
+}
