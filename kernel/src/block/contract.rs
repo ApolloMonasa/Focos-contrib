@@ -162,11 +162,21 @@ pub fn check_write_isolation(device: &mut dyn BlockDevice) -> Result<(), Contrac
         .read_block(0, &mut probe)
         .map_err(unexpected(scenario, "read_block"))?;
     compare_block(scenario, 0, &probe, &snapshot)?;
-    // 其余块按降序复核：读取较低块才触发的破坏在最低块的最后一次读取
-    // 处暴露，升序会让它落在自身比对之后逃过检查。
+    // 其余块正反两遍复核：任一方向的读取触发的破坏都会在反方向的遍历
+    // 中暴露，单方向复核总会留下镜像盲区（升序漏高目标、降序漏低目标）。
     let mut recheck = [0u8; BLOCK_SIZE];
-    for i in (0..others_len).rev() {
-        let slot = &others[i];
+    for (i, slot) in others.iter().enumerate().take(others_len) {
+        device
+            .read_block(i as u64 + 1, &mut recheck)
+            .map_err(unexpected(scenario, "read_block"))?;
+        if *slot != recheck {
+            return Err(ContractFailure {
+                scenario,
+                kind: FailureKind::OtherBlocksMutated,
+            });
+        }
+    }
+    for (i, slot) in others.iter().enumerate().take(others_len).rev() {
         device
             .read_block(i as u64 + 1, &mut recheck)
             .map_err(unexpected(scenario, "read_block"))?;
@@ -287,8 +297,9 @@ pub fn check_read_write_roundtrip(device: &mut dyn BlockDevice) -> Result<(), Co
 /// 全盘预置探针基线，每个被拒操作返回后立即校验探针缓冲区并整盘复核：
 /// 先部分写入目标块或溢出到其他块、再返回长度错误，或破坏后恢复的
 /// 两阶段缺陷都会被本检查拒收（HAL-001「长度错误时数据不变」指整盘
-/// 数据）。长度优先探针把三种非法长度分别与块 0、首个越界块和 `u64::MAX`
-/// 组合，读写两条路径都验证，只特判部分块号的实现无法绕过。
+/// 数据）。长度优先探针把三种非法长度分别与块 0、有效非零块、首个
+/// 越界块和 `u64::MAX` 组合，读写两条路径都验证，只特判部分块号的
+/// 实现无法绕过。
 ///
 /// 前置：设备至少 1 块，且写入专用测试盘。
 pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<(), ContractFailure> {
@@ -308,10 +319,10 @@ pub fn check_buffer_length_validation(device: &mut dyn BlockDevice) -> Result<()
     let mut probe = [sentinel; BLOCK_SIZE + 1];
     // 每个被拒操作返回后立即校验探针缓冲区并整盘复核：非法读取破坏
     // 其他块、随后写入恢复的两阶段缺陷无法跨操作隐藏（HAL-001「数据
-    // 不变」）。长度错误优先于块号错误的约定对块 0、首个越界块与
-    // 巨大块号全部成立。
+    // 不变」）。长度错误优先于块号错误的约定对块 0、有效非零块、首个
+    // 越界块与巨大块号全部成立。
     for length in [0, BLOCK_SIZE - 1, BLOCK_SIZE + 1] {
-        for block in [0, count, u64::MAX] {
+        for block in [0, count.saturating_sub(1), count, u64::MAX] {
             expect_error(
                 scenario,
                 "read_block",

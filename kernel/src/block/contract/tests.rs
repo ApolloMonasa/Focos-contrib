@@ -1119,3 +1119,85 @@ fn baseline_suffix_recheck_reads_in_reverse() {
     };
     assert!(check_out_of_bounds_rejected(&mut disk).is_err());
 }
+
+/// 非合规设备：首次写入后，读取块 1 时先正确填充缓冲区、随后破坏块 2。
+struct ReadOneClobbersTwoAfterFirstWriteDisk<'a> {
+    inner: MemoryDisk<'a>,
+    first_write_done: bool,
+    clobbered: bool,
+}
+
+impl BlockDevice for ReadOneClobbersTwoAfterFirstWriteDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        self.inner.read_block(block, buffer)?;
+        if block == 1 && self.first_write_done && !self.clobbered {
+            self.clobbered = true;
+            self.inner.write_block(2, &[0xEE; BLOCK_SIZE])?;
+        }
+        Ok(())
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        self.inner.write_block(block, buffer)?;
+        if block == 0 {
+            self.first_write_done = true;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn write_isolation_rechecks_others_in_both_directions() {
+    // 纯降序复核后，"读最低块破坏较高块"会落在最高块比对之后逃过；
+    // 正反两遍复核任一方向的读取破坏都在反向遍历中暴露。
+    let mut storage = [0x33; BLOCK_SIZE * 3];
+    let mut disk = ReadOneClobbersTwoAfterFirstWriteDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+        first_write_done: false,
+        clobbered: false,
+    };
+    assert!(check_write_isolation(&mut disk).is_err());
+}
+
+/// 非合规设备：非法长度仅对块 0 与越界块优先校验，有效非零块号
+/// 却返回设备错误。
+struct ValidBlockIoDisk<'a> {
+    inner: MemoryDisk<'a>,
+}
+
+impl BlockDevice for ValidBlockIoDisk<'_> {
+    fn block_count(&self) -> u64 {
+        self.inner.block_count()
+    }
+    fn read_block(&mut self, block: u64, buffer: &mut [u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            if block == 0 || block >= self.block_count() {
+                return Err(BlockError::InvalidBufferLength);
+            }
+            return Err(BlockError::Io);
+        }
+        self.inner.read_block(block, buffer)
+    }
+    fn write_block(&mut self, block: u64, buffer: &[u8]) -> Result<(), BlockError> {
+        if buffer.len() != BLOCK_SIZE {
+            if block == 0 || block >= self.block_count() {
+                return Err(BlockError::InvalidBufferLength);
+            }
+            return Err(BlockError::Io);
+        }
+        self.inner.write_block(block, buffer)
+    }
+}
+
+#[test]
+fn length_priority_covers_valid_nonzero_block() {
+    // 长度优先探针必须包含有效非零块：非法长度命中有效块时返回
+    // 设备错误（而非长度错误）的实现不能绕过优先级约定。
+    let mut storage = [0x33; BLOCK_SIZE * 2];
+    let mut disk = ValidBlockIoDisk {
+        inner: MemoryDisk::new(&mut storage).unwrap(),
+    };
+    assert!(check_buffer_length_validation(&mut disk).is_err());
+}
