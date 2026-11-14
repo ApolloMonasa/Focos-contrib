@@ -74,17 +74,15 @@ pub fn run_block_contract(
     runner.validate()?;
     runner.verify("known_data")?;
     runner.parameters()?;
-    // 两轮非零掩码的二元组唯一标识 0..512 的字节位置：即便初始镜像
-    // 全零，也不会一直写均匀图样而漏掉字节置换；每轮所有字节均改变。
-    for round in 0..2 {
+    // 先取反使第一次写入可观察；再写固定的索引低/高位图样。
+    // 后两次的实际值对唯一标识 0..512 的位置，不能把这个性质归给
+    // 与模型异或的掩码：初始内容可能恰好抵消掩码而制造写入值碰撞。
+    for round in 0..3 {
         for block in 0..runner.model.len() {
-            let input = core::array::from_fn(|byte| {
-                let mask = if round == 0 {
-                    byte % 255 + 1
-                } else {
-                    byte / 255 + 1
-                } as u8;
-                runner.model[block][byte] ^ mask
+            let input = core::array::from_fn(|byte| match round {
+                0 => !runner.model[block][byte],
+                1 => byte as u8,
+                _ => (byte >> 8) as u8,
             });
             let actual = runner.device.write_block(block as u64, &input);
             runner.expect("write", Some(block as u64), Ok(()), actual)?;

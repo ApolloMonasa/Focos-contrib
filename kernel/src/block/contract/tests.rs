@@ -57,6 +57,8 @@ enum Defect {
     SwapReadBytes,
     DuplicateReadHalf,
     SwapReadHalves,
+    SwapWriteBytes,
+    SwapWriteHighBytes,
 }
 
 // 用安全 Rust 模拟可观察的错误，不通过违反 &[u8] 借用规则伪造 DMA。
@@ -154,6 +156,12 @@ impl<const N: usize> BlockDevice for TestDisk<N> {
             return Ok(());
         }
         self.storage[index].copy_from_slice(buffer);
+        if self.defect == Defect::SwapWriteBytes {
+            self.storage[index].swap(0, 16);
+        }
+        if self.defect == Defect::SwapWriteHighBytes {
+            self.storage[index].swap(0, 256);
+        }
         if self.defect == Defect::SpillWrite && N > 1 {
             self.storage[(index + 1) % N][13] ^= 0xff;
         }
@@ -233,6 +241,20 @@ fn dropped_writes_are_observed_before_any_later_write() {
         assert!(matches!(error.kind, FailureKind::DataMismatch { .. }));
         assert_eq!(disk.writes, block as usize + 1);
     }
+    // 即使原内容恰好等于后续固定图样，首次取反仍使丢写可观察。
+    let mut disk = TestDisk::<1>::new(Defect::DropFirstWrite);
+    disk.storage = [core::array::from_fn(|byte| byte as u8)];
+    let mut model = disk.storage;
+    let error = run_block_contract(
+        "preseeded",
+        &mut disk,
+        &mut model,
+        FlushExpectation::Supported,
+    )
+    .unwrap_err();
+    assert_eq!(error.scenario, "write_readback");
+    assert!(matches!(error.kind, FailureKind::DataMismatch { .. }));
+    assert_eq!(disk.writes, 1);
 }
 
 #[test]
@@ -411,4 +433,30 @@ fn uniform_initial_image_still_exercises_byte_order() {
         error.kind,
         FailureKind::DataMismatch { byte: 1, .. }
     ));
+}
+
+#[test]
+fn write_only_permutations_cannot_hide_behind_initial_image() {
+    for defect in [Defect::SwapWriteBytes, Defect::SwapWriteHighBytes] {
+        for uniform in [false, true] {
+            let mut disk = TestDisk::<4>::new(defect);
+            if uniform {
+                disk.storage = [[0; BLOCK_SIZE]; 4];
+            }
+            let mut model = disk.storage;
+            let error = run_block_contract(
+                "write-byte-order",
+                &mut disk,
+                &mut model,
+                FlushExpectation::Supported,
+            )
+            .unwrap_err();
+            assert_eq!(error.scenario, "write_readback");
+            assert_eq!(error.block, Some(0));
+            assert!(matches!(
+                error.kind,
+                FailureKind::DataMismatch { byte: 0, .. }
+            ));
+        }
+    }
 }
