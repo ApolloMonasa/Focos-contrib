@@ -3,7 +3,7 @@ use crate::block::{BLOCK_SIZE, BlockDevice, BlockError, MemoryDisk};
 
 fn image<const N: usize>() -> [[u8; BLOCK_SIZE]; N] {
     core::array::from_fn(|block| {
-        core::array::from_fn(|byte| (byte as u8).wrapping_mul(17) ^ block as u8)
+        core::array::from_fn(|byte| (byte as u8).wrapping_mul(17) ^ (byte >> 8) as u8 ^ block as u8)
     })
 }
 
@@ -54,6 +54,9 @@ enum Defect {
     UnsupportedFlush,
     IoFlush,
     ClobberOnFlush,
+    SwapReadBytes,
+    DuplicateReadHalf,
+    SwapReadHalves,
 }
 
 // 用安全 Rust 模拟可观察的错误，不通过违反 &[u8] 借用规则伪造 DMA。
@@ -113,6 +116,15 @@ impl<const N: usize> BlockDevice for TestDisk<N> {
             Defect::UnfilledReads => (),
             Defect::ComplementReads => buffer.iter_mut().for_each(|b| *b = !*b),
             _ => buffer.copy_from_slice(&self.storage[index]),
+        }
+        if self.defect == Defect::SwapReadBytes {
+            buffer.swap(1, 256);
+        }
+        if self.defect == Defect::DuplicateReadHalf {
+            buffer.copy_within(..256, 256);
+        }
+        if self.defect == Defect::SwapReadHalves {
+            buffer.rotate_left(256);
         }
         Ok(())
     }
@@ -191,6 +203,8 @@ fn known_image_rejects_cache_only_and_fake_reads() {
         Defect::CachedReads,
         Defect::UnfilledReads,
         Defect::ComplementReads,
+        Defect::DuplicateReadHalf,
+        Defect::SwapReadHalves,
     ] {
         let mut disk = TestDisk::<3>::new(defect);
         let mut model = image::<3>();
@@ -377,4 +391,24 @@ fn injected_check_rejects_empty_or_unsupported_fixtures() {
             actual: Err(BlockError::Unsupported)
         }
     );
+}
+
+#[test]
+fn uniform_initial_image_still_exercises_byte_order() {
+    let mut disk = TestDisk::<1>::new(Defect::SwapReadBytes);
+    disk.storage = [[0; BLOCK_SIZE]];
+    let mut model = disk.storage;
+    let error = run_block_contract(
+        "byte-order",
+        &mut disk,
+        &mut model,
+        FlushExpectation::Supported,
+    )
+    .unwrap_err();
+    assert_eq!(error.scenario, "write_readback");
+    assert_eq!(error.block, Some(0));
+    assert!(matches!(
+        error.kind,
+        FailureKind::DataMismatch { byte: 1, .. }
+    ));
 }

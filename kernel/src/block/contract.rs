@@ -74,10 +74,18 @@ pub fn run_block_contract(
     runner.validate()?;
     runner.verify("known_data")?;
     runner.parameters()?;
-    // 每轮每个字节都不同于模型现值；初次丢写也无法靠预置图样蒙混。
-    for mask in [0xff, 0xa5] {
+    // 两轮非零掩码的二元组唯一标识 0..512 的字节位置：即便初始镜像
+    // 全零，也不会一直写均匀图样而漏掉字节置换；每轮所有字节均改变。
+    for round in 0..2 {
         for block in 0..runner.model.len() {
-            let input = runner.model[block].map(|byte| byte ^ mask);
+            let input = core::array::from_fn(|byte| {
+                let mask = if round == 0 {
+                    byte % 255 + 1
+                } else {
+                    byte / 255 + 1
+                } as u8;
+                runner.model[block][byte] ^ mask
+            });
             let actual = runner.device.write_block(block as u64, &input);
             runner.expect("write", Some(block as u64), Ok(()), actual)?;
             runner.model[block] = input;
