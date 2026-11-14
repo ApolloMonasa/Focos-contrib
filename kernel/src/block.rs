@@ -1,5 +1,7 @@
 //! HAL-001：以 512 字节为单位的同步块设备接口。
 
+pub mod contract;
+
 mod memory;
 
 pub use memory::MemoryDisk;
