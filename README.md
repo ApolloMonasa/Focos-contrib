@@ -22,11 +22,11 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。页表、用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
+本分支另增：TEST-001 的输入冻结、427 项子用例清单、参考 Linux 判分基线、可复现的 initramfs 构建脚本和串口日志 runner；FOCOS 的 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[reference-run](docs/reference/reference-run.md)、[summary](tests/results/reference-2026-11-08/summary.md)、[TEST-001](specs/TEST-001.md)。
+
 本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
 
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
-
-本分支另增：TEST-001 的输入冻结、427 项子用例清单、参考 Linux 判分基线和可复现的 initramfs 构建脚本；FOCOS 的 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[reference-run](docs/reference/reference-run.md)、[summary](tests/results/reference-2026-11-08/summary.md)、[TEST-001](specs/TEST-001.md)。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -100,14 +100,20 @@ Focos/
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
 │   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（草案）
 │   ├── REGION-001.md                  # 区域赛交付范围
+│   ├── TEST-002.md                    # 共享块接口与独立镜像模型的验收
 │   ├── TEST-001.md                    # 2025 初赛 11 组测试接入、判分与结果
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
-│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
-│   └── ref/                           # TEST-001 参考运行 initramfs 构建
+│   ├── run_tests.py                   # TEST-001 串口切组、判分与结果汇总
+│   ├── fetch_judges.py                # 按固定 commit 拉取官方 judge
+│   ├── judge_team/                    # 6 组无官方 stdin judge 的团队判据
+│   ├── ref/                           # TEST-001 参考运行 initramfs 构建
+│   └── tests/                         # runner 的负向与契约测试
+
+│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── inventory.json                 # TEST-001 冻结的 427 项子用例清单
@@ -127,11 +133,12 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
-│       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
-│       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── test-audit.md              # 历史测评分支与测例审计
 │       ├── reference-run.md           # TEST-001 参考 Linux 判分基线与限制
 │       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
+
+│       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
+│       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
 ├── .github/                           # GitHub 模板、检查与保护配置
