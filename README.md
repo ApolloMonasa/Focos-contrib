@@ -100,6 +100,7 @@ Focos/
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
 │   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（草案）
 │   ├── REGION-001.md                  # 区域赛交付范围
+│   ├── TEST-001.md                    # 2025 初赛 11 组测试接入、判分与结果
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
