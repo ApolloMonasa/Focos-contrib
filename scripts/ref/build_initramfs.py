@@ -13,11 +13,18 @@ import tarfile
 import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from inventory import NAME, REFERENCE_LOCK, digest, load_inventory
+from inventory import NAME, REFERENCE_LOCK, INVENTORY, digest, load_inventory
 from reference_manifest import build_identity
 
 MODULES = ['failover', 'net_failover', 'virtio_ring', 'virtio', 'virtio_net',
            'virtio_mmio', 'virtio_blk', 'crc16', 'mbcache', 'jbd2', 'ext4']
+
+
+IMPLEMENTATION_FILES = {
+    'builder_sha256': Path(__file__).resolve(),
+    'inventory_code_sha256': Path(__file__).resolve().parents[1]/'inventory.py',
+    'manifest_code_sha256': Path(__file__).resolve().parents[1]/'reference_manifest.py',
+}
 
 
 def extract_busybox(image: Path, explicit: Path | None) -> bytes:
@@ -181,8 +188,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--network-dummy', action='store_true')
     parser.add_argument('--allow-unpinned-inputs', action='store_true', help='显式实验输入；manifest 标为未冻结')
     args = parser.parse_args(argv)
-    inventory = load_inventory()
-    lock = json.loads(REFERENCE_LOCK.read_text())
+    implementation_hashes = {key: digest(path) for key, path in IMPLEMENTATION_FILES.items()}
+    inventory_bytes = INVENTORY.read_bytes()
+    lock_bytes = REFERENCE_LOCK.read_bytes()
+    inventory = load_inventory(raw=inventory_bytes)
+    lock = json.loads(lock_bytes)
+    import hashlib
+    inventory_hash = hashlib.sha256(inventory_bytes).hexdigest()
+    lock_hash = hashlib.sha256(lock_bytes).hexdigest()
+    frozen = {path: implementation_hashes[key] for key, path in IMPLEMENTATION_FILES.items()}
+    frozen.update({INVENTORY: inventory_hash, REFERENCE_LOCK: lock_hash})
+    def unchanged():
+        for path, initial in frozen.items():
+            if not path.is_file() or digest(path) != initial:
+                raise ValueError('build source/input changed: '+str(path))
     args.release = args.release or lock['kernel']['release']
     scripts = {f'{g}_testcode.sh' for g in inventory['groups']}
     if (not NAME.fullmatch(args.release) or
@@ -190,14 +209,20 @@ def main(argv: list[str] | None = None) -> int:
             any(v not in ('musl', 'glibc') for v in args.libcs) or
             len(set(args.libcs)) != len(args.libcs) or len(set(args.scripts)) != len(args.scripts)):
         raise ValueError('invalid release, scripts or duplicate selections')
-    inputs_paths = {p.resolve() for p in (args.image, args.kernel_apk, args.busybox) if p is not None}
+    protected_inputs = [args.image, args.kernel_apk, INVENTORY, REFERENCE_LOCK, *IMPLEMENTATION_FILES.values()] + ([args.busybox] if args.busybox else [])
+    inputs_paths = {p.resolve() for p in protected_inputs}
     outputs_paths = [args.out, args.out.with_suffix('.manifest.json'), args.kernel_out] + [
         args.modules_dir/f'{m}.ko' for m in MODULES + (['dummy'] if args.network_dummy or 'netperf_testcode.sh' in args.scripts else [])]
     resolved_outputs = [p.resolve() for p in outputs_paths]
-    if inputs_paths.intersection(resolved_outputs) or len(set(resolved_outputs)) != len(resolved_outputs):
+    hardlink_overlap = any(out.exists() and source.exists() and out.samefile(source) for out in outputs_paths for source in protected_inputs)
+    if inputs_paths.intersection(resolved_outputs) or hardlink_overlap or len(set(resolved_outputs)) != len(resolved_outputs):
         raise ValueError('input/output paths overlap')
     args.network_dummy = args.network_dummy or 'netperf_testcode.sh' in args.scripts
     inputs = {'image': digest(args.image), 'kernel_apk': digest(args.kernel_apk)}
+    frozen.update({args.image: inputs['image'], args.kernel_apk: inputs['kernel_apk']})
+    if args.busybox:
+        frozen[args.busybox] = digest(args.busybox)
+    for path, initial in list(frozen.items()): frozen[path.resolve()] = initial
     pinned = (inputs['image'] == inventory['image']['uncompressed_sha256'] and
               inputs['kernel_apk'] == lock['kernel']['sha256'] and
               args.release == lock['kernel']['release'] and args.busybox is None)
@@ -211,11 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     import hashlib
     manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
                 'busybox_sha256': hashlib.sha256(busybox).hexdigest(), 'module_order': modules,
-                'builder_sha256': digest(Path(__file__)),
-                'inventory_code_sha256': digest(Path(__file__).resolve().parents[1]/'inventory.py'),
-                'manifest_code_sha256': digest(Path(__file__).resolve().parents[1]/'reference_manifest.py'),
-                'inventory_sha256': digest(Path(__file__).resolve().parents[2]/'tests/inventory.json'),
-                'reference_lock_sha256': digest(REFERENCE_LOCK),
+                **implementation_hashes,
+                'inventory_sha256': inventory_hash,
+                'reference_lock_sha256': lock_hash,
                 'zlib_version': zlib.ZLIB_RUNTIME_VERSION,
                 'selection': {'libcs': args.libcs, 'scripts': args.scripts, 'release': args.release,
                               'network_dummy': args.network_dummy}}
@@ -231,11 +254,13 @@ def main(argv: list[str] | None = None) -> int:
     for ino, (name, (mode, data)) in enumerate(sorted(files.items()), len(dirs)+1):
         buffer.write(entry(name, mode, data, ino))
     buffer.write(entry('TRAILER!!!', 0, b'', 0))
+    unchanged()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open('wb') as raw:
         with gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=9) as handle:
             handle.write(buffer.getvalue())
     manifest['outputs'] = {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}
+    unchanged()
     args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
     command = ['qemu-system-riscv64', '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
                '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', str(args.kernel_out),

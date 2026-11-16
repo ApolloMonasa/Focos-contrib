@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import os
 import subprocess
 import sys
 import tempfile
@@ -644,19 +645,22 @@ class RunnerSafetyTests(unittest.TestCase):
     def test_strict_disk_changed_before_or_during_capture_never_passes(self):
         import run_tests,contextlib,io,shlex
         from unittest.mock import patch
-        for stage in ['before','during']:
+        for stage in ['before','during','qemu']:
             proc,data,out=self.invoke(self.reference(),['--reference','strict']);root=out.parent
             image=root/'disk.img';kernel=root/'Image';init=root/'initramfs.gz'
             command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
                                '-bios','default','-kernel',str(kernel),'-initrd',str(init),'-append','console=ttyS0 rdinit=/init',
                                '-drive',f'file={image},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+            qemu=root/'qemu-system-riscv64';qemu.write_bytes(b'fake executable')
+            from inventory import digest
+            info={'path':str(qemu),'invoked_path':str(qemu),'sha256':digest(qemu),'version':'QEMU emulator version test'}
             if stage=='before':image.write_bytes(b'replaced disk')
             def capture(cmd,timeout):
                 self.assertIsInstance(cmd,list)
-                image.write_bytes(b'mutated while running')
+                (qemu if stage=='qemu' else image).write_bytes(b'mutated while running')
                 return (out/'serial.log').read_bytes(),False,0
             dest=root/'capture-out'
-            with self.subTest(stage=stage),patch.object(run_tests,'capture',side_effect=capture) as mocked,contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+            with self.subTest(stage=stage),patch.object(run_tests,'qemu_identity',return_value=info),patch.object(run_tests,'capture',side_effect=capture) as mocked,contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
                 code=run_tests.main(['--capture-cmd',command,'--out',str(dest),'--libc','musl','--group','iperf',
                                      '--reference','strict','--reference-image',str(image),'--inventory',str(root/'inventory.json'),
                                      '--reference-manifest',str(root/'build.manifest.json'),'--reference-artifacts',str(kernel),str(init),
@@ -702,6 +706,38 @@ class RunnerSafetyTests(unittest.TestCase):
             self.assertEqual(argv[13],str(kernel))
             self.assertEqual(argv[15],str(init))
             self.assertEqual(argv[19],f'file={image},if=none,format=raw,id=x0')
+
+    def test_log_replay_has_source_and_replay_time_not_capture_time(self):
+        proc,data,out=self.invoke(self.complete())
+        self.assertEqual(proc.returncode,0)
+        self.assertEqual(data['meta']['mode'],'replay')
+        self.assertNotIn('captured_at',data['meta'])
+        self.assertIn('replayed_at',data['meta'])
+        self.assertEqual(data['meta']['replayed_from']['sha256'],data['meta']['log_sha256'])
+
+    def test_script_failure_does_not_hide_judge_error(self):
+        for contents in [None,'raise SystemExit(3)','print("not json")']:
+            with self.subTest(contents=contents),tempfile.TemporaryDirectory() as tmp:
+                if contents is not None:(Path(tmp)/'judge_iperf.py').write_text(contents)
+                proc,data,out=self.invoke(self.reference(3),['--reference','strict','--team-judge-dir',tmp])
+                self.assertEqual(proc.returncode,1)
+                self.assertEqual(data['groups'][0]['status'],'JUDGE_ERROR')
+                self.assertEqual(data['totals']['groups']['JUDGE_ERROR'],1)
+                self.assertEqual(data['meta']['environment']['script_exits']['iperf-musl'],3)
+
+    def test_qemu_identity_resolves_path_and_rejects_version_probe_changes(self):
+        from reference_manifest import qemu_identity
+        from unittest.mock import patch
+        from inventory import digest
+        with tempfile.TemporaryDirectory() as tmp:
+            binary=Path(tmp)/'real-qemu';alias=Path(tmp)/'qemu-system-riscv64'
+            binary.write_text('#!/bin/sh\necho "QEMU emulator version test"\n');binary.chmod(0o755);alias.symlink_to(binary)
+            with patch.dict(os.environ,{'PATH':tmp}):info=qemu_identity('qemu-system-riscv64')
+            self.assertEqual(info['path'],str(binary))
+            self.assertEqual(info['sha256'],digest(binary))
+            self.assertEqual(info['version'],'QEMU emulator version test')
+            binary.write_text('#!/bin/sh\necho "# changed" >> "$0"\necho "QEMU emulator version test"\n')
+            with self.assertRaises(ValueError):qemu_identity(str(alias))
 
 if __name__ == '__main__':
     unittest.main()

@@ -100,6 +100,28 @@ class BuildTests(unittest.TestCase):
         with self.assertRaises(ValueError): build.module_order(['a'],dep)
         with self.assertRaises(ValueError): build.module_order(['a','b'],'a.ko.gz: b.ko.gz\nb.ko.gz: a.ko.gz\n')
 
+    def test_implementation_change_during_extraction_rejects_publication(self):
+        original=build.extract_busybox
+        for field in ['builder_sha256','inventory_code_sha256','manifest_code_sha256']:
+            with self.subTest(field=field):
+                sources={key:self.root/(key+'.py') for key in ['builder_sha256','inventory_code_sha256','manifest_code_sha256']}
+                for path in sources.values():path.write_bytes(b'original source')
+                def extract(*args):
+                    sources[field].write_bytes(b'edited during image extraction')
+                    return original(*args)
+                out=self.root/(field+'.gz')
+                with patch.object(build,'IMPLEMENTATION_FILES',sources),patch.object(build,'extract_busybox',side_effect=extract),self.assertRaisesRegex(ValueError,'changed'):
+                    self.invoke(out)
+                self.assertFalse(out.with_suffix('.manifest.json').exists())
+
+    def test_output_cannot_overwrite_implementation_or_its_hardlink(self):
+        source=self.root/'builder.py';source.write_bytes(b'implementation')
+        alias=self.root/'alias.py';os.link(source,alias)
+        for out in [source,alias]:
+            with self.subTest(out=out),patch.object(build,'IMPLEMENTATION_FILES',{'builder_sha256':source}),self.assertRaisesRegex(ValueError,'overlap'):
+                self.invoke(out)
+        self.assertEqual(source.read_bytes(),b'implementation')
+
 
 class InitTests(unittest.TestCase):
     def test_every_preparation_failure_stops_before_tests(self):

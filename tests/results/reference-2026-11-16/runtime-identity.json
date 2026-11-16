@@ -1,0 +1,41 @@
+{
+  "kind": "runtime_identity_and_replay_audit",
+  "test001_tests_passed": 70,
+  "historical_replays_matched": 15,
+  "builder_implementation_snapshot": {
+    "builder_sha256": "2ca15b998677268afa88b8248768e811734030404940983000af7a4a5e225f36",
+    "inventory_code_sha256": "8d35642499cdf19a08768da81427793f17100469b26a4ce667272c291e1619a3",
+    "manifest_code_sha256": "bcfd0a8d911f1f92f2d066229e5fa21690e7c233d7ed3a332d9a054da7cb1f51",
+    "inventory_sha256": "cfb0a44193e1a6a2ad9ce71baa300f774f25038b943458d3417f2d46f435b8e3",
+    "reference_lock_sha256": "74fa1ddefa38676ab63fbd729ca3991a8a24d6382ee6e6c25f6739c6c171d42f"
+  },
+  "qemu": {
+    "requested": "qemu-system-riscv64",
+    "invoked_path": "/usr/bin/qemu-system-riscv64",
+    "path": "/usr/bin/qemu-system-riscv64",
+    "sha256": "df4a9e8a7a8a3f9f8dfa834af228127a722d86428e206728d28e0becb35413b3",
+    "version": "QEMU emulator version 10.2.2 (qemu-10.2.2-1.fc44)"
+  },
+  "capture": {
+    "pass": 9,
+    "count": 9,
+    "mode": "capture",
+    "captured_at": "2026-11-16T13:39:46+00:00",
+    "serial_sha256": "e0dfed477338b720cebbccce87d5e5a35a3c555e81d1c1a4f8397386367b7d6c"
+  },
+  "replay": {
+    "pass": 9,
+    "count": 9,
+    "mode": "replay",
+    "replayed_at": "2026-11-16T13:39:56+00:00",
+    "replayed_from": {
+      "path": "target/evidence/pr29-review7-qemu/glibc/serial.log",
+      "sha256": "e0dfed477338b720cebbccce87d5e5a35a3c555e81d1c1a4f8397386367b7d6c"
+    }
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "b693a7a44b330e10aea015c7a539baf29b63e16036db944f6236d6c585bfc8f4",
+    "scripts/reference_manifest.py": "bcfd0a8d911f1f92f2d066229e5fa21690e7c233d7ed3a332d9a054da7cb1f51",
+    "scripts/ref/build_initramfs.py": "2ca15b998677268afa88b8248768e811734030404940983000af7a4a5e225f36"
+  }
+}

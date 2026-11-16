@@ -59,3 +59,5 @@
 2026-11-16，PR #29 最新 unresolved 复核：实际 APK 元数据表明 virtio 依赖 virtio_ring，P1 方向误判；增加基于 modules.dep 的排序与负例，并重新做真实 QEMU 双 libc Lua 9/9。补普通 capture 构件登记与变更拒绝、团队清单兼容约束、sections 复用及输出输入隔离。58 项专项与原有完整工程回归、15 份历史回放通过；未重跑 22 次参考测量，不覆盖旧证据。
 
 2026-11-16，PR #29 再次按负责人要求处理 unresolved：补 actual disk 与 strict QEMU argv 的绑定，并把所有输入纳入受管摘要别名检查（含硬链接）。65 项专项及原有完整工程回归、15 份历史回放通过；实际冻结磁盘重新 strict 启动，双 libc Lua 9/9。回放不冒充新采集，旧归档不覆盖，证据见 disk-binding.json；仍需人工复审。
+
+2026-11-16，按负责人要求处理新四项 unresolved，并在修复后触发 @codex review：固定 strict QEMU 可执行文件身份、构建开始时的实现/输入快照，保留 JUDGE_ERROR，原生区分采集与回放时间。70 项专项与原有完整回归、15 份历史回放通过；真实重建与 strict QEMU 采集双 libc Lua 9/9，证据见 runtime-identity.json。旧证据保留，新评审结果以 PR 为准。

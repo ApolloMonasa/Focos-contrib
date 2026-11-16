@@ -29,7 +29,7 @@ from pathlib import Path
 
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
-from reference_manifest import verify_manifest, strict_qemu_command
+from reference_manifest import verify_manifest, strict_qemu_command, qemu_identity
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -329,7 +329,8 @@ def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) 
         f"- libc: {meta.get('libc')}",
         f"- inventory: {meta.get('inventory')}",
         f"- log: {meta.get('log')}",
-        f"- captured_at: {meta.get('captured_at')}",
+        f"- mode: {meta['mode']}",
+        f"- {'captured_at' if meta['mode'] == 'capture' else 'replayed_at'}: {meta.get('captured_at', meta.get('replayed_at'))}",
         f"- environment: {meta['environment']['status']}",
         f"- execution_valid: {meta['execution_valid']}",
         f"- errors: {meta['environment']['errors'] or meta['log_error'] or '-'}",
@@ -428,6 +429,24 @@ def main(argv: list[str] | None = None) -> int:
             print('team parser does not support this inventory snapshot: '+group, file=sys.stderr)
             return 2
 
+    capture_command = args.capture_cmd
+    command_verified = False
+    qemu = None
+    if args.capture_cmd and (args.reference == 'strict' or args.reference_manifest):
+        try:
+            capture_command = strict_qemu_command(args.capture_cmd, args.reference_artifacts or [], args.reference_image)
+            manifest = json.loads(args.reference_manifest.read_text()) if args.reference_manifest else {}
+            image_hash = artifact_hashes.get(str(args.reference_image))
+            if image_hash != inventory['image']['uncompressed_sha256'] or image_hash != manifest.get('inputs', {}).get('image'):
+                raise ValueError('actual reference disk does not match frozen manifest')
+            qemu = qemu_identity(capture_command[0])
+            capture_command[0] = qemu['path']
+            artifact_hashes[qemu['path']] = qemu['sha256']
+            command_verified = True
+        except (ValueError, OSError, TypeError) as exc:
+            print(f'invalid strict capture: {exc}', file=sys.stderr)
+            return 2
+
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in
                           [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
@@ -441,6 +460,8 @@ def main(argv: list[str] | None = None) -> int:
     watched = {Path(ROOT/name): sha for name, sha in source_hashes.items()}
     watched.update({p: judge_hashes.get(str(p)) for p in judge_paths})
     watched.update({Path(p): sha for p, sha in artifact_hashes.items()})
+    if qemu:
+        watched[Path(qemu['invoked_path'])] = qemu['sha256']
     for p in {inventory_path, INVENTORY, REFERENCE_LOCK}:
         watched[p] = digest(p) if p.is_file() else None
     watched[inventory_path] = inventory_hash
@@ -476,19 +497,6 @@ def main(argv: list[str] | None = None) -> int:
             if current != original:
                 changed.append(str(path))
         return sorted(changed)
-    capture_command = args.capture_cmd
-    command_verified = False
-    if args.capture_cmd and (args.reference == 'strict' or args.reference_manifest):
-        try:
-            capture_command = strict_qemu_command(args.capture_cmd, args.reference_artifacts or [], args.reference_image)
-            manifest = json.loads(args.reference_manifest.read_text()) if args.reference_manifest else {}
-            image_hash = artifact_hashes.get(str(args.reference_image))
-            if image_hash != inventory['image']['uncompressed_sha256'] or image_hash != manifest.get('inputs', {}).get('image'):
-                raise ValueError('actual reference disk does not match frozen manifest')
-            command_verified = True
-        except (ValueError, OSError, TypeError) as exc:
-            print(f'invalid strict capture: {exc}', file=sys.stderr)
-            return 2
     truncated = False
     if args.log:
         raw_log = Path(args.log).read_bytes()
@@ -559,7 +567,7 @@ def main(argv: list[str] | None = None) -> int:
             for sub in result['subcases']:
                 sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
                 sub.update(status=failure, **{'pass': 0, 'score': 0.0})
-        elif environment['script_exits'].get(f"{result['group']}-{args.libc}", 0) != 0:
+        elif environment['script_exits'].get(f"{result['group']}-{args.libc}", 0) != 0 and result['status'] in ('PASS', 'PARTIAL', 'FAIL'):
             result['status'] = 'FAIL'
             for sub in result['subcases']:
                 sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
@@ -580,19 +588,27 @@ def main(argv: list[str] | None = None) -> int:
         "capture_exit_code": exit_code,
         "capture_argv": capture_command if isinstance(capture_command, list) else None,
         "capture_truncated": truncated,
-        "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "mode": "capture" if args.capture_cmd else "replay",
         'inventory_sha256': inventory_hash,
         'artifact_sha256': artifact_hashes,
         'log_sha256': hashlib.sha256(raw_log).hexdigest(),
         'environment': environment,
         'reference_provenance': provenance,
         'reference_command_verified': command_verified,
+        'qemu': qemu,
         'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
         'log_error': log_error,
         'source_sha256': source_hashes,
         'judge_sha256': judge_hashes,
         'changed_inputs': changed,
     }
+    timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
+    if args.capture_cmd:
+        meta['captured_at'] = timestamp
+    else:
+        meta['replayed_at'] = timestamp
+        meta['replayed_from'] = {'path': str(Path(args.log)), 'sha256': meta['log_sha256']}
+
     # 外部采集命令也可能新建别名；落盘前再次检查，不能只检查启动时的目录。
     if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()) or any(p.is_symlink() for p in managed_files):
         print('managed output changed into a symlink or non-directory', file=sys.stderr)

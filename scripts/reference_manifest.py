@@ -4,6 +4,9 @@ import json
 from pathlib import Path
 import re
 import shlex
+import shutil
+import subprocess
+import os
 
 from inventory import REFERENCE_LOCK, INVENTORY, digest
 
@@ -41,6 +44,28 @@ def strict_qemu_command(command, artifacts, image):
     if normalized != expected:
         raise ValueError('QEMU command paths/options do not match declared reference artifacts')
     return expected
+
+
+def qemu_identity(executable):
+    """固定 PATH 解析结果与真实文件；版本探测前后文件身份必须一致。"""
+    invoked = shutil.which(executable)
+    if invoked is None:
+        raise ValueError('QEMU executable not found: '+executable)
+    path = Path(invoked).resolve(strict=True)
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise ValueError('QEMU executable is not an executable file')
+    initial = digest(path)
+    try:
+        result = subprocess.run([str(path), '--version'], capture_output=True, text=True, timeout=10, check=True)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError('QEMU version probe failed') from exc
+    version = result.stdout.splitlines()[0] if result.stdout.splitlines() else ''
+    if not version.startswith('QEMU emulator version ') or len(result.stdout) > 4096:
+        raise ValueError('QEMU version output is invalid')
+    if digest(path) != initial or Path(invoked).resolve() != path:
+        raise ValueError('QEMU executable changed during version probe')
+    return {'requested': executable, 'invoked_path': str(Path(invoked).absolute()),
+            'path': str(path), 'sha256': initial, 'version': version}
 
 
 def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):

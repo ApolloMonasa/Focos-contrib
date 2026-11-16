@@ -82,3 +82,9 @@ CI 补充：Ubuntu dash 的 echo 会展开测试桩命令中的反斜杠，现�
 最新审核的两项问题均成立。strict 现在要求实际磁盘，取其当前 SHA256 与清单/manifest 同时绑定并监视变化；capture 仅执行经过路径与固定选项核对的直接 QEMU argv，拒绝额外挂盘、shell 包装及误指向其他构件。输出碰撞检查覆盖全部输入与硬链接别名，保留受控 serial.log 原地回放。
 
 新增负例先在旧实现暴露 4 个失败和 1 个错误；修复后 65 项专项、52 Rust、15 原有 Python 与三个内核检查通过，15 份历史回放一致。使用实际 4 GiB 冻结磁盘重新做 strict QEMU 采集，glibc/musl Lua 均为 9/9（后者从同一双 libc 启动日志重判，非第二次启动）。源码哈希、磁盘哈希和命令核对状态见 [disk-binding.json](disk-binding.json)。没有重跑整轮 22 项测量，旧包不覆盖；旧包内的固定 SOURCE 入口继续对应旧实现。
+
+## 执行工具、构建快照和结果来源修复
+
+最新四项 P2 均按实现遗漏修复：strict QEMU 解析真实文件，记录和监视版本/哈希；构建源码、清单、锁与输入在处理前固定，发布前复查，且禁止输出覆盖实现；脚本退出失败保留同时发生的 JUDGE_ERROR；原生日志回放明确使用 replayed_at/replayed_from，不伪造 captured_at。
+
+新增负例在旧实现暴露 3 个失败和 5 个错误；修复后专项共 70 项，完整工程检查与 15 份历史回放通过。重新构建真实参考环境并采集双 libc Lua，glibc 9/9；musl 从同一日志重判 9/9，原生元数据区分 capture/replay。真实 QEMU 路径、版本、哈希、构建开始时的实现身份见 [runtime-identity.json](runtime-identity.json)。旧归档不覆盖，未重跑 22 次全组测量。

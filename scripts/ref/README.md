@@ -113,3 +113,9 @@ cpio 的顺序、权限、属主和时间固定；gzip 固定 `mtime=0` 且不�
 受管输出别名在启动前和落盘前分别检查；采集命令运行期间新建的输出符号链接同样被拒绝，不能借输出写入覆盖原始输入。
 
 strict capture 执行规范化的真实构件路径，声明路径及其解析后的路径都参与变化检查；实际 argv 写入 capture_argv，避免命令别名在核对后重定向到另一文件。
+
+strict capture 还会解析 QEMU 的实际可执行文件，先取 SHA256，运行同一文件的 --version 并复查未变化，再执行真实路径；元数据 qemu 包含路径、版本探测输出和初始哈希，实际文件及调用别名都加入运行期检查。版本输出用于记录条件，不是供应商签名认证。
+
+构建器在处理镜像/APK 前固定 builder、inventory.py、reference_manifest.py、清单与锁的身份；重操作后、发布 manifest 前复查源码和输入。输出不能覆盖这些源码/配置或其硬链接。清单与锁从同一字节快照解析、计算哈希，避免归因到后来编辑的版本。
+
+原生 --log 输出现在包含 mode=replay、replayed_at 和 replayed_from（路径与原始字节哈希），不写 captured_at。真实 capture 才记录 captured_at；旧包的包装回放仍按其冻结 SOURCE 解释。脚本非零退出仅覆盖可判分状态，judge 缺失、崩溃或非法输出仍为 JUDGE_ERROR。
