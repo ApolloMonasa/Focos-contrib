@@ -686,5 +686,22 @@ class RunnerSafetyTests(unittest.TestCase):
                 self.assertEqual(artifact.read_bytes(),b'original kernel')
                 self.assertEqual((external/'keep').read_text(),'keep')
 
+    def test_strict_command_executes_canonical_artifact_paths(self):
+        from reference_manifest import strict_qemu_command
+        import shlex
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);kernel=root/'Image';init=root/'init.gz';image=root/'disk.img'
+            for p in [kernel,init,image]:p.write_bytes(b'artifact')
+            aliases=[]
+            for p in [kernel,init,image]:
+                alias=root/('alias-'+p.name);alias.symlink_to(p);aliases.append(alias)
+            command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                               '-bios','default','-kernel',str(aliases[0]),'-initrd',str(aliases[1]),'-append','console=ttyS0 rdinit=/init',
+                               '-drive',f'file={aliases[2]},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+            argv=strict_qemu_command(command,aliases[:2],aliases[2])
+            self.assertEqual(argv[13],str(kernel))
+            self.assertEqual(argv[15],str(init))
+            self.assertEqual(argv[19],f'file={image},if=none,format=raw,id=x0')
+
 if __name__ == '__main__':
     unittest.main()

@@ -40,7 +40,7 @@ def strict_qemu_command(command, artifacts, image):
     normalized[19] = f'file={Path(disk_argument).resolve()}{suffix}'
     if normalized != expected:
         raise ValueError('QEMU command paths/options do not match declared reference artifacts')
-    return args
+    return expected
 
 
 def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):

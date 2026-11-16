@@ -446,6 +446,10 @@ def main(argv: list[str] | None = None) -> int:
     watched[inventory_path] = inventory_hash
     for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
         watched[p] = digest(p) if p.is_file() else None
+    # 同时固定声明路径和其解析后的真实路径，防止别名重定向掩盖变化。
+    for p, initial_hash in list(watched.items()):
+        if initial_hash is not None:
+            watched[p.resolve()] = initial_hash
     managed_files = [out_dir/name for name in ('serial.log', 'summary.json', 'summary.md')]
     def aliases(a, b):
         if a.resolve() == b.resolve(): return True
@@ -574,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
         "inventory": str(inventory_path),
         "log": log_label,
         "capture_exit_code": exit_code,
+        "capture_argv": capture_command if isinstance(capture_command, list) else None,
         "capture_truncated": truncated,
         "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         'inventory_sha256': inventory_hash,

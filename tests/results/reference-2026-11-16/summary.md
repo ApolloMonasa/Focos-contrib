@@ -81,4 +81,4 @@ CI 补充：Ubuntu dash 的 echo 会展开测试桩命令中的反斜杠，现�
 
 最新审核的两项问题均成立。strict 现在要求实际磁盘，取其当前 SHA256 与清单/manifest 同时绑定并监视变化；capture 仅执行经过路径与固定选项核对的直接 QEMU argv，拒绝额外挂盘、shell 包装及误指向其他构件。输出碰撞检查覆盖全部输入与硬链接别名，保留受控 serial.log 原地回放。
 
-新增负例先在旧实现暴露 4 个失败和 1 个错误；修复后 64 项专项、52 Rust、15 原有 Python 与三个内核检查通过，15 份历史回放一致。使用实际 4 GiB 冻结磁盘重新做 strict QEMU 采集，glibc/musl Lua 均为 9/9（后者从同一双 libc 启动日志重判，非第二次启动）。源码哈希、磁盘哈希和命令核对状态见 [disk-binding.json](disk-binding.json)。没有重跑整轮 22 项测量，旧包不覆盖；旧包内的固定 SOURCE 入口继续对应旧实现。
+新增负例先在旧实现暴露 4 个失败和 1 个错误；修复后 65 项专项、52 Rust、15 原有 Python 与三个内核检查通过，15 份历史回放一致。使用实际 4 GiB 冻结磁盘重新做 strict QEMU 采集，glibc/musl Lua 均为 9/9（后者从同一双 libc 启动日志重判，非第二次启动）。源码哈希、磁盘哈希和命令核对状态见 [disk-binding.json](disk-binding.json)。没有重跑整轮 22 项测量，旧包不覆盖；旧包内的固定 SOURCE 入口继续对应旧实现。
