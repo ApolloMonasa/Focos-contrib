@@ -404,5 +404,43 @@ class RunnerSafetyTests(unittest.TestCase):
         self.assertEqual(data['groups'][0]['status'], 'PASS')
 
 
+
+    def test_complete_assertions_without_group_end_are_not_effective_passes(self):
+        raw = self.complete().replace(b'#### OS COMP TEST GROUP END iperf-musl ####\n', b'')
+        proc, data, _ = self.invoke(raw)
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'TIMEOUT')
+        self.assertEqual(data['totals']['pass'], 0)
+        self.assertEqual(data['totals']['pass_rate'], 0)
+        self.assertTrue(all(s['status'] == 'TIMEOUT' and s['pass'] == 0 for s in data['groups'][0]['subcases']))
+        self.assertEqual(data['groups'][0]['subcases'][0]['observed']['status'], 'PASS')
+
+
+
+    def test_capture_records_source_identity_before_external_execution(self):
+        import contextlib
+        import io
+        import run_tests
+        from unittest.mock import patch
+        original_digest = run_tests.digest
+        started = False
+        def capture(command, timeout):
+            nonlocal started
+            started = True
+            return self.complete(), False, 0
+        def digest(path):
+            if Path(path).resolve() == RUNNER.resolve():
+                return 'b'*64 if started else 'a'*64
+            return original_digest(path)
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'digest', side_effect=digest), contextlib.redirect_stdout(io.StringIO()):
+                code = run_tests.main(['--capture-cmd', 'fake', '--out', tmp, '--libc', 'musl',
+                                       '--group', 'iperf', '--inventory', str(INVENTORY),
+                                       '--team-judge-dir', str(TEAM_DIR)])
+            data = json.loads((Path(tmp)/'summary.json').read_text())
+            self.assertEqual(code, 0)
+            self.assertEqual(data['meta']['source_sha256']['scripts/run_tests.py'], 'a'*64)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -77,12 +77,12 @@
 
 ## 5. 分母政策
 
-- **评分分母用 judge 清单（427）**，因为它决定了平台能给你多少分；
+- **本地逐项报告分母固定为 427**，由 5 组公开 judge 和 6 组团队判据共同组成，不宣称等同最终赛方评分；
 - **执行能力用镜像清单**（busybox 52 可执行、libctest 217 可执行），用于解释为什么有些项永远是 0；
 - 在输入未冻结、失败未复现前，不发布“总通过率”；
 - 任何对镜像或脚本的修改都必须单独标记为“适配镜像”，不能与“原版镜像兼容”混在一起。
 
-**当前理论上限（按 libc 分列）**：
+**按当前本地清单与已知缺项计算的上界（按 libc 分列）**，不是参考 Linux 成绩或赛方承诺：
 
 - glibc：423/427（99.1%），扣 busybox 1 项 + libctest 3 项；
 - musl：≤391/427（91.6%），再扣 basic 的 32 项；libctest 动态项还会更低。
@@ -93,7 +93,7 @@
 
 ## 6. 复现入口
 
-下面命令依赖 runner 与团队判据，它们**不在本 PR**，而在 PR #2（`feat/8-test-runner`，https://github.com/MindScrath/Focos/compare/main...Weibo-Hd:feat/8-test-runner ）。本 PR 只提供清单、SPEC 和参考运行 harness。runner 的固定版本用标签 `test-001-runner-2026-11-08` 检出；PR #2 尚未合入，合入后以 merge commit 为准。
+本 PR 已包含构建器、runner、6 个团队判据和全部开发机测试。历史 runner 来源固定为 `Weibo-Hd/Focos@051b611fb5810b9863dcc19afc1764d42f907812`；当前验证按本 PR 的代码执行，不能用旧标签代替当前实现。完整构建和严格运行命令见 [参考入口](../../scripts/ref/README.md)。
 
 ```bash
 # 1. 拉取官方 judge（固定 commit，不入库）
@@ -106,10 +106,14 @@ python scripts/run_tests.py \
   --judge-dir third_party/oskernel-testsuits-cooperation/judge \
   --libc musl
 
-# 3. runner 自身契约测试（空输入/缺组/超时/未知用例/judge 崩溃）
-TEST001_JUDGE_DIR=third_party/oskernel-testsuits-cooperation/judge \
-  python -m unittest discover -s scripts/tests -v
+# 3. 环境、构建、判分与 runner 契约
+make test-test001
+
+# 4. 固定历史证据回放（38 个文件、15 份摘要）
+make reference-replay
 ```
+
+普通 FocOS 日志按上述命令判分；旧参考日志需追加 `--reference legacy`，新参考日志需提供 manifest 和构件并使用 strict。
 
 参考运行 harness 见 [scripts/ref/README.md](../../scripts/ref/README.md)；2026-11-08 的 11 组摘要见 [summary](../../tests/results/reference-2026-11-08/summary.md)；原始日志与逐项判分结果见 [证据归档](https://github.com/Weibo-Hd/Focos/releases/tag/test-001-evidence-2026-11-08)。
 

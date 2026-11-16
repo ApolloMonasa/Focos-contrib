@@ -1,6 +1,8 @@
 # TEST-001 参考运行：Linux/QEMU 判分基线
 
-关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 日期：2026-11-08 · 性质：判分管线验证，不是 FOCOS 成绩
+关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 日期：2026-11-08 · 性质：历史判分测量，不是 FOCOS 成绩
+
+本页保留 2026-11-08 的测量，历史 runner 固定为 `051b611fb5810b9863dcc19afc1764d42f907812`。旧 Alpine APK 的滚动下载地址已返回 404；历史串口可由归档重新判分，但不能据此声称已重建旧环境。当前构建协议、固定输入与命令见 [scripts/ref/README.md](../../scripts/ref/README.md)，新一轮测量另存，不覆盖本表。
 
 本文记录用**参考 Linux**（Alpine 内核 + 官方测试镜像）跑 11 组的真实串口输出，以及 runner/judge 在真实输出上的行为。目的是确认“判分能不能信”，不是证明 FOCOS 兼容性。FOCOS 的结果必须另跑、另列。
 
@@ -31,7 +33,7 @@ qemu-system-riscv64 \
   -device virtio-blk-device,drive=x0
 ```
 
-initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virtio_ring/virtio/virtio_mmio/virtio_blk/crc16/mbcache/jbd2/ext4/dummy` 模块，以及一个 `/init`：挂 proc/sys/dev，`insmod` 模块，挂载 `/dev/vda` 到 `/mnt`，`chroot` 进 `/mnt/glibc` 或 `/mnt/musl` 执行官方脚本。每个步骤都带 `|| fail`：只有确实成功才打印 `REF_MODULES_OK` / `REF_MOUNT_OK`，失败打印 `REF_FAIL <stage>` 并关机，不会出现“模块加载或挂载失败但仍然打印 OK”的情况（标记含义见 [scripts/ref/README.md](../../scripts/ref/README.md)）。
+initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virtio_ring/virtio/virtio_mmio/virtio_blk/crc16/mbcache/jbd2/ext4/dummy` 模块，以及一个 `/init`：挂 proc/sys/dev，`insmod` 模块，挂载 `/dev/vda` 到 `/mnt`，`chroot` 进 `/mnt/glibc` 或 `/mnt/musl` 执行官方脚本。旧构建在 11/11 收紧模块和挂载失败，11/16 的 `dd1dc69` 又检查 dummy 配置；这些修订不代表当时的链接、权限和配置步骤均已检查。当前实现统一检查必需前置步骤，并将环境失败与测试脚本退出分开记录（标记含义见 [scripts/ref/README.md](../../scripts/ref/README.md)）。
 
 ## 2. 参考环境做的打包适配（仅用于参考运行）
 
@@ -74,7 +76,7 @@ initramfs 内含：测试镜像里的静态 `busybox`、Alpine 6.18.60 的 `virt
 5. **lmbench 的官方 judge 不是 stdin 判分器**：`judge/lmbench.sh` 会执行命令；团队解析器按真实标签校准后，前 11 项正确。`lat_proc fork` 在最小参考环境挂住，说明后续项需要完整进程/文件环境。
 6. **unixbench 的 SHELL 项**：`SHELL1/8/16` 没有输出 `Unixbench ... test(lpm):` 行；团队判据按缺项 0 分处理，24/27。需要真实 FOCOS 输出再确认是环境问题还是实现问题。
 7. **netperf 的 `AI_ADDRCONFIG`**：只有 loopback 时 `getaddrinfo("127.0.0.1")` 返回 `EAI_NONAME`；加 `dummy0` 后 5/5。这说明运行环境需要至少一个非 loopback IPv4 地址。
-8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 6 个团队判据（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；缺组/缺输出/START 无 END 的负向行为由 PR #2 的 `scripts/tests/test_runner.py` 覆盖（该文件不在本 PR，以标签 `test-001-runner-2026-11-08` 为准）。
+8. **判分器稳定性**：11 组、5 个 stdin 官方 judge + 6 个团队判据（lmbench 用团队解析器），全部无 `JUDGE_ERROR`；历史负向测试来自固定 runner `051b611`；当前完整测试已纳入本 PR，入口为 `make test-test001`。本表只说明旧测量可重新判分，不是新协议环境验收。
 
 ## 5. 这些结果不能怎么用
 

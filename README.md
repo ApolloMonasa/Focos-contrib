@@ -22,7 +22,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。页表、用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
-本分支另增：TEST-001 的输入冻结、427 项子用例清单、参考 Linux 判分基线、可复现的 initramfs 构建脚本和串口日志 runner；FOCOS 的 QEMU/真板结果尚未产生。入口见 [test-inventory](docs/reference/test-inventory.md)、[reference-run](docs/reference/reference-run.md)、[summary](tests/results/reference-2026-11-08/summary.md)、[TEST-001](specs/TEST-001.md)。
+TEST-001 已冻结 11 组、427 项输入，并提供确定性参考构建、串口 runner 和 6 个团队判据。`make test-test001` 检查故障处理、日志与判分契约，`make reference-replay` 校验并回放历史证据。使用见[参考运行入口](scripts/ref/README.md)，判分边界见 [TEST-001](specs/TEST-001.md)；FocOS 的 QEMU/真板测例结果仍未产生。
 
 本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
 
@@ -100,23 +100,40 @@ Focos/
 │   ├── MM-002.md                      # QEMU 真实内存接入规格
 │   ├── MM-003.md                      # QEMU 内核分页与真实访问验收（草案）
 │   ├── REGION-001.md                  # 区域赛交付范围
-│   ├── TEST-002.md                    # 共享块接口与独立镜像模型的验收
 │   ├── TEST-001.md                    # 2025 初赛 11 组测试接入、判分与结果
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
-│   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
-│   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
-│   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
-│   ├── run_tests.py                   # TEST-001 串口切组、判分与结果汇总
-│   ├── fetch_judges.py                # 按固定 commit 拉取官方 judge
-│   ├── judge_team/                    # 6 组无官方 stdin judge 的团队判据
-│   ├── ref/                           # TEST-001 参考运行 initramfs 构建
-│   └── tests/                         # runner 的负向与契约测试
-
-│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
+│   ├── smoke.py                       # QEMU 启动、真实页读写与中断状态检查
+│   ├── test_build.py                  # 构建目标、板型与 host 边界测试
+│   ├── test_irq_api.py                # 启动自检 unsafe 边界的调用方编译测试
+│   ├── test_smoke.py                  # 启动检查器标记、退出状态与超时测试
+│   ├── inventory.py                   # 冻结输入的共用读取、校验与哈希
+│   ├── sync_test_plan.py              # 从清单生成区域计划与文档表格
+│   ├── run_tests.py                   # 串口切组、判分、原始日志与结果
+│   ├── fetch_judges.py                # 拉取并核对固定官方 judge 文件
+│   ├── reference_protocol.py          # 参考环境准备与逐组执行协议
+│   ├── reference_manifest.py          # 构建身份、冻结输入、构件与日志绑定
+│   ├── judge_team/                    # 6 组团队判据
+│   │   ├── common.py                 # 冻结名称、数值与重复结果规则
+│   │   ├── judge_unixbench.py         # Unixbench 完整正数结果行
+│   │   ├── judge_iperf.py             # iperf 结束状态
+│   │   ├── judge_libcbench.py         # libc-bench 标签与完整 time 行
+│   │   ├── judge_lmbench.py           # lmbench 标签、单位与命令上下文
+│   │   ├── judge_netperf.py           # netperf 结束状态
+│   │   └── judge_cyclictest.py        # cyclictest 结束状态
+│   ├── ref/                           # TEST-001 参考 Linux 验证链
+│   │   ├── README.md                 # 构建、运行与回放命令
+│   │   ├── build_initramfs.py         # 输入校验、确定性构建与 manifest
+│   │   └── replay_evidence.py         # 历史归档校验与逐项结果对比
+│   └── tests/                         # TEST-001 开发机测试
+│       ├── test_inputs.py             # 清单投影、来源与归档边界
+│       ├── test_judges.py             # 性能格式与误报负例
+│       ├── test_reference.py          # 确定性构建及逐步故障注入
+│       └── test_runner.py             # 切组、捕获、判分与协议边界
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
-│   ├── inventory.json                 # TEST-001 冻结的 427 项子用例清单
+│   ├── inventory.json                 # TEST-001 冻结的 427 项清单与官方 judge 哈希
+│   ├── reference.lock.json            # 当前/历史参考内核与证据归档的固定输入
 │   ├── results/                       # TEST-001 参考运行摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
@@ -133,12 +150,11 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
+│       ├── local-irq-critical-section.md # 临界区实现、屏障与限制
+│       ├── sv39-paging.md             # 页表接口、启动映射与分页验收
 │       ├── test-audit.md              # 历史测评分支与测例审计
-│       ├── reference-run.md           # TEST-001 参考 Linux 判分基线与限制
+│       ├── reference-run.md           # TEST-001 2026-11-08 历史参考测量
 │       └── test-inventory.md          # TEST-001 输入冻结、逐组清单与差异
-
-│       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
-│       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
 ├── .github/                           # GitHub 模板、检查与保护配置
@@ -147,7 +163,7 @@ Focos/
 │   ├── pull_request_template.md       # 改动、验证与限制
 │   ├── main-protection.json           # main 分支保护的可复用配置
 │   └── workflows/                     # GitHub Actions 工作流
-│       └── ci.yml                     # PR 与 main 的构建、启动、内存与中断检查
+│       └── ci.yml                     # 内核门禁、TEST-001 契约与历史证据回放
 ├── .gitignore                         # Git 忽略规则
 ├── Cargo.toml                         # Rust 工作区与构建配置
 ├── Cargo.lock                         # 锁定 Cargo 依赖版本

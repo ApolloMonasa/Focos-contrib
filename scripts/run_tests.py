@@ -390,6 +390,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unknown group(s): {', '.join(unknown)}", file=sys.stderr)
         return 2
 
+    # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
+    source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in
+                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
     truncated = False
     if args.log:
         raw_log = Path(args.log).read_bytes()
@@ -455,6 +458,10 @@ def main(argv: list[str] | None = None) -> int:
             for sub in result['subcases']:
                 sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
                 sub.update(status='FAIL', **{'pass': 0, 'score': 0.0})
+        elif result['status'] == 'TIMEOUT' and args.reference != 'legacy':
+            for sub in result['subcases']:
+                sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
+                sub.update(status='TIMEOUT', **{'pass': 0, 'score': 0.0})
 
     totals = summarize(results)
     import datetime
@@ -473,8 +480,7 @@ def main(argv: list[str] | None = None) -> int:
         'reference_provenance': provenance,
         'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
         'log_error': log_error,
-        'source_sha256': {str(p.relative_to(ROOT)): digest(p) for p in
-                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']},
+        'source_sha256': source_hashes,
         'judge_sha256': {str(p): digest(p) for p in
                          sorted(set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py')))},
     }
