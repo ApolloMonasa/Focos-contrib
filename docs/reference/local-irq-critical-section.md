@@ -45,7 +45,7 @@ unsafe { asm!("csrsi sstatus, 2", options(nomem, nostack)); }
 
 实现前先加入自检，`make build` 因缺少 `irq` 模块失败；实现后通过。另做过两次临时变异核对测试有效性：
 
-- 去掉关中断：`single-on` 场景报告 `expected: true, actual: false` 并 panic。
+- 去掉关中断（只读取 SIE 作为保存值，不执行 `csrrc`）：`single-on` 在闭包内的状态检查报告 `expected: false, actual: true` 并 panic。
 - 恢复时总是开中断：`single-off` 场景报告 `expected: false, actual: true` 并 panic。
 
 两次变异均已还原。QEMU 的 panic 路径以 `FOCOS_PANIC` 被检查器判失败，不依赖 QEMU 退出码。
