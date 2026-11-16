@@ -106,7 +106,7 @@ esac
 n=0
 [ ! -f "$CALLS" ] || read -r n < "$CALLS"
 n=$((n+1)); echo "$n" > "$CALLS"
-echo "$cmd $*" >> "$TRACE"
+printf '%s\\n' "$cmd $*" >> "$TRACE"
 [ "$n" != "$FAIL_AT" ] || exit 7
 exit 0
 ''')
@@ -119,6 +119,7 @@ exit 0
             self.assertEqual(result.returncode, 0, result.stdout+result.stderr)
             self.assertIn('REF_ALL_DONE', result.stdout)
             commands = (root/'trace').read_text().splitlines()
+            self.assertEqual(len(commands), int((root/'calls').read_text()))
             for index, command in enumerate(commands, 1):
                 # 最后一次 chroot 是被测脚本；其非零退出由 REF RESULT 单独记录。
                 if 'chroot ' in command and '_testcode.sh' in command:
