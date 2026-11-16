@@ -135,6 +135,10 @@ Focos/
 │   ├── inventory.json                 # TEST-001 冻结的 427 项清单与官方 judge 哈希
 │   ├── reference.lock.json            # 当前/历史参考内核与证据归档的固定输入
 │   ├── results/                       # TEST-001 参考运行摘要
+│   │   ├── reference-2026-11-08/       # 原始历史基线
+│   │   │   └── summary.md             # 旧镜像差异与参考结果
+│   │   └── reference-2026-11-16/       # 验证链重构后的独立测量
+│   │       └── summary.md             # 22 次参考运行、回放、故障与证据
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南
