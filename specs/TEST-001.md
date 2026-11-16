@@ -8,7 +8,7 @@
 
 ## 行为约定
 
-- **输入与来源**：源码、镜像和官方 judge 以 `tests/inventory.json` 为准；参考环境与历史证据以 `tests/reference.lock.json` 为准。记录输入、原始日志、判据及执行代码的 SHA256，官方 judge 必须匹配冻结文件。原始日志逐字节保留。
+- **输入与来源**：源码、镜像和官方 judge 以 `tests/inventory.json` 为准；参考环境与历史证据以 `tests/reference.lock.json` 为准。记录输入、原始日志、判据及执行代码的 SHA256，官方 judge 必须匹配冻结文件。清单从同一份字节快照解析并计算哈希；清单、源码、判分器、参考锁和构件在采集前登记，采集/判分期间变化则 ENV_ERROR，不能归因给新版本。原始日志逐字节保留。
 - **构建**：默认校验镜像和 APK；固定 cpio 元数据、gzip 时间戳和文件名。相同输入、参数及压缩工具链，在不同时间和目录构建得到相同内核/initramfs 哈希。显式允许未冻结输入时，manifest 必须标记；不能作为冻结环境的证据。
 - **环境准备**：所有必需的模块、挂载、目录、链接、权限、配置、网络及 chroot 预检失败，输出 `REF_FAIL <stage>` 并停止，不执行后续组。测试脚本非零退出单独记录，不冒充环境失败或成功。
 - **组切分**：严格配对 `#### OS COMP TEST GROUP START/END <group>-<libc> ####`；不带后缀时用必填的 `--libc`。重复、嵌套、错配标记是 `LOG_ERROR`，禁止选择一段覆盖其他段；EOF 前未结束是 `TIMEOUT`。
@@ -16,7 +16,7 @@
 - **判据**：团队性能解析器只接受约定格式、单位和有效数值。错误消息中的关键词、数字、耗时或部分输出不构成成功。重复/冲突结果不能用后一次成功覆盖失败。
 - **状态**：`PASS` 仅限清单内每项 `pass == all > 0`；部分断言通过为 `PARTIAL`，无通过为 `FAIL`。缺组为 `NOT_RUN`，缺项为 `MISSING`（0 分）。另列 `TIMEOUT`、`JUDGE_ERROR`、`LOG_ERROR`、`ENV_ERROR`、`CAPTURE_ERROR`；这些均不能通过。环境错误优先于其他状态。
 - **参考协议**：新 init 输出版本、准备、运行及退出码标记；严格模式必须提供 manifest 与内核/initramfs，核对构建 ID、冻结输入、构件哈希、顺序与所选组；环境错误使结果失效。旧日志只能显式使用 legacy 模式，标记环境未经新协议验证；不据此声称新构建通过。详见[参考运行说明](../scripts/ref/README.md)。
-- **输出**：`summary.json`、`summary.md`、原始 `serial.log`、`sections/<group>-<libc>.log`；额外 judge 名称与未知用例另列，不进入分母。每项保留 `name/status/all/pass/score`，不同单位的分数不汇总。
+- **输出**：`summary.json`、`summary.md`、原始 `serial.log`、`sections/<group>-<libc>.log`；额外 judge 名称与未知用例另列（含 iperf/netperf/cyclictest 结束标记、Unixbench 结果名及 libc-bench 标签），不进入分母。每项保留 `name/status/all/pass/score`，不同单位的分数不汇总。
 - **退出码**：0 = 所选组全部通过且运行有效；1 = 非通过或运行无效；2 = 参数、文件或清单错误。捕获命令非零退出不得报告通过；超时终止整个子进程组。
 
 ## 怎样验收

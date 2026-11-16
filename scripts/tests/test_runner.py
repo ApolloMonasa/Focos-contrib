@@ -438,9 +438,89 @@ class RunnerSafetyTests(unittest.TestCase):
                                        '--group', 'iperf', '--inventory', str(INVENTORY),
                                        '--team-judge-dir', str(TEAM_DIR)])
             data = json.loads((Path(tmp)/'summary.json').read_text())
-            self.assertEqual(code, 0)
+            self.assertEqual(code, 1)
+            self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
             self.assertEqual(data['meta']['source_sha256']['scripts/run_tests.py'], 'a'*64)
 
+
+    def test_score_does_not_create_partial_assertions(self):
+        import run_tests
+        from unittest.mock import patch
+        cfg = {'kind': 'team', 'judge_file': 'judge_iperf.py', 'subcases': ['a']}
+        for passed, score, status in [(0, 10, 'FAIL'), (1, 0, 'PARTIAL'), (2, 0, 'PASS')]:
+            with self.subTest(passed=passed), patch.object(run_tests, 'run_judge', return_value=run_tests.JudgeResult(
+                    [{'name': 'a', 'all': 2, 'pass': passed, 'score': score}], 'ok')):
+                result = run_tests.judge_group('iperf', run_tests.Section('iperf', 'musl'), cfg, Path('.'), Path('.'), 1)
+                self.assertEqual(result['status'], status)
+                self.assertEqual(result['subcases'][0]['status'], status)
+
+    def test_unknown_team_markers_are_reported(self):
+        import run_tests
+        from inventory import load_inventory
+        for group in ['iperf', 'netperf', 'cyclictest']:
+            text = f'====== {group} NEW_CASE end: success ======\n'
+            cfg = load_inventory()['groups'][group]
+            result = run_tests.judge_group(group, run_tests.Section(group, 'musl', text.splitlines()), cfg, Path('.'), TEAM_DIR, 5)
+            self.assertEqual(result['unexpected_in_log'], ['NEW_CASE'])
+
+    def test_inventory_changes_during_capture_or_judging_invalidate_result(self):
+        import contextlib
+        import io
+        import run_tests
+        from inventory import digest
+        from unittest.mock import patch
+        for stage in ['capture', 'judge']:
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as tmp:
+                inventory = Path(tmp)/'inventory.json'
+                inventory.write_bytes(INVENTORY.read_bytes())
+                original_hash = digest(inventory)
+                original_judge = run_tests.judge_group
+                def mutate():
+                    inventory.write_bytes(inventory.read_bytes()+b' ')
+                def capture(command, timeout):
+                    if stage == 'capture': mutate()
+                    return self.complete(), False, 0
+                def judge(*args, **kwargs):
+                    result = original_judge(*args, **kwargs)
+                    if stage == 'judge': mutate()
+                    return result
+                with patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'judge_group', side_effect=judge), contextlib.redirect_stdout(io.StringIO()):
+                    code = run_tests.main(['--capture-cmd', 'fake', '--out', tmp, '--libc', 'musl',
+                                           '--group', 'iperf', '--inventory', str(inventory), '--team-judge-dir', str(TEAM_DIR)])
+                data = json.loads((Path(tmp)/'summary.json').read_text())
+                self.assertEqual(code, 1)
+                self.assertEqual(data['meta']['inventory_sha256'], original_hash)
+                self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+                self.assertEqual(data['totals']['pass'], 0)
+
+    def test_judge_or_reference_lock_change_is_detected_before_judging(self):
+        import contextlib
+        import io
+        import run_tests
+        from inventory import digest
+        from unittest.mock import patch
+        for kind in ['judge', 'lock']:
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                team = root/'team'
+                team.mkdir()
+                judge = team/'judge_iperf.py'
+                judge.write_bytes((TEAM_DIR/'judge_iperf.py').read_bytes())
+                lock = root/'reference.lock.json'
+                lock.write_text('{}')
+                target = judge if kind == 'judge' else lock
+                before = digest(target)
+                def capture(command, timeout):
+                    target.write_bytes(target.read_bytes()+b' ')
+                    return self.complete(), False, 0
+                with patch.object(run_tests, 'REFERENCE_LOCK', lock), patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'run_judge', side_effect=AssertionError('changed judge executed')), contextlib.redirect_stdout(io.StringIO()):
+                    code = run_tests.main(['--capture-cmd', 'fake', '--out', str(root/'out'), '--libc', 'musl',
+                                           '--group', 'iperf', '--inventory', str(INVENTORY), '--team-judge-dir', str(team)])
+                data = json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(code, 1)
+                self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+                self.assertIn(str(target), data['meta']['changed_inputs'])
+                if kind == 'judge': self.assertEqual(data['meta']['judge_sha256'][str(judge)], before)
 
 if __name__ == '__main__':
     unittest.main()

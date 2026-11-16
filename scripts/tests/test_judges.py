@@ -84,3 +84,36 @@ class JudgeTests(unittest.TestCase):
         for tail in ['malloc failed: errno 12\n', 'time: 2.0, virt: 1, res: 1\n']:
             with self.subTest(tail=tail):
                 self.assertEqual(judge('libcbench', prefix+tail)[0]['pass'], 0)
+
+    def test_anonymous_lmbench_invalid_or_missing_attempt_cannot_be_retried_into_pass(self):
+        commands = ['lat_mmap -P 1 512k /var/tmp/XXX',
+                    'bw_file_rd -P 1 512k io_only /var/tmp/XXX',
+                    'bw_file_rd -P 1 512k open2close /var/tmp/XXX',
+                    'bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX',
+                    'bw_mmap_rd -P 1 512k open2close /var/tmp/XXX']
+        for command in commands:
+            for invalid in ['0.524288 NaN', '0.524288 -1', '0.524288 Inf',
+                            '0.524288 1e999', '0.524288 0', 'error: errno 12', '']:
+                with self.subTest(command=command, invalid=invalid):
+                    trace = '+ ./lmbench_all '+command+'\n'
+                    rows = judge('lmbench', trace+invalid+'\n'+trace+'0.524288 123\n')
+                    self.assertFalse(any(r['pass'] for r in rows))
+
+    def test_invalid_table_results_cannot_be_retried_into_pass(self):
+        for banner, bad, good, index in [('file system latency', '10k 10 NaN 12', '10k 10 12 13', 18),
+                                         ('context switch overhead', '96 -1', '96 1.2', 23)]:
+            rows = judge('lmbench', f'{banner}\n{bad}\n{banner}\n{good}\n')
+            self.assertEqual(rows[index]['pass'], 0)
+
+    def test_anonymous_valid_measurement_followed_by_invalid_is_not_pass(self):
+        trace = '+ ./lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX\n'
+        for tail in ['0.524288 -1', '0.524288 NaN', '0.524288 2']:
+            rows = judge('lmbench', trace+'0.524288 123\n'+tail+'\n')
+            self.assertEqual(rows[19]['pass'], 0)
+
+    def test_missing_scoped_table_attempt_is_not_erased_by_retry(self):
+        for command, result, index in [('lat_fs /var/tmp', '10k 10 12 13', 18),
+                                        ('lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96', '96 1.2', 23)]:
+            trace = '+ ./lmbench_all '+command+'\n'
+            self.assertEqual(judge('lmbench', trace+trace+result+'\n')[index]['pass'], 0)
+            self.assertEqual(judge('lmbench', trace+result+'\n')[index]['pass'], 1)

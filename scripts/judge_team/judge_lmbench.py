@@ -30,12 +30,30 @@ contexts = {
 }
 found = {}
 context = None
+measured = False
+pending = None
+
+
+def observe(index, ok):
+    global measured
+    values = found.setdefault(names[index], [])
+    if context == index and pending is not None:
+        if measured:
+            values.append(False)
+        else:
+            values[pending] = ok
+        measured = True
+    else:
+        values.append(ok)
+
+
 for raw in sys.stdin.read().splitlines():
     line = raw.strip()
     if not line:
         continue
     if line.startswith('+ '):
         context = None
+        pending = None
         try:
             args = shlex.split(line[2:])
         except ValueError:
@@ -46,12 +64,19 @@ for raw in sys.stdin.read().splitlines():
                 context = 18
             if args[1:] == ['lat_ctx', '-P', '1', '-s', '32', '2', '4', '8', '16', '24', '32', '64', '96']:
                 context = 23
+        if context in (16, 18, 19, 20, 21, 22, 23):
+            values = found.setdefault(names[context], [])
+            pending = len(values)
+            values.append(False)
+            measured = False
         continue
     if line == 'file system latency':
         context = 18
+        pending = None
         continue
     if line == 'context switch overhead':
         context = 23
+        pending = None
         continue
     matched = False
     for index, pattern, prefix in patterns:
@@ -66,21 +91,24 @@ for raw in sys.stdin.read().splitlines():
         match = re.fullmatch(rf'({NUMBER})\s+({NUMBER})', line)
         if match:
             ok = math.isclose(float(match[1]), 0.524288, rel_tol=0, abs_tol=0.0000005) and positive(match[2])
-            found.setdefault(names[context], []).append(ok)
-            # 保留 context，使同一命令重复输出也能被拒绝。
+            observe(context, ok)
+            # 每次命令预留失败记录；结果非法、缺失或重复都不能被重试覆盖。
         else:
+            observe(context, False)
             context = None
     elif context == 18:
         match = re.fullmatch(r'10k\s+(\d+)\s+(\d+)\s+(\d+)', line)
         if match:
-            found.setdefault(names[18], []).append(all(int(n) > 0 for n in match.groups()))
+            observe(18, all(int(n) > 0 for n in match.groups()))
         elif not re.fullmatch(r'\d+k\s+\d+\s+\d+\s+\d+', line):
+            observe(18, False)
             context = None
     elif context == 23:
         match = re.fullmatch(rf'96\s+({NUMBER})', line)
         if match:
-            found.setdefault(names[23], []).append(positive(match[1]))
+            observe(23, positive(match[1]))
         elif not (re.fullmatch(r'"size=32k ovr=\d+(?:\.\d+)?', line)
                   or re.fullmatch(rf'(?:2|4|8|16|24|32|64)\s+{NUMBER}', line)):
+            observe(23, False)
             context = None
 emit(names, found)

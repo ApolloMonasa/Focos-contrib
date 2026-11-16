@@ -26,7 +26,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from inventory import load_inventory, digest, ROOT
+from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
 from reference_manifest import verify_manifest
 
@@ -184,6 +184,13 @@ def judge_group(
             name.strip()
             for name in re.findall(r"^=+\s*START\s+(.+?)\s*=+\s*$", section.text, re.M)
         }
+        if group in ('iperf', 'netperf', 'cyclictest'):
+            logged.update(re.findall(rf'^=+\s*{group}\s+(\S+)\s+end:\s*\S+\s*=+\s*$', section.text, re.M))
+        elif group == 'unixbench':
+            logged.update('Unixbench '+name.strip() for name in re.findall(r'^Unixbench (.+?):', section.text, re.M))
+        elif group == 'libcbench':
+            logged.update(re.findall(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', section.text, re.M))
+            logged = {name.strip() for name in logged}
         if group == "libctest":
             normalized = set()
             for name in logged:
@@ -246,7 +253,7 @@ def judge_group(
             continue
         if item["pass"] == item["all"] and item["all"] > 0:
             status = "PASS"
-        elif item["pass"] > 0 or item["score"] > 0:
+        elif item["pass"] > 0:
             status = "PARTIAL"
         else:
             status = "FAIL"
@@ -373,7 +380,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"inventory not found: {inventory_path}", file=sys.stderr)
         return 2
     try:
-        inventory = load_inventory(inventory_path)
+        inventory_bytes = inventory_path.read_bytes()
+        inventory_hash = hashlib.sha256(inventory_bytes).hexdigest()
+        inventory = load_inventory(inventory_path, raw=inventory_bytes)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         print(f'invalid inventory: {exc}', file=sys.stderr)
         return 2
@@ -393,6 +402,30 @@ def main(argv: list[str] | None = None) -> int:
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in
                           [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
+    # 所有会影响判分的文件在采集前登记；缺失文件也登记，防止中途补入。
+    judge_paths = set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py'))
+    for group in selected:
+        cfg = groups_cfg[group]
+        directory = Path(args.judge_dir) if cfg['kind'] == 'official' else Path(args.team_judge_dir)
+        judge_paths.add(directory/Path(cfg['judge_file']).name)
+    judge_hashes = {str(p): digest(p) for p in sorted(judge_paths) if p.is_file()}
+    watched = {Path(ROOT/name): sha for name, sha in source_hashes.items()}
+    watched.update({p: judge_hashes.get(str(p)) for p in judge_paths})
+    for p in {inventory_path, INVENTORY, REFERENCE_LOCK}:
+        watched[p] = digest(p) if p.is_file() else None
+    watched[inventory_path] = inventory_hash
+    for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
+        watched[p] = digest(p) if p.is_file() else None
+    def changed_inputs():
+        changed = []
+        for path, original in watched.items():
+            try:
+                current = digest(path) if path.is_file() else None
+            except OSError:
+                current = None
+            if current != original:
+                changed.append(str(path))
+        return sorted(changed)
     truncated = False
     if args.log:
         raw_log = Path(args.log).read_bytes()
@@ -409,9 +442,10 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         sections, log_error = {}, str(exc)
     environment = validate_reference(log_text, args.reference, selected, args.libc)
+    changed = changed_inputs()
     provenance = None
     strict = args.reference == 'strict' or (args.reference is None and environment['status'] != 'NOT_APPLICABLE')
-    if strict and not truncated:
+    if strict and not truncated and not changed:
         try:
             if args.reference_manifest is None or args.reference_artifacts is None:
                 raise ValueError('strict reference requires --reference-manifest and --reference-artifacts KERNEL INITRAMFS')
@@ -422,7 +456,8 @@ def main(argv: list[str] | None = None) -> int:
             environment['errors'].append(str(exc))
     results = []
     for group in selected:
-        section = sections.get((group, args.libc))
+        changed = sorted(set(changed + changed_inputs()))
+        section = None if changed else sections.get((group, args.libc))
         result = judge_group(
             group,
             section,
@@ -434,8 +469,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         results.append(result)
 
+    changed = sorted(set(changed + changed_inputs()))
+    if changed:
+        environment['status'] = 'ERROR'
+        environment['errors'].append('inputs changed during run: '+', '.join(changed))
     failure = None
-    if re.search(r'^[ \t]*REF_FAIL(?:\s|$)', log_text, re.M):
+    if changed:
+        failure = 'ENV_ERROR'
+    elif re.search(r'^[ \t]*REF_FAIL(?:\s|$)', log_text, re.M):
         failure = 'ENV_ERROR'
     elif truncated:
         failure = 'TIMEOUT'
@@ -474,15 +515,15 @@ def main(argv: list[str] | None = None) -> int:
         "capture_exit_code": exit_code,
         "capture_truncated": truncated,
         "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-        'inventory_sha256': digest(inventory_path),
+        'inventory_sha256': inventory_hash,
         'log_sha256': hashlib.sha256(raw_log).hexdigest(),
         'environment': environment,
         'reference_provenance': provenance,
         'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
         'log_error': log_error,
         'source_sha256': source_hashes,
-        'judge_sha256': {str(p): digest(p) for p in
-                         sorted(set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py')))},
+        'judge_sha256': judge_hashes,
+        'changed_inputs': changed,
     }
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)

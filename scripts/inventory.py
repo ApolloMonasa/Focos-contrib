@@ -17,8 +17,8 @@ def digest(path: Path) -> str:
         return hashlib.file_digest(handle, 'sha256').hexdigest()
 
 
-def load_inventory(path: Path = INVENTORY) -> dict:
-    data = json.loads(path.read_text(encoding='utf-8'))
+def load_inventory(path: Path = INVENTORY, *, raw: bytes | None = None) -> dict:
+    data = json.loads(path.read_bytes() if raw is None else raw)
     if not isinstance(data, dict) or type(data.get('schema_version')) is not int or data.get('schema_version') != 1:
         raise ValueError('unsupported inventory schema')
     groups = data.get('groups')

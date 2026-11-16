@@ -1,0 +1,123 @@
+{
+  "kind": "review_fix_regression_not_new_QEMU_measurement",
+  "source_sha256": {
+    "scripts/run_tests.py": "4c62b80678bc01fd1338dd5c078d68203e2c3ae27557e5cd3a9eacf90b0a9d1a",
+    "scripts/inventory.py": "8d35642499cdf19a08768da81427793f17100469b26a4ce667272c291e1619a3",
+    "scripts/judge_team/judge_lmbench.py": "7915698f57e928cee3e00761c6de685c49e3ca79982f76878dbac6f346d11629"
+  },
+  "reference_capture_archive_sha256": "34c0a8ecd72acedf73152df53e737ba9fad38af6b4174a78984d2fe769c5d5e4",
+  "reference_captures": [
+    {
+      "sample": "lua-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "lua-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "netperf-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "netperf-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "iperf-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "iperf-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "libcbench-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "libcbench-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "iozone-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "iozone-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "busybox-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "busybox-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "libctest-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "libctest-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "basic-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "basic-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "cyclictest-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "cyclictest-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "lmbench-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "lmbench-musl",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "unixbench-glibc",
+      "groups_match": true,
+      "totals_match": true
+    },
+    {
+      "sample": "unixbench-musl",
+      "groups_match": true,
+      "totals_match": true
+    }
+  ],
+  "historical_summaries_matched": 15,
+  "test001_tests_passed": 52
+}
