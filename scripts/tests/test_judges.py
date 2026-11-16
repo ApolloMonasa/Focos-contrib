@@ -117,3 +117,16 @@ class JudgeTests(unittest.TestCase):
             trace = '+ ./lmbench_all '+command+'\n'
             self.assertEqual(judge('lmbench', trace+trace+result+'\n')[index]['pass'], 0)
             self.assertEqual(judge('lmbench', trace+result+'\n')[index]['pass'], 1)
+
+    def test_untraced_table_headers_reserve_missing_attempts(self):
+        cases=[('file system latency','+ ./lmbench_all lat_fs /var/tmp','0k 10 12 13','10k 10 12 13',18),
+               ('context switch overhead','+ ./lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96','2 1.2','96 1.2',23)]
+        for header,trace,intermediate,good,index in cases:
+            for first in [header,header+'\n'+intermediate,trace+'\n'+header,trace+'\n'+intermediate]:
+                for retry in [header,trace+'\n'+header]:
+                    with self.subTest(first=first,retry=retry):
+                        rows=judge('lmbench',first+'\n'+retry+'\n'+good+'\n')
+                        self.assertEqual(rows[index]['pass'],0)
+            for prefix in [header,trace,trace+'\n'+header]:
+                with self.subTest(prefix=prefix):
+                    self.assertEqual(judge('lmbench',prefix+'\n'+intermediate+'\n'+good+'\n')[index]['pass'],1)

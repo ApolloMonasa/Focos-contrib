@@ -32,6 +32,17 @@ found = {}
 context = None
 measured = False
 pending = None
+header_expected = False
+
+
+def start_attempt(index, *, traced=False):
+    global context, pending, measured, header_expected
+    context = index
+    values = found.setdefault(names[index], [])
+    pending = len(values)
+    values.append(False)
+    measured = False
+    header_expected = traced and index in (18,23)
 
 
 def observe(index, ok):
@@ -54,6 +65,7 @@ for raw in sys.stdin.read().splitlines():
     if line.startswith('+ '):
         context = None
         pending = None
+        header_expected = False
         try:
             args = shlex.split(line[2:])
         except ValueError:
@@ -65,19 +77,18 @@ for raw in sys.stdin.read().splitlines():
             if args[1:] == ['lat_ctx', '-P', '1', '-s', '32', '2', '4', '8', '16', '24', '32', '64', '96']:
                 context = 23
         if context in (16, 18, 19, 20, 21, 22, 23):
-            values = found.setdefault(names[context], [])
-            pending = len(values)
-            values.append(False)
-            measured = False
+            start_attempt(context,traced=True)
         continue
-    if line == 'file system latency':
-        context = 18
-        pending = None
+    if line in ('file system latency','context switch overhead'):
+        index = 18 if line == 'file system latency' else 23
+        # trace + 首个表头属于同一次尝试；无 trace 或重复表头各自预留失败观测。
+        if context == index and pending is not None and header_expected and not measured:
+            header_expected = False
+        else:
+            start_attempt(index)
         continue
-    if line == 'context switch overhead':
-        context = 23
-        pending = None
-        continue
+    # 已经出现表格数据或其他输出，后来的表头不能再借用命令预留项。
+    header_expected = False
     matched = False
     for index, pattern, prefix in patterns:
         match = pattern.fullmatch(line)
@@ -86,6 +97,9 @@ for raw in sys.stdin.read().splitlines():
             matched = True
             break
     if matched:
+        context = None
+        pending = None
+        header_expected = False
         continue
     if context in (16, 19, 20, 21, 22):
         match = re.fullmatch(rf'({NUMBER})\s+({NUMBER})', line)

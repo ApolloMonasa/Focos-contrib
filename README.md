@@ -134,17 +134,21 @@ Focos/
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── inventory.json                 # TEST-001 冻结的 427 项清单与官方 judge 哈希
 │   ├── reference.lock.json            # 当前/历史参考内核与证据归档的固定输入
+│   ├── reference-replay-updates.json  # 与固定历史归档绑定的两处未知名称诊断增补
 │   ├── results/                       # TEST-001 参考运行摘要
 │   │   ├── reference-2026-11-08/       # 原始历史基线
 │   │   │   └── summary.md             # 旧镜像差异与参考结果
-│   │   └── reference-2026-11-16/       # 验证链重构后的独立测量
-│   │       ├── summary.md             # 22 次参考运行、回放、故障与证据
-│   │       ├── review-fixes.json       # 后续审核修复的源码哈希与回放对照
-│   │       ├── unresolved-fixes.json   # 模块依赖核实、实际启动与本轮证据
-│   │       ├── disk-binding.json       # strict 磁盘绑定及输出别名的修复证据
-│   │       └── runtime-identity.json   # QEMU 身份、构建快照及回放时间证据
-│   │       └── payload-binding.json       # schema 2 内容身份、双构建与回归验证
-│   │       └── schema2-lua/               # 新协议原始串口、manifest 与采集/回放摘要
+│   │   ├── reference-2026-11-16/       # 验证链重构后的独立测量
+│   │   │   ├── summary.md             # 22 次参考运行、回放、故障与证据
+│   │   │   ├── review-fixes.json       # 后续审核修复的源码哈希与回放对照
+│   │   │   ├── unresolved-fixes.json   # 模块依赖核实、实际启动与本轮证据
+│   │   │   ├── disk-binding.json       # strict 磁盘绑定及输出别名的修复证据
+│   │   │   ├── runtime-identity.json   # QEMU 身份、构建快照及回放时间证据
+│   │   │   ├── payload-binding.json       # schema 2 内容身份、双构建与回归验证
+│   │   │   └── schema2-lua/             # 新协议原始串口、manifest 与采集/回放摘要
+│   │   └── review-2026-11-17/           # 后续审核边界修复与历史诊断差异
+│   │       ├── summary.md             # 问题分析、验证结果与限制
+│   │       └── validation.json        # 逐份历史对照、严格回放及源码哈希
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

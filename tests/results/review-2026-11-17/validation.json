@@ -1,0 +1,278 @@
+{
+  "kind": "review_boundary_fixes",
+  "date": "2026-11-17",
+  "base_commit": "f29724421e139f10bf71bd44c58df196d3172065",
+  "analysis": {
+    "manifest": "Shared structure validation before external commands; malformed explicit files return 2.",
+    "lmbench": "Each header reserves an attempt; only the immediate first header can consume a trace reservation.",
+    "lua": "Official judge already returns extras; raw unexpected_in_log was missing. Busybox had the same raw scan omission.",
+    "evidence": "Private staging plus verification before publication; reject output symlinks and input aliases, preserve modified trees."
+  },
+  "checks": {
+    "rust_tests": 52,
+    "existing_python_tests": 15,
+    "test001_tests": 86,
+    "qemu_kernel_checks": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "regressions": {
+    "initial_failures": 62,
+    "initial_errors": 9,
+    "additional_table_header_failures": 2,
+    "stale_summary_failure": 1,
+    "replay_input_alias_failures": 2
+  },
+  "strict_replays": [
+    {
+      "libc": "glibc",
+      "mode": "replay",
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      },
+      "replayed_from": {
+        "path": "tests/results/reference-2026-11-16/schema2-lua/serial.log",
+        "sha256": "ec5db4339ee2576c276dbe760c7000106138231f394cc988be2bd780cb4d1019"
+      },
+      "reference_provenance": {
+        "manifest_sha256": "3edb6a145290918db6e9f94e76e7ad8db7ff8f0cf08a70c0fea6aa6f6f9e69aa",
+        "build_id": "ae84f5e2bc50544f7bbb6870462b46bd021fa30b4fcbee77c270e7c692246afd",
+        "inputs_pinned": true,
+        "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
+      }
+    },
+    {
+      "libc": "musl",
+      "mode": "replay",
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      },
+      "replayed_from": {
+        "path": "tests/results/reference-2026-11-16/schema2-lua/serial.log",
+        "sha256": "ec5db4339ee2576c276dbe760c7000106138231f394cc988be2bd780cb4d1019"
+      },
+      "reference_provenance": {
+        "manifest_sha256": "3edb6a145290918db6e9f94e76e7ad8db7ff8f0cf08a70c0fea6aa6f6f9e69aa",
+        "build_id": "ae84f5e2bc50544f7bbb6870462b46bd021fa30b4fcbee77c270e7c692246afd",
+        "inputs_pinned": true,
+        "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
+      }
+    }
+  ],
+  "historical_replay": {
+    "archive_sha256": "8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd",
+    "historical_runner_commit": "051b611fb5810b9863dcc19afc1764d42f907812",
+    "runner_sha256": "c125cda0c3fab762d05a497bb0417d81b2f55d5714b3ab588ec0f3b807900e85",
+    "source_sha256": {
+      "scripts/ref/replay_evidence.py": "b9961a33b01a57f2a3289136931dd6dbef1d67c3b4b7b8ae54f7b1219dc4ec7b",
+      "scripts/run_tests.py": "c125cda0c3fab762d05a497bb0417d81b2f55d5714b3ab588ec0f3b807900e85",
+      "tests/reference.lock.json": "74fa1ddefa38676ab63fbd729ca3991a8a24d6382ee6e6c25f6739c6c171d42f",
+      "tests/inventory.json": "cfb0a44193e1a6a2ad9ce71baa300f774f25038b943458d3417f2d46f435b8e3",
+      "tests/reference-replay-updates.json": "912bfe80b09837b1d12b2124bf18513d6dfedefa3c124464ff676c2a860c404a"
+    },
+    "samples": [
+      {
+        "sample": "basic-glibc",
+        "log_sha256": "009dc11bd6fd5ed96ae81ae443665987cf67e8b6372ea6700252fd865990e736",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "basic-musl",
+        "log_sha256": "009dc11bd6fd5ed96ae81ae443665987cf67e8b6372ea6700252fd865990e736",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "busybox-glibc",
+        "log_sha256": "fd954fdb480553d6b2a94e295556a46a899dfcc33cfecf971f979f1fb8013bcc",
+        "groups_match": false,
+        "expected_groups_match": true,
+        "diagnostic_updates": [
+          {
+            "sample": "busybox-glibc",
+            "group": "busybox",
+            "field": "unexpected_in_log",
+            "before": [],
+            "after": [
+              "busybox sh -c 'sleep 5' & ./busybox kill $!"
+            ],
+            "reason": "原始 testcase 行已输出该未知命令；新扫描显式记录，原有 extras 与逐项判分均不变。"
+          }
+        ],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "busybox-musl",
+        "log_sha256": "fd954fdb480553d6b2a94e295556a46a899dfcc33cfecf971f979f1fb8013bcc",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "cyclictest-glibc",
+        "log_sha256": "7322b7dcb8e8c2655e36591e401d608ccc47d27fb7b8dc1f388ff8a2e06337ba",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "iozone-glibc",
+        "log_sha256": "94a77443f7225477d01dab38734c1c18a6106fe5b9ba323220d2c6a142c1da83",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "iperf-glibc",
+        "log_sha256": "bbe040fdd1eeb492a49277368d4db09511d509d361e33ef2a464ac763924d174",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "libcbench-glibc",
+        "log_sha256": "94a77443f7225477d01dab38734c1c18a6106fe5b9ba323220d2c6a142c1da83",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "libctest-glibc",
+        "log_sha256": "f9b7c6bc6d0c9d6744913002a056a7761f05aeb40d41aea447c826048d79cb45",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "libctest-musl",
+        "log_sha256": "f9b7c6bc6d0c9d6744913002a056a7761f05aeb40d41aea447c826048d79cb45",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "lmbench-glibc",
+        "log_sha256": "94a77443f7225477d01dab38734c1c18a6106fe5b9ba323220d2c6a142c1da83",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "lua-glibc",
+        "log_sha256": "fd954fdb480553d6b2a94e295556a46a899dfcc33cfecf971f979f1fb8013bcc",
+        "groups_match": false,
+        "expected_groups_match": true,
+        "diagnostic_updates": [
+          {
+            "sample": "lua-glibc",
+            "group": "busybox",
+            "field": "unexpected_in_log",
+            "before": [],
+            "after": [
+              "busybox sh -c 'sleep 5' & ./busybox kill $!"
+            ],
+            "reason": "该历史摘要同时含 Lua 和 busybox 组；同一 testcase 未知命令新增诊断，原有判分均不变。"
+          }
+        ],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "lua-musl",
+        "log_sha256": "fd954fdb480553d6b2a94e295556a46a899dfcc33cfecf971f979f1fb8013bcc",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "netperf-glibc",
+        "log_sha256": "bbe040fdd1eeb492a49277368d4db09511d509d361e33ef2a464ac763924d174",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      },
+      {
+        "sample": "unixbench-glibc",
+        "log_sha256": "3c43ea667eb9d8a31125a6a77db567e940f2d77a47b925421539fbe90cba9be9",
+        "groups_match": true,
+        "expected_groups_match": true,
+        "diagnostic_updates": [],
+        "totals_match": true,
+        "environment": "LEGACY_UNVERIFIED"
+      }
+    ],
+    "all_match": false,
+    "all_expected_match": true
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "c125cda0c3fab762d05a497bb0417d81b2f55d5714b3ab588ec0f3b807900e85",
+    "scripts/reference_manifest.py": "7b60bbcac9d6173801a093df522d47b7570bc6159295df446165f35c9d8c9c97",
+    "scripts/ref/replay_evidence.py": "b9961a33b01a57f2a3289136931dd6dbef1d67c3b4b7b8ae54f7b1219dc4ec7b",
+    "scripts/judge_team/judge_lmbench.py": "d67d04dfb8eb6e71b6e861409504aa0e4f8ce69b0691c48a2e29cb04262e215d",
+    "tests/reference-replay-updates.json": "912bfe80b09837b1d12b2124bf18513d6dfedefa3c124464ff676c2a860c404a"
+  },
+  "limits": [
+    "No newly captured reference Linux run; strict results replay the already committed schema 2 serial log.",
+    "Historical archives and summaries remain unchanged; two explicit diagnostic additions do not change scores or statuses."
+  ],
+  "fresh_extraction_and_reused_tree_replay_agree": true,
+  "fresh_replay_report_sha256": "5a6657d7f34c246b0bcefd0ffb8d4722071185d1b4fc4e229cffac1203ba0f53"
+}

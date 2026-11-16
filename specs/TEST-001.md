@@ -16,12 +16,13 @@
 - **环境准备**：所有必需的模块、挂载、目录、链接、权限、配置、网络及 chroot 预检失败，输出 `REF_FAIL <stage>` 并停止，不执行后续组。测试脚本非零退出单独记录，不冒充环境失败或成功。
 - **组切分**：严格配对 `#### OS COMP TEST GROUP START/END <group>-<libc> ####`；不带后缀时用必填的 `--libc`。重复、嵌套、错配标记是 `LOG_ERROR`，禁止选择一段覆盖其他段；EOF 前未结束是 `TIMEOUT`。
 - **判分**：固定官方或团队 Python judge 用 stdin 接收组段，stdout 返回 JSON 列表；不设 fallback。非法字段、重复名字、非有限数值、非法计数、崩溃、超时均为 `JUDGE_ERROR`。官方 `total` 兼容为 `all`；iozone 按有效正 `result` 判完成。
-- **判据**：团队性能解析器只接受约定格式、单位和有效数值。错误消息中的关键词、数字、耗时或部分输出不构成成功。重复/冲突结果不能用后一次成功覆盖失败。
+- **判据**：lmbench 每次命令或无 trace 表头先预留失败观测；trace 后首个表头不重复计数，缺失尝试不能被后续重试覆盖。团队性能解析器只接受约定格式、单位和有效数值。错误消息中的关键词、数字、耗时或部分输出不构成成功。重复/冲突结果不能用后一次成功覆盖失败。
 - **状态**：`PASS` 仅限清单内每项 `pass == all > 0`；部分断言通过为 `PARTIAL`，无通过为 `FAIL`。缺组为 `NOT_RUN`，缺项为 `MISSING`（0 分）。另列 `TIMEOUT`、`JUDGE_ERROR`、`LOG_ERROR`、`ENV_ERROR`、`CAPTURE_ERROR`；这些均不能通过。环境错误优先于其他状态；已知 EOF 截断优先于判分器错误，后者保留在 judge_error 中，execution_valid 为 false。脚本非零退出不得覆盖 JUDGE_ERROR 等不可判分状态。
 - **参考协议**：新 init 输出版本、准备、运行及退出码标记；严格模式必须提供 manifest 与内核/initramfs，另须提供实际磁盘 --reference-image 并核对其 SHA256；capture 命令的 kernel/initrd/drive 必须与声明一致，仅允许直接 QEMU argv；实际可执行文件经 PATH 解析、规范化，记录版本探测输出与哈希并监视文件变化。核对构建 ID、冻结输入、构件哈希、顺序与所选组；环境错误使结果失效。旧日志只能显式使用 legacy 模式，标记环境未经新协议验证；不据此声称新构建通过。详见[参考运行说明](../scripts/ref/README.md)。
-- **输出**：`summary.json`、`summary.md`、原始 `serial.log`、`sections/<group>-<libc>.log`；额外 judge 名称与未知用例另列（含 iperf/netperf/cyclictest 结束标记、Unixbench 结果名及 libc-bench 标签），不进入分母。每项保留 `name/status/all/pass/score`，不同单位的分数不汇总。采集使用 mode=capture/captured_at；日志回放使用 mode=replay/replayed_at/replayed_from，不伪造采集时间。
+- **输出**：`summary.json`、`summary.md`、原始 `serial.log`、`sections/<group>-<libc>.log`；额外 judge 名称与未知用例另列（含 iperf/netperf/cyclictest 结束标记、Unixbench 结果名、libc-bench 标签以及 Lua/busybox testcase 行），不进入分母。每项保留 `name/status/all/pass/score`，不同单位的分数不汇总。采集使用 mode=capture/captured_at；日志回放使用 mode=replay/replayed_at/replayed_from，不伪造采集时间。
 - **构建身份**：严格模式使用 schema 2 manifest；嵌入式 ID 绑定实际内核及 initramfs 全部解压内容，只将 /init 内唯一的 ID 字段归零以解除自引用。校验时从实际归档重算，拒绝重名、路径别名、硬链接、截断和尾随归档。改写 manifest 的输出哈希不能为旧日志换配新构件。schema 1 不作为严格证据。
-- **退出码**：0 = 所选组全部通过且运行有效；1 = 非通过或运行无效；2 = 参数、文件或清单错误。捕获命令非零退出不得报告通过；超时终止整个子进程组。
+- **历史证据**：隔离解包并校验全部文件后发布，拒绝目标及祖先符号链接；已有不同内容不覆盖。每次回放须生成新摘要。诊断增补绑定固定归档、样本、组和精确前后值，只允许 unexpected_in_log；不允许改状态、分数、通过数，其他差异使检查失败。
+- **退出码**：显式 manifest 的对象、字段类型、哈希与选择结构在采集/回放前统一校验，非法文件退出 2，不执行 QEMU 或判分器。0 = 所选组全部通过且运行有效；1 = 非通过或运行无效；2 = 参数、文件或清单错误。捕获命令非零退出不得报告通过；超时终止整个子进程组。
 
 ## 怎样验收
 

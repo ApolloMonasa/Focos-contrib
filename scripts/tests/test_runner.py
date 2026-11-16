@@ -799,6 +799,49 @@ class RunnerSafetyTests(unittest.TestCase):
             verify_manifest(path,[root/'Image',root/'initramfs.gz'],(out/'serial.log').read_text(),
                             load_inventory(root/'inventory.json'),['iperf'],'musl',root/'inventory.json',image=root/'disk.img')
 
+    def test_invalid_manifest_structure_is_argument_error_before_execution(self):
+        import contextlib,copy,io,run_tests,shlex
+        from unittest.mock import patch
+        _,_,out=self.invoke(self.reference(),['--reference','strict'])
+        root=out.parent;path=root/'build.manifest.json';valid=json.loads(path.read_text())
+        malformed=[[],None,False,'manifest',{'inputs':[]}]
+        for field in ['inputs','selection','outputs','content']:
+            for value in [[],None,'bad',1]:
+                bad=copy.deepcopy(valid);bad[field]=value;malformed.append(bad)
+        for field,value in [('libcs',[{}]),('scripts',[[]]),('libcs','musl'),('release',[])]:
+            bad=copy.deepcopy(valid);bad['selection'][field]=value;malformed.append(bad)
+        for mode in ['capture','replay']:
+            for index,bad in enumerate(malformed):
+                with self.subTest(mode=mode,bad=bad):
+                    path.write_text(json.dumps(bad));dest=root/f'{mode}-{index}'
+                    command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                                       '-bios','default','-kernel',str(root/'Image'),'-initrd',str(root/'initramfs.gz'),'-append','console=ttyS0 rdinit=/init',
+                                       '-drive',f'file={root}/disk.img,if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+                    source=['--capture-cmd',command] if mode=='capture' else ['--log',str(out/'serial.log')]
+                    with patch.object(run_tests,'qemu_identity',side_effect=AssertionError('version probe executed')),patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),patch.object(run_tests,'run_judge',side_effect=AssertionError('judge executed')),contextlib.redirect_stderr(io.StringIO()):
+                        code=run_tests.main(source+['--out',str(dest),'--libc','musl','--group','iperf','--reference','strict',
+                                                   '--inventory',str(root/'inventory.json'),'--reference-manifest',str(path),
+                                                   '--reference-image',str(root/'disk.img'),'--reference-artifacts',str(root/'Image'),str(root/'initramfs.gz')])
+                    self.assertEqual(code,2)
+                    self.assertFalse(dest.exists())
+
+    def test_unknown_testcase_lines_are_recorded_for_lua_and_busybox(self):
+        from inventory import load_inventory
+        for group,name in [('lua','lua added.lua'),('busybox','echo new command')]:
+            cases=load_inventory()['groups'][group]['subcases']
+            for status in ['success','fail','invalid']:
+                with self.subTest(group=group,status=status):
+                    text=f'#### OS COMP TEST GROUP START {group}-musl ####\n'
+                    text+=''.join(f'testcase {case} success\n' for case in cases)
+                    text+=f'testcase {name} {status}\n'
+                    text+=f'+ echo testcase {name} trace-only success\ndiagnostic testcase {name} embedded success\n'
+                    text+=f'#### OS COMP TEST GROUP END {group}-musl ####\n'
+                    code,data=run(text,[group])
+                    self.assertEqual(code,0)
+                    self.assertEqual(data['groups'][0]['unexpected_in_log'],[name])
+                    self.assertEqual(data['totals']['subcases'],len(cases))
+                    self.assertEqual(data['totals']['pass'],len(cases))
+
     def test_managed_output_hardlinks_are_rejected_before_capture_and_before_write(self):
         import run_tests,contextlib,io
         from itertools import combinations

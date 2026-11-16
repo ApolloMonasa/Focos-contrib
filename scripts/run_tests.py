@@ -29,7 +29,7 @@ from pathlib import Path
 
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
-from reference_manifest import verify_manifest, strict_qemu_command, qemu_identity
+from reference_manifest import load_manifest, verify_manifest, strict_qemu_command, qemu_identity
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -192,6 +192,10 @@ def judge_group(
         elif group == 'libcbench':
             logged.update(re.findall(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', section.text, re.M))
             logged = {name.strip() for name in logged}
+        elif group == 'lua':
+            logged.update('lua '+name for name in re.findall(r'^testcase[ \t]+lua[ \t]+(\S+)[ \t]+\S+[ \t]*$',section.text,re.M))
+        elif group == 'busybox':
+            logged.update(name.strip() for name in re.findall(r'^testcase[ \t]+(.+?)[ \t]+\S+[ \t]*$',section.text,re.M))
         if group == "libctest":
             normalized = set()
             for name in logged:
@@ -425,13 +429,23 @@ def main(argv: list[str] | None = None) -> int:
             print('team parser does not support this inventory snapshot: '+group, file=sys.stderr)
             return 2
 
+    manifest, manifest_hash = None, None
+    if args.reference_manifest:
+        try:
+            manifest_bytes = args.reference_manifest.read_bytes()
+            manifest = load_manifest(args.reference_manifest,raw=manifest_bytes)
+            manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
+        except (ValueError,OSError) as exc:
+            print(f'invalid reference manifest: {exc}',file=sys.stderr)
+            return 2
     capture_command = args.capture_cmd
     command_verified = False
     qemu = None
     if args.capture_cmd and (args.reference == 'strict' or args.reference_manifest):
         try:
+            if manifest is None:
+                raise ValueError('strict capture requires --reference-manifest')
             capture_command = strict_qemu_command(args.capture_cmd, args.reference_artifacts or [], args.reference_image)
-            manifest = json.loads(args.reference_manifest.read_text()) if args.reference_manifest else {}
             image_hash = artifact_hashes.get(str(args.reference_image))
             if image_hash != inventory['image']['uncompressed_sha256'] or image_hash != manifest.get('inputs', {}).get('image'):
                 raise ValueError('actual reference disk does not match frozen manifest')
@@ -462,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
         watched[p] = digest(p) if p.is_file() else None
     watched[inventory_path] = inventory_hash
     for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
-        watched[p] = digest(p) if p.is_file() else None
+        watched[p] = manifest_hash if p == args.reference_manifest else (digest(p) if p.is_file() else None)
     # 同时固定声明路径和其解析后的真实路径，防止别名重定向掩盖变化。
     for p, initial_hash in list(watched.items()):
         if initial_hash is not None:

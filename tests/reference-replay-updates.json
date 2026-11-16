@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "archive_sha256": "8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd",
+  "updates": [
+    {
+      "sample": "busybox-glibc",
+      "group": "busybox",
+      "field": "unexpected_in_log",
+      "before": [],
+      "after": ["busybox sh -c 'sleep 5' & ./busybox kill $!"],
+      "reason": "原始 testcase 行已输出该未知命令；新扫描显式记录，原有 extras 与逐项判分均不变。"
+    },
+    {
+      "sample": "lua-glibc",
+      "group": "busybox",
+      "field": "unexpected_in_log",
+      "before": [],
+      "after": ["busybox sh -c 'sleep 5' & ./busybox kill $!"],
+      "reason": "该历史摘要同时含 Lua 和 busybox 组；同一 testcase 未知命令新增诊断，原有判分均不变。"
+    }
+  ]
+}

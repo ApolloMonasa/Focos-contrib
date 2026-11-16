@@ -13,6 +13,10 @@ make reference-replay
 
 第一条运行清单一致性、构建故障注入、判分和 runner 契约测试。第二条核对历史归档 SHA256、38 个内部文件哈希，再回放 15 份机器结果，输出 `target/evidence/test001/replay/replay.json`。CI 同时执行这些检查；不依赖本地已有镜像、APK 或第三方 judge。
 
+归档先在私有临时目录解包，校验完成后发布；目标、祖先或树内存在符号链接（含断链）时拒绝。复用 original 树仅在内容完全一致时读取，不覆盖不同内容；需要恢复被修改的证据时改用新 --out。归档不可放进受管 current 树，也不可与结果文件硬链接重叠；每次执行前移除旧摘要，子进程崩溃不能借用旧结果。报告以原子替换写入，避免修改其他硬链接。
+
+历史诊断变化登记在 tests/reference-replay-updates.json，绑定归档 SHA256、具体样本/组及精确前后值。目前仅两份摘要新增 busybox 的未知命令标记；15 份的状态、逐项判分和数量均不变。报告保留 groups_match/all_match 的历史直接对比，另列 expected_groups_match/all_expected_match 与 diagnostic_updates；退出成功要求全部符合审计后对照。登记只允许 unexpected_in_log，不能改状态、分数、通过数；未登记或超出登记的变化仍失败。
+
 官方 judge 不入库。`scripts/fetch_judges.py` 从 `inventory.json` 的固定提交拉取 5 个文件并校验各自 SHA256；已有缓存被修改时明确失败，不覆盖现场。需要重新下载时使用新的 `--dest`，并把对应 `judge/` 传给 runner 的 `--judge-dir`。
 
 ## 取得当前冻结输入
@@ -88,6 +92,7 @@ cpio 的顺序、权限、属主和时间固定；gzip 固定 `mtime=0` 且不�
 
 ## 团队判据与边界
 
+- lmbench 无 trace 的两个表头也会预留一次观测；缺失或不完整尝试不能被后续成功覆盖。trace 与紧随的首个表头合为一次，出现数据后再遇表头则是新尝试。
 - 六个团队判据拒绝重复/冲突结果。指标名从同一冻结清单读取，避免独立维护多份名称。
 - lmbench 按冻结源码的完整标签、单位和有效正数识别。lat_mmap 与四个读带宽指标的原始输出没有标签；新 harness 对 lmbench 使用 `sh -x` 记录命令上下文，脚本内容不修改。缺少上下文时不按数字出现顺序猜测归属。
 - libc-bench 需要标签和完整 time 行；中间/尾随错误、重复 time、NaN/Inf 不构成成功。
@@ -123,3 +128,7 @@ strict capture 还会解析 QEMU 的实际可执行文件，先取 SHA256，运�
 新构建使用 schema 2 manifest。构建 ID 同时包含实际内核 SHA256，以及 initramfs 解压后整份 newc 归档的 SHA256；后者仅将 `/init` 中唯一的 64 位 ID 字段归零，避免自引用，其他文件、脚本和元数据不变。严格回放重新解析实际 initramfs 并计算该值，同时核对归档里的 ID；仅改写 `outputs` 不能让旧日志通过新构件校验。重名路径、路径别名、非普通文件/目录、硬链接、截断和尾随归档均拒绝。压缩文件本身另以 `outputs.initramfs_sha256` 校验。
 
 schema 1 的归档和记录保留原样，但不能声明 schema 2 的严格身份保证；重测请重新构建，历史对照可使用明确标为未验证的 legacy 回放。构建输出和 runner 的受管输出都检查彼此的路径/inode 冲突，拒绝复用目录中的硬链接覆盖。
+
+显式 manifest 在读取嵌套字段前做共用结构校验：顶层及 inputs/selection/outputs/content 必须是对象，版本、SHA256、选择列表及类型须合法；非法文件退出 2，在任何 QEMU 版本探测、采集或判分前停止。解析与登记哈希使用同一字节快照。Lua 与 busybox 的未知 testcase 名称直接从原始行收集，独立于官方 judge 是否返回该项；不计入分母。
+
+2026-11-17 这轮只修复边界并回放既有数据，未新采集参考 Linux。问题分析、完整检查及两份历史诊断差异见 [本轮摘要](../../tests/results/review-2026-11-17/summary.md)。

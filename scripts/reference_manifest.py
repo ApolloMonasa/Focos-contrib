@@ -10,7 +10,40 @@ import subprocess
 import os
 import zlib
 
-from inventory import REFERENCE_LOCK, INVENTORY, digest
+from inventory import NAME, REFERENCE_LOCK, INVENTORY, digest
+
+
+def load_manifest(path, *, raw=None):
+    """采集和回放共用结构校验；读取字段前拒绝语法合法但类型错误的 JSON。"""
+    def invalid_constant(value):
+        raise ValueError('non-finite reference manifest value: '+value)
+    manifest = json.loads(Path(path).read_bytes() if raw is None else raw, parse_constant=invalid_constant)
+    if not isinstance(manifest,dict) or any(not isinstance(manifest.get(key),dict) for key in ('inputs','selection','outputs','content')):
+        raise ValueError('reference manifest must contain object fields: inputs, selection, outputs, content')
+    if (type(manifest.get('schema_version')) is not int or manifest['schema_version'] != 2 or
+            type(manifest.get('protocol')) is not int or manifest['protocol'] != 1 or
+            type(manifest.get('inputs_pinned')) is not bool):
+        raise ValueError('unsupported reference manifest schema/protocol/pinning')
+    sha_fields=[(manifest,key) for key in ('build_id','inventory_sha256','reference_lock_sha256')]
+    sha_fields += [(manifest[section],key) for section,keys in [
+        ('inputs',('image','kernel_apk')),('outputs',('kernel_sha256','initramfs_sha256')),
+        ('content',('kernel_sha256','initramfs_payload_sha256'))] for key in keys]
+    sha_fields += [(manifest,key) for key in ('builder_sha256','inventory_code_sha256','manifest_code_sha256','busybox_sha256') if key in manifest]
+    if any(not isinstance(obj.get(key),str) or not re.fullmatch(r'[0-9a-f]{64}',obj[key]) for obj,key in sha_fields):
+        raise ValueError('invalid reference manifest SHA256 field')
+    selection=manifest['selection']
+    for key in ('libcs','scripts'):
+        values=selection.get(key)
+        if not isinstance(values,list) or not values or any(not isinstance(v,str) for v in values) or len(set(values)) != len(values):
+            raise ValueError('invalid reference selection: '+key)
+    if (any(v not in ('musl','glibc') for v in selection['libcs']) or
+            any(not NAME.fullmatch(v) or not v.endswith('_testcode.sh') for v in selection['scripts']) or
+            not isinstance(selection.get('release'),str) or not NAME.fullmatch(selection['release']) or
+            ('network_dummy' in selection and type(selection['network_dummy']) is not bool)):
+        raise ValueError('invalid reference selection values')
+    if manifest['build_id'] != build_identity(manifest):
+        raise ValueError('reference build identity mismatch')
+    return manifest
 
 
 def build_identity(manifest):
@@ -116,15 +149,7 @@ def qemu_identity(executable):
 
 
 def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):
-    manifest = json.loads(Path(path).read_text())
-    if not isinstance(manifest, dict):
-        raise ValueError('reference manifest must be an object')
-    if any(not isinstance(manifest.get(key), dict) for key in ('inputs', 'selection', 'outputs', 'content')):
-        raise ValueError('invalid reference manifest fields')
-    if manifest.get('schema_version') != 2 or manifest.get('protocol') != 1:
-        raise ValueError('unsupported reference manifest')
-    if manifest.get('build_id') != build_identity(manifest):
-        raise ValueError('reference build identity mismatch')
+    manifest = load_manifest(path)
     ids = [match[1] for line in text.splitlines()
            if (match := re.fullmatch(r'REF_BUILD_ID ([0-9a-f]{64})', line))]
     if ids != [manifest['build_id']]:
