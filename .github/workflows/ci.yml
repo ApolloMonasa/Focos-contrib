@@ -36,6 +36,8 @@ jobs:
         run: make check
       - name: Verify MM-002 real pages
         run: make mm-smoke
+      - name: Verify ARCH-001 local IRQ state
+        run: make irq-smoke
       - name: Keep boot evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
