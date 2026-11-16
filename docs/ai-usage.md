@@ -24,6 +24,7 @@
 | 11/11 队友 review 二轮 | 按 ApolloMonasa 意见修 `--network-dummy` 提取 dummy、把 runner 依赖标注到 PR #2、补原始证据归档 | 用真实 APK 构建成功且 init 含 dummy 加载；用缺 dummy 的合成 APK 验证报错退出；证据包 7 份日志 + 15 组 summary.json + SHA256SUMS，归档 SHA256 `8e55f993…`；未重跑完整 QEMU |
 | 11/16 本核临界区 | DeepSeek Harness（deepseek-flash）按 [ARCH-001](../specs/ARCH-001.md) 实现 `with_local_irqs_disabled`，先加 QEMU 单层/两层与初态开/关状态自检，再补 `sstatus.SIE` 保存/恢复、两处编译器屏障、检查器与[参考页](reference/local-irq-critical-section.md)；待作者审阅全部代码。原文误写为 Codex，已更正 | 接口缺失时 `make build` 先失败；两次临时变异（不关中断、恢复时总开）均被 QEMU 自检报告并触发 `FOCOS_PANIC`，已还原。`make check`、`make mm-smoke`、`make irq-smoke` 通过；环境为 QEMU 10.2.2 / OpenSBI 1.7。真实定时中断未验收，待 #2/#5，未做真板 |
 | 11/16 临界区审阅修复 | Codex 核对 PR #42 的三轮审阅与整份差异，将启动自检及其辅助函数标为 `unsafe`，补充调用点前提、SPEC 和调用方编译回归；同时明确恢复函数允许按调用栈嵌套配对。待作者与队友审阅 | 新回归在修复前确认 HAL、架构层的普通调用均意外编译成功；修复后普通调用均报 E0133，显式 `unsafe` 与普通临界区可编译。`make check`（38 项 Rust、15 项 Python）、`make mm-smoke`、`make irq-smoke` 通过；QEMU 10.2.2 / OpenSBI 1.7。未做真实定时中断与真板验收 |
+| 11/16 TEST-001 二轮修复 | 按 Codex 意见让 `ifconfig dummy0` 失败即终止，固定 gzip 头使 initramfs 可复现，并把 427 项清单与镜像校验写回 `tests/regional-plan.json` | 同参数连续两次构建 SHA256 均为 `6deb9b17…`；`--network-dummy` 的 init 含 `|| fail "ifconfig:dummy0:<libc>"`；JSON 校验通过；未重跑 QEMU |
 
 本次多平台设计：2026-11-11，Codex 参考 KernelX 固定快照补充分层、三份边界 SPEC 和分平台验收计划。完成依赖、初始化、资源所有权与移植场景的静态审查；具体检查结果见本次 PR。未修改内核；未做新增平台运行验证，规格待另外两名成员审阅。
 

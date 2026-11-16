@@ -122,7 +122,9 @@ def build_init(libcs: list[str], scripts: list[str], modules: list[str], release
 """
         )
         if network:
-            libc_lines[-1] += "  /busybox ifconfig dummy0 10.0.0.1 netmask 255.255.255.0 up\n"
+            libc_lines[-1] += (
+                f'  /busybox ifconfig dummy0 10.0.0.1 netmask 255.255.255.0 up || fail "ifconfig:dummy0:{libc}"\n'
+            )
         for script in scripts:
             libc_lines[-1] += f"  /busybox echo \"REF RUN {libc} {script}\"\n"
             libc_lines[-1] += f"  /busybox chroot /mnt/{libc} /busybox sh /{script}\n"
@@ -199,7 +201,9 @@ def main() -> int:
     buffer.write(entry("TRAILER!!!", 0, b"", 0))
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with gzip.open(args.out, "wb") as handle:
+    with open(args.out, "wb") as raw, gzip.GzipFile(
+        filename="", mode="wb", fileobj=raw, mtime=0
+    ) as handle:
         handle.write(buffer.getvalue())
 
     print(f"kernel: {args.kernel_out} ({args.kernel_out.stat().st_size} bytes)")

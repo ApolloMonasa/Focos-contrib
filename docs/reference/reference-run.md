@@ -18,7 +18,7 @@
 | 内核 apk SHA256 | `06454180443143009db6c36e1bcd9300871c65c5b2d9f41697007db51455994c` |
 | 解压后 `Image` SHA256 | `d80d8505dfd15de0f656b4a4b5c2e3213dcbc1dc427898288cb1527751084928` |
 | 测试镜像 | `pre-20250615/sdcard-rv.img`，解压后 SHA256 `95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8` |
-| initramfs | `scripts/ref/build_initramfs.py` 生成；2026-11-08 结果的构建 SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8`，2026-11-11 修正启动标记后重建为 `9aea76713981d385b7243b2921e2957d280f3eaffb3153736b65e367cfb1fc3b`（lua 双 libc 复跑 9/9） |
+| initramfs | `scripts/ref/build_initramfs.py` 生成；2026-11-08 结果的构建 SHA256 `f579c71226da0039bf309853454ac8c7b2369da93972219bfaad0eecfbabaed8`，2026-11-16 固定 gzip 头（`mtime=0`、不写文件名）后重建为 `6deb9b177b151c40dbd0af1590c67c611fd93bc267509b9b85613c57ea859da4`（同参数连续两次构建 SHA256 相同；lua 双 libc 复跑 9/9） |
 
 启动命令（关键参数）：
 

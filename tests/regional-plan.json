@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-06",
+  "updated_at": "2026-11-16",
   "kind": "acceptance_plan_not_execution_results",
   "spec": "specs/REGION-001.md",
   "required_environment": "qemu-riscv64",
@@ -14,8 +14,8 @@
   "excluded_groups": [
     "ltp"
   ],
-  "case_inventory_status": "PENDING_IMAGE_AND_JUDGE_AUDIT",
-  "case_count": null,
+  "case_inventory_status": "FROZEN",
+  "case_count": 427,
   "groups": [
     {
       "name": "basic",
@@ -111,9 +111,10 @@
       "purpose": "preliminary",
       "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz",
       "published_compressed_sha256": "2b59aee4d26681b2d78a8faa615ac216f723a8ea157544e7867bbc8c77aac087",
-      "digest_source": "GitHub release metadata; not locally verified",
-      "image_sha256": null,
-      "source_match": "PENDING: release 20250615 vs source container 20250624"
+      "digest_source": "GitHub release metadata + local sha256sum（2026-11-08 校验通过）",
+      "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "source_match": "11 组脚本与 pre-2025@8b58dd1 一致；镜像 basic 的 musl 实为 glibc 构建，见 docs/reference/test-inventory.md",
+      "local_verification": "VERIFIED"
     },
     {
       "purpose": "tools",
@@ -127,7 +128,6 @@
     "container_digest",
     "judge_revision_match",
     "image_source_script_match",
-    "expanded_case_inventory",
     "tool_ELF_hashes",
     "make_source_version_and_hash"
   ],
@@ -167,5 +167,10 @@
       "commit": "b5ec6ef8497e1818cbdec3b54bb722f036e57972",
       "role": "CAgent/BuildStorm after regional required target; not replacement"
     }
-  ]
+  ],
+  "case_inventory_file": "tests/inventory.json",
+  "judge": {
+    "repo": "https://github.com/oscomp/oskernel-testsuits-cooperation",
+    "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b"
+  }
 }
