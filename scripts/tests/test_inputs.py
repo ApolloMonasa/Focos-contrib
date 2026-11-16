@@ -51,3 +51,23 @@ class InputTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'modified'):
                 fetch(root)
             self.assertEqual(path.read_text(), 'modified')
+
+    def test_evidence_archive_rejects_changed_bytes_and_unsafe_paths(self):
+        import importlib.util
+        import io
+        import tarfile
+        import hashlib
+        spec = importlib.util.spec_from_file_location('replay', ROOT/'scripts/ref/replay_evidence.py')
+        replay = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(replay)
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp)/'bad.tar.gz'
+            with tarfile.open(archive, 'w:gz') as target:
+                item = tarfile.TarInfo('test-001-evidence-2026-11-08/../../escape')
+                item.size = 1
+                target.addfile(item, io.BytesIO(b'x'))
+            sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+            for expected in ['0'*64, sha]:
+                with self.subTest(expected=expected), self.assertRaises(ValueError):
+                    replay.unpack(archive, Path(tmp)/'out', expected)
+            self.assertFalse((Path(tmp)/'escape').exists())

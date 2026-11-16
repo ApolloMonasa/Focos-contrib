@@ -14,6 +14,7 @@ import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inventory import NAME, REFERENCE_LOCK, digest, load_inventory
+from reference_manifest import build_identity
 
 MODULES = ['failover', 'net_failover', 'virtio_ring', 'virtio', 'virtio_net',
            'virtio_mmio', 'virtio_blk', 'crc16', 'mbcache', 'jbd2', 'ext4']
@@ -67,7 +68,7 @@ def entry(name: str, mode: int, data: bytes, ino: int) -> bytes:
     return out + b'\0' * (-len(out) % 4) + data + b'\0' * (-len(data) % 4)
 
 
-def build_init(libcs: list[str], scripts: list[str], modules: list[str], release: str, network: bool) -> str:
+def build_init(libcs: list[str], scripts: list[str], modules: list[str], release: str, network: bool, build_id: str | None = None) -> str:
     # 生成命令一律经过 must；只有被测脚本退出码与环境错误分开记录。
     lines = ['''#!/busybox sh
 fail() {
@@ -81,6 +82,8 @@ must() {
   "$@" || fail "$stage"
 }
 /busybox echo "REF_PROTOCOL 1"''']
+    if build_id:
+        lines.append('/busybox echo REF_BUILD_ID ' + build_id)
     def must(stage, *args):
         lines.append('must ' + shlex.join([stage, '/busybox', *args]))
     must('mkdir-root', 'mkdir', '-p', '/proc', '/sys', '/dev', '/mnt')
@@ -93,6 +96,8 @@ must() {
     lines.append('/busybox echo REF_MODULES_OK')
     must('mount-ext4', 'mount', '-t', 'ext4', '/dev/vda', '/mnt')
     lines.append('/busybox echo REF_MOUNT_OK')
+    if network or 'iperf_testcode.sh' in scripts:
+        must('network-loopback', 'ifconfig', 'lo', '127.0.0.1', 'up')
     if network:
         must('network-dummy', 'ifconfig', 'dummy0', '10.0.0.1', 'netmask', '255.255.255.0', 'up')
     # 先准备全部 libc；避免后一套环境失败时已有部分运行被误作完整基线。
@@ -149,6 +154,13 @@ def main(argv: list[str] | None = None) -> int:
             any(v not in ('musl', 'glibc') for v in args.libcs) or
             len(set(args.libcs)) != len(args.libcs) or len(set(args.scripts)) != len(args.scripts)):
         raise ValueError('invalid release, scripts or duplicate selections')
+    inputs_paths = {p.resolve() for p in (args.image, args.kernel_apk, args.busybox) if p is not None}
+    outputs_paths = [args.out, args.out.with_suffix('.manifest.json'), args.kernel_out] + [
+        args.modules_dir/f'{m}.ko' for m in MODULES + (['dummy'] if args.network_dummy or 'netperf_testcode.sh' in args.scripts else [])]
+    resolved_outputs = [p.resolve() for p in outputs_paths]
+    if inputs_paths.intersection(resolved_outputs) or len(set(resolved_outputs)) != len(resolved_outputs):
+        raise ValueError('input/output paths overlap')
+    args.network_dummy = args.network_dummy or 'netperf_testcode.sh' in args.scripts
     inputs = {'image': digest(args.image), 'kernel_apk': digest(args.kernel_apk)}
     pinned = (inputs['image'] == inventory['image']['uncompressed_sha256'] and
               inputs['kernel_apk'] == lock['kernel']['sha256'] and
@@ -160,7 +172,19 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError('empty busybox')
     modules = extract_kernel_and_modules(args.kernel_apk, args.release, args.kernel_out,
                                         args.modules_dir, ('dummy',) if args.network_dummy else ())
-    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy)
+    import hashlib
+    manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
+                'busybox_sha256': hashlib.sha256(busybox).hexdigest(),
+                'builder_sha256': digest(Path(__file__)),
+                'inventory_code_sha256': digest(Path(__file__).resolve().parents[1]/'inventory.py'),
+                'manifest_code_sha256': digest(Path(__file__).resolve().parents[1]/'reference_manifest.py'),
+                'inventory_sha256': digest(Path(__file__).resolve().parents[2]/'tests/inventory.json'),
+                'reference_lock_sha256': digest(REFERENCE_LOCK),
+                'zlib_version': zlib.ZLIB_RUNTIME_VERSION,
+                'selection': {'libcs': args.libcs, 'scripts': args.scripts, 'release': args.release,
+                              'network_dummy': args.network_dummy}}
+    manifest['build_id'] = build_identity(manifest)
+    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy, manifest['build_id'])
     files = {'init': (0o100755, init.encode()), 'busybox': (0o100755, busybox)}
     for module in modules:
         files[f'lib/modules/{args.release}/{module}.ko'] = (0o100644, (args.modules_dir/f'{module}.ko').read_bytes())
@@ -175,14 +199,7 @@ def main(argv: list[str] | None = None) -> int:
     with args.out.open('wb') as raw:
         with gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=9) as handle:
             handle.write(buffer.getvalue())
-    import hashlib
-    manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
-                'busybox_sha256': hashlib.sha256(busybox).hexdigest(),
-                'builder_sha256': digest(Path(__file__)), 'inventory_code_sha256': digest(Path(__file__).resolve().parents[1]/'inventory.py'), 'inventory_sha256': digest(Path(__file__).resolve().parents[2]/'tests/inventory.json'),
-                'zlib_version': zlib.ZLIB_RUNTIME_VERSION,
-                'selection': {'libcs': args.libcs, 'scripts': args.scripts, 'release': args.release,
-                              'network_dummy': args.network_dummy},
-                'outputs': {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}}
+    manifest['outputs'] = {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}
     args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
     command = ['qemu-system-riscv64', '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
                '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', str(args.kernel_out),

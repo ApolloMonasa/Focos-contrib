@@ -28,6 +28,7 @@ from pathlib import Path
 
 from inventory import load_inventory, digest, ROOT
 from reference_protocol import validate_reference
+from reference_manifest import verify_manifest
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -115,9 +116,18 @@ def run_judge(judge_path: Path, section_text: str, timeout: int) -> JudgeResult:
         detail = (proc.stderr or proc.stdout or "").strip()[:2000]
         return JudgeResult([], "error", f"judge exited {proc.returncode}: {detail}")
 
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('duplicate JSON field: ' + key)
+            result[key] = value
+        return result
+    def reject_constant(value):
+        raise ValueError('nonfinite JSON constant: ' + value)
     try:
-        data = json.loads(proc.stdout)
-    except json.JSONDecodeError as exc:
+        data = json.loads(proc.stdout, object_pairs_hook=unique_object, parse_constant=reject_constant)
+    except ValueError as exc:
         return JudgeResult([], "error", f"judge output is not JSON: {exc}; stdout={proc.stdout[:500]!r}")
     if not isinstance(data, list) or not all(isinstance(x, dict) for x in data):
         return JudgeResult([], "error", "judge output must be a JSON list of objects")
@@ -136,6 +146,8 @@ def normalize_item(item: dict, mode: str) -> tuple[str, int, int, float]:
         if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
             raise ValueError('invalid/nonfinite performance result')
         return name, 1, int(value > 0), float(score)
+    if 'all' in item and 'total' in item and item['all'] != item['total']:
+        raise ValueError('conflicting all/total assertion counts')
     all_count = item.get('all', item.get('total'))
     passed = item.get('pass')
     if (type(all_count) is not int or type(passed) is not int or
@@ -346,6 +358,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--group", action="append", default=None, help="group to judge; repeatable; default all")
     parser.add_argument("--libc", required=True, choices=["musl", "glibc"])
     parser.add_argument("--reference", choices=["strict", "legacy"], help="严格新协议或显式回放未验证的旧环境")
+    parser.add_argument('--reference-manifest', type=Path)
+    parser.add_argument('--reference-artifacts', nargs=2, metavar=('KERNEL', 'INITRAMFS'))
     parser.add_argument("--timeout", type=int, default=600, help="capture timeout in seconds")
     parser.add_argument("--judge-timeout", type=int, default=120, help="judge timeout in seconds")
     parser.add_argument("--judge-dir", default="third_party/oskernel-testsuits-cooperation/judge")
@@ -392,6 +406,17 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         sections, log_error = {}, str(exc)
     environment = validate_reference(log_text, args.reference, selected, args.libc)
+    provenance = None
+    strict = args.reference == 'strict' or (args.reference is None and environment['status'] != 'NOT_APPLICABLE')
+    if strict and not truncated:
+        try:
+            if args.reference_manifest is None or args.reference_artifacts is None:
+                raise ValueError('strict reference requires --reference-manifest and --reference-artifacts KERNEL INITRAMFS')
+            provenance = verify_manifest(args.reference_manifest, args.reference_artifacts, log_text,
+                                         inventory, selected, args.libc, inventory_path)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            environment['status'] = 'ERROR'
+            environment['errors'].append(str(exc))
     results = []
     for group in selected:
         section = sections.get((group, args.libc))
@@ -407,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
         results.append(result)
 
     failure = None
-    if re.search(r'^REF_FAIL(?:\s|$)', log_text, re.M):
+    if re.search(r'^[ \t]*REF_FAIL(?:\s|$)', log_text, re.M):
         failure = 'ENV_ERROR'
     elif truncated:
         failure = 'TIMEOUT'
@@ -423,11 +448,13 @@ def main(argv: list[str] | None = None) -> int:
             result['status'] = failure
             # 无效运行的子项不能留 PASS；数值仍供诊断，不能计入通过率。
             for sub in result['subcases']:
-                sub['status'] = failure
+                sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
+                sub.update(status=failure, **{'pass': 0, 'score': 0.0})
         elif environment['script_exits'].get(f"{result['group']}-{args.libc}", 0) != 0:
             result['status'] = 'FAIL'
             for sub in result['subcases']:
-                sub['status'] = 'FAIL'
+                sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
+                sub.update(status='FAIL', **{'pass': 0, 'score': 0.0})
 
     totals = summarize(results)
     import datetime
@@ -443,10 +470,11 @@ def main(argv: list[str] | None = None) -> int:
         'inventory_sha256': digest(inventory_path),
         'log_sha256': hashlib.sha256(raw_log).hexdigest(),
         'environment': environment,
+        'reference_provenance': provenance,
         'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
         'log_error': log_error,
         'source_sha256': {str(p.relative_to(ROOT)): digest(p) for p in
-                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py']},
+                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']},
         'judge_sha256': {str(p): digest(p) for p in
                          sorted(set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py')))},
     }

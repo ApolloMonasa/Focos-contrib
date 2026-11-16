@@ -16,6 +16,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT/'scripts'))
 RUNNER = ROOT / "scripts" / "run_tests.py"
 INVENTORY = ROOT / "tests" / "inventory.json"
 JUDGE_DIR = Path(os.environ.get("TEST001_JUDGE_DIR", ROOT / "third_party" / "oskernel-testsuits-cooperation" / "judge"))
@@ -206,6 +207,29 @@ class RunnerSafetyTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         root = Path(directory.name)
         log = root / 'input.log'
+        if data.startswith(b'REF_PROTOCOL 1'):
+            import hashlib
+            sys.path.insert(0, str(ROOT/'scripts'))
+            from reference_manifest import build_identity
+            from inventory import load_inventory, REFERENCE_LOCK, digest
+            inventory = load_inventory()
+            lock = json.loads(REFERENCE_LOCK.read_text())
+            kernel, initramfs = root/'Image', root/'initramfs.gz'
+            kernel.write_bytes(b'synthetic kernel')
+            initramfs.write_bytes(b'synthetic initramfs')
+            manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': True,
+                        'inputs': {'image': inventory['image']['uncompressed_sha256'],
+                                   'kernel_apk': lock['kernel']['sha256']},
+                        'inventory_sha256': digest(INVENTORY), 'reference_lock_sha256': digest(REFERENCE_LOCK),
+                        'selection': {'libcs': ['musl'], 'scripts': ['iperf_testcode.sh'],
+                                      'release': lock['kernel']['release']},
+                        'outputs': {'kernel_sha256': digest(kernel), 'initramfs_sha256': digest(initramfs)}}
+            manifest['build_id'] = build_identity(manifest)
+            path = root/'build.manifest.json'
+            path.write_text(json.dumps(manifest))
+            newline = b'\r\n' if data.startswith(b'REF_PROTOCOL 1\r\n') else b'\n'
+            data = data.replace(b'REF_PROTOCOL 1'+newline, b'REF_PROTOCOL 1'+newline+f"REF_BUILD_ID {manifest['build_id']}".encode()+newline, 1)
+            extra = list(extra) + ['--reference-manifest', str(path), '--reference-artifacts', str(kernel), str(initramfs)]
         log.write_bytes(data)
         out = root / 'out'
         cmd = [sys.executable, '-B', str(RUNNER), '--out', str(out),
@@ -331,6 +355,53 @@ class RunnerSafetyTests(unittest.TestCase):
             stat = Path('/proc')/child_pid.read_text()/'stat'
             if stat.exists():
                 self.assertEqual(stat.read_text().split()[2], 'Z')
+
+
+
+    def test_crlf_reference_binds_manifest_and_preserves_serial_bytes(self):
+        raw = self.reference().replace(b'\n', b'\r\n')
+        proc, data, out = self.invoke(raw, ['--reference', 'strict'])
+        self.assertEqual(proc.returncode, 0)
+        self.assertTrue(data['meta']['reference_provenance']['inputs_pinned'])
+        self.assertIn(b'REF_BUILD_ID ', (out/'serial.log').read_bytes())
+        self.assertEqual((out/'serial.log').read_bytes().count(b'\r\n'), raw.count(b'\r\n')+1)
+
+    def test_group_output_must_belong_to_active_reference_attempt(self):
+        valid = self.reference()
+        raw = valid.replace(self.complete(), b'')
+        raw = raw.replace(b'REF RUN musl iperf_testcode.sh', self.complete()+b'REF RUN musl iperf_testcode.sh')
+        proc, data, _ = self.invoke(raw, ['--reference', 'strict'])
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+        self.assertTrue(any('outside its reference attempt' in e for e in data['meta']['environment']['errors']))
+
+    def test_reference_manifest_rejects_modified_artifact_or_unpinned_input(self):
+        from reference_manifest import verify_manifest, build_identity
+        from inventory import load_inventory
+        proc, data, out = self.invoke(self.reference(), ['--reference', 'strict'])
+        root = out.parent
+        path = root/'build.manifest.json'
+        manifest = json.loads(path.read_text())
+        text = (out/'serial.log').read_bytes().decode()
+        (root/'Image').write_bytes(b'changed')
+        with self.assertRaisesRegex(ValueError, 'artifact hash'):
+            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text, load_inventory(), ['iperf'], 'musl')
+        (root/'Image').write_bytes(b'synthetic kernel')
+        old = manifest['build_id']
+        manifest['inputs_pinned'] = False
+        manifest['build_id'] = build_identity(manifest)
+        path.write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError, 'not the frozen inputs'):
+            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text.replace(old, manifest['build_id']), load_inventory(), ['iperf'], 'musl')
+
+
+
+    def test_shell_trace_does_not_create_fake_group_boundaries(self):
+        raw = (b"+ echo '#### OS COMP TEST GROUP START iperf-musl ####'\n" + self.complete() +
+               b"+ echo '#### OS COMP TEST GROUP END iperf-musl ####'\n")
+        proc, data, _ = self.invoke(raw)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(data['groups'][0]['status'], 'PASS')
 
 
 if __name__ == '__main__':

@@ -19,7 +19,7 @@ def digest(path: Path) -> str:
 
 def load_inventory(path: Path = INVENTORY) -> dict:
     data = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(data, dict) or data.get('schema_version') != 1:
+    if not isinstance(data, dict) or type(data.get('schema_version')) is not int or data.get('schema_version') != 1:
         raise ValueError('unsupported inventory schema')
     groups = data.get('groups')
     if not isinstance(groups, dict) or not groups:
@@ -45,10 +45,15 @@ def load_inventory(path: Path = INVENTORY) -> dict:
         raise ValueError('inventory total_subcases mismatch')
     for key in ('source', 'judge'):
         cfg = data.get(key, {})
-        if not re.fullmatch(r'[0-9a-f]{40}', cfg.get('commit', '')):
+        if not isinstance(cfg, dict) or not isinstance(cfg.get('commit'), str) or not re.fullmatch(r'[0-9a-f]{40}', cfg['commit']):
             raise ValueError(f'invalid {key} commit')
+        if not isinstance(cfg.get('repo'), str) or not re.fullmatch(r'https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', cfg['repo']):
+            raise ValueError(f'invalid {key} repository')
     files = data['judge'].get('files', {})
     expected = {g['judge_file'] for g in groups.values() if g['kind'] == 'official'}
-    if set(files) != expected or any(not re.fullmatch(r'[0-9a-f]{64}', v) for v in files.values()):
+    if not isinstance(files, dict) or set(files) != expected or any(not isinstance(v, str) or not re.fullmatch(r'[0-9a-f]{64}', v) for v in files.values()):
         raise ValueError('missing or invalid official judge file hashes')
+    image = data.get('image', {})
+    if not isinstance(image, dict) or any(not isinstance(image.get(k), str) or not re.fullmatch(r'[0-9a-f]{64}', image[k]) for k in ('published_compressed_sha256', 'uncompressed_sha256')):
+        raise ValueError('invalid frozen image hashes')
     return data

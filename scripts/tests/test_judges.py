@@ -54,3 +54,33 @@ class JudgeTests(unittest.TestCase):
         for name, text in examples.items():
             with self.subTest(name=name):
                 self.assertEqual(judge(name, text)[0]["pass"], 0)
+
+    def test_lmbench_full_source_formats_map_each_metric_once(self):
+        labels = ['Simple syscall', 'Simple read', 'Simple write', 'Simple stat', 'Simple fstat',
+                  'Simple open/close', "Select on 100 fd's", 'Signal handler installation',
+                  'Signal handler overhead', 'Protection fault', 'Pipe latency',
+                  'Process fork+exit', 'Process fork+execve', 'Process fork+/bin/sh -c']
+        text = '\n'.join(f'{label}: 1.2 microseconds' for label in labels) + '\n'
+        text += 'File /var/tmp/XXX write bandwidth: 123 KB/sec\nPagefaults on /var/tmp/XXX: 1.2 microseconds\n'
+        text += '+ ./lmbench_all lat_mmap -P 1 512k /var/tmp/XXX\n0.524288 12\n'
+        text += 'Pipe bandwidth: 123 MB/sec\nfile system latency\n0k 10 123 456\n10k 10 123 456\n'
+        for args in ['bw_file_rd -P 1 512k io_only /var/tmp/XXX',
+                     'bw_file_rd -P 1 512k open2close /var/tmp/XXX',
+                     'bw_mmap_rd -P 1 512k mmap_only /var/tmp/XXX',
+                     'bw_mmap_rd -P 1 512k open2close /var/tmp/XXX']:
+            text += f'+ ./lmbench_all {args}\n0.524288 123\n'
+        text += 'context switch overhead\n"size=32k ovr=0.25\n2 1.2\n4 1.3\n96 2.3\n'
+        rows = judge('lmbench', text)
+        self.assertEqual(len(rows), 24)
+        self.assertTrue(all(row['pass'] == 1 for row in rows))
+
+    def test_invalid_measurement_cannot_be_overridden_by_valid_one(self):
+        for value in ['-1', 'NaN', '1.2 milliseconds']:
+            rows = judge('lmbench', f'Simple syscall: {value}\nSimple syscall: 1.2 microseconds\n')
+            self.assertEqual(rows[0]['pass'], 0)
+
+    def test_libcbench_trailing_error_or_duplicate_time_invalidates_case(self):
+        prefix = 'b_malloc_sparse (0)\ntime: 1.0, virt: 1, res: 1\n'
+        for tail in ['malloc failed: errno 12\n', 'time: 2.0, virt: 1, res: 1\n']:
+            with self.subTest(tail=tail):
+                self.assertEqual(judge('libcbench', prefix+tail)[0]['pass'], 0)

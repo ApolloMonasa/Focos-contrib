@@ -6,6 +6,8 @@ from common import NUMBER, emit, expected, positive
 names = expected('libcbench')
 found = {}
 current = None
+measured = False
+valid_scope = True
 pattern = re.compile(rf'time:\s*({NUMBER}),\s*virt:\s*\d+,\s*res:\s*\d+(?:,\s*dirty:\s*\d+)?')
 for raw in sys.stdin.read().splitlines():
     line = raw.strip()
@@ -14,9 +16,15 @@ for raw in sys.stdin.read().splitlines():
     if line in names:
         current = line
         found.setdefault(current, []).append(False)
+        measured = False
+        valid_scope = True
         continue
     if current:
         match = pattern.fullmatch(line)
-        found[current][-1] = bool(match and positive(match[1]))
-        current = None
+        if valid_scope and not measured and match:
+            found[current][-1] = positive(match[1])
+            measured = True
+        else:
+            found[current][-1] = False
+            valid_scope = False
 emit(names, found)

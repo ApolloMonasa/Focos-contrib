@@ -5,7 +5,8 @@
     "sha256": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369",
     "release": "6.18.63-0-lts",
     "version": "6.18.63-r0",
-    "aports_commit": "5001b1fba5a7a200a3b76cbf3361f00925064264"
+    "aports_commit": "5001b1fba5a7a200a3b76cbf3361f00925064264",
+    "archive_url": "https://github.com/ApolloMonasa/Focos-contrib/releases/download/test-001-pr29-validation-2026-11-16/linux-lts-6.18.63-r0.apk"
   },
   "evidence": {
     "repo": "Weibo-Hd/Focos",

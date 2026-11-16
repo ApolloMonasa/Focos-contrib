@@ -77,6 +77,14 @@ class BuildTests(unittest.TestCase):
             build.main(['--image', str(self.busybox), '--kernel-apk', str(self.apk),
                         '--out', str(self.root/'bad.gz'), '--scripts', 'lua_testcode.sh'])
 
+    def test_output_cannot_replace_an_input_or_another_output(self):
+        before = self.busybox.read_bytes()
+        for out, extra in [(self.busybox, ()), (self.root/'out.gz', ('--kernel-out', str(self.busybox))),
+                           (self.root/'out.gz', ('--kernel-out', str(self.root/'out.gz')))]:
+            with self.subTest(out=out, extra=extra), self.assertRaisesRegex(ValueError, 'overlap'):
+                self.invoke(out, extra)
+        self.assertEqual(self.busybox.read_bytes(), before)
+
     def test_release_and_scripts_are_validated(self):
         for args in [('--release', '../bad'), ('--scripts', 'missing.sh'),
                      ('--libcs', 'glibc', 'glibc')]:
