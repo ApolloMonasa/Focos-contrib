@@ -93,3 +93,11 @@ cpio 的顺序、权限、属主和时间固定；gzip 固定 `mtime=0` 且不�
 - symlink、chmod、hosts、loopback/dummy 是参考环境适配，必须随结果披露；不能声称原版镜像无需适配即可兼容。
 
 历史结果见 [2026-11-08 测量](../../docs/reference/reference-run.md)，新验证结果及限制见 [2026-11-16 摘要](../../tests/results/reference-2026-11-16/summary.md)。这些均非 FocOS 或 VF2 成绩。
+
+## 后续未解决评论的处理
+
+构建器从当前 APK 的 `modules.dep` 拓扑排序必需模块，缺依赖或环时拒绝构建。锁定的 6.18.63 中 `virtio.ko` 依赖 `virtio_ring.ko`，而非反向；真实 QEMU 已验证该顺序可挂载并运行双 libc 的 Lua。详见结果目录的 `unresolved-fixes.json`。
+
+普通 `--capture-cmd` 现在必须声明实际构件，例如 `--capture-artifact target/kernel --capture-artifact path/to/sdcard.img`，可重复传入；参考模式已有的 `--reference-artifacts` 仍有效。所有声明构件的初始哈希写入 `artifact_sha256`，运行期变化使结果失效；调用方应列全实际依赖文件。
+
+`--inventory` 的团队组仅接受与冻结判据具有相同名称顺序和模式的快照，不兼容快照在执行前明确失败。复用 `--out` 会重新生成受管 `sections/`，不会夹带上次缺组或少选组的日志；不要在该目录存放输入文件。旧 Release 与 SOURCE 校验仍针对旧源码，不覆盖历史构建值。

@@ -139,7 +139,8 @@ Focos/
 │   │   │   └── summary.md             # 旧镜像差异与参考结果
 │   │   └── reference-2026-11-16/       # 验证链重构后的独立测量
 │   │       ├── summary.md             # 22 次参考运行、回放、故障与证据
-│   │       └── review-fixes.json       # 后续审核修复的源码哈希与回放对照
+│   │       ├── review-fixes.json       # 后续审核修复的源码哈希与回放对照
+│   │       └── unresolved-fixes.json   # 模块依赖核实、实际启动与本轮证据
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

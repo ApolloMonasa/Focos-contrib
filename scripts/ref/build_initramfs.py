@@ -35,6 +35,37 @@ def extract_busybox(image: Path, explicit: Path | None) -> bytes:
             handle.close()
 
 
+def module_order(targets: list[str], dependency_table: str) -> list[str]:
+    """只从 APK 的 modules.dep 推导顺序；缺失依赖/重复声明/环均拒绝构建。"""
+    dependencies = {}
+    def name(path):
+        return Path(path).name.split('.ko', 1)[0]
+    for line in dependency_table.splitlines():
+        if not line.strip():
+            continue
+        module, separator, deps = line.partition(':')
+        if not separator:
+            raise ValueError('malformed modules.dep')
+        key = name(module)
+        if key in targets:
+            if key in dependencies:
+                raise ValueError('duplicate module dependency entry: '+key)
+            dependencies[key] = [name(dep) for dep in deps.split()]
+    order, active, done = [], set(), set()
+    def visit(module):
+        if module in done: return
+        if module in active: raise ValueError('module dependency cycle: '+module)
+        if module not in targets or module not in dependencies:
+            raise ValueError('required module/dependency missing: '+module)
+        active.add(module)
+        for dependency in dependencies[module]: visit(dependency)
+        active.remove(module)
+        done.add(module)
+        order.append(module)
+    for module in targets: visit(module)
+    return order
+
+
 def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path,
                                modules_dir: Path, extra: tuple[str, ...] = ()) -> list[str]:
     targets = MODULES + list(extra)
@@ -46,6 +77,11 @@ def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path,
                 raise ValueError(f'expected one {description}, found {len(candidates)}')
             with archive.extractfile(candidates[0]) as handle:
                 return gzip.decompress(handle.read())
+        tables = [m for m in members if m.name.lstrip('./') == f'lib/modules/{release}/modules.dep']
+        if len(tables) != 1:
+            raise ValueError('missing/duplicate modules.dep for release')
+        with archive.extractfile(tables[0]) as handle:
+            targets = module_order(targets, handle.read().decode('utf-8'))
         kernel = read_one([m for m in members if m.name.lstrip('./') == 'boot/vmlinuz-lts'], 'kernel')
         for module in targets:
             payloads[module] = read_one([
@@ -174,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
                                         args.modules_dir, ('dummy',) if args.network_dummy else ())
     import hashlib
     manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
-                'busybox_sha256': hashlib.sha256(busybox).hexdigest(),
+                'busybox_sha256': hashlib.sha256(busybox).hexdigest(), 'module_order': modules,
                 'builder_sha256': digest(Path(__file__)),
                 'inventory_code_sha256': digest(Path(__file__).resolve().parents[1]/'inventory.py'),
                 'manifest_code_sha256': digest(Path(__file__).resolve().parents[1]/'reference_manifest.py'),

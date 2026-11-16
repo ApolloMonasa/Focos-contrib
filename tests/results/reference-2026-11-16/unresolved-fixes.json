@@ -1,0 +1,89 @@
+{
+  "kind": "unresolved_review_validation",
+  "module_review": "P1 dependency direction disproved by frozen APK metadata and real QEMU boot",
+  "apk_sha256": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369",
+  "modules_dep_sha256": "1f2cb1ddb53e45d7c077720e2291ead1a6b420033a2dc0b7052946254f21c0ca",
+  "dependency_lines": [
+    "kernel/drivers/virtio/virtio.ko.gz: kernel/drivers/virtio/virtio_ring.ko.gz",
+    "kernel/drivers/virtio/virtio_ring.ko.gz:"
+  ],
+  "module_order": [
+    "failover",
+    "net_failover",
+    "virtio_ring",
+    "virtio",
+    "virtio_net",
+    "virtio_mmio",
+    "virtio_blk",
+    "crc16",
+    "mbcache",
+    "jbd2",
+    "ext4"
+  ],
+  "build_manifest": {
+    "build_id": "7445015542e75d45ebcbc5a491189150bddb46bc41169a16f3945361132c5953",
+    "builder_sha256": "da2c74f12cc89d7bffd5713eea7951cbe484fcb1731d91c074d224adcfc73793",
+    "busybox_sha256": "bc09c5ae5eabf091d0ded0208a17a1173725f10d8b79264d896d09c9553c68de",
+    "inputs": {
+      "image": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "kernel_apk": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369"
+    },
+    "inputs_pinned": true,
+    "inventory_code_sha256": "8d35642499cdf19a08768da81427793f17100469b26a4ce667272c291e1619a3",
+    "inventory_sha256": "cfb0a44193e1a6a2ad9ce71baa300f774f25038b943458d3417f2d46f435b8e3",
+    "manifest_code_sha256": "226a06bb1cc81b4ee026135e44e6053b3c653913ab4ddb2af770134f5746fe20",
+    "module_order": [
+      "failover",
+      "net_failover",
+      "virtio_ring",
+      "virtio",
+      "virtio_net",
+      "virtio_mmio",
+      "virtio_blk",
+      "crc16",
+      "mbcache",
+      "jbd2",
+      "ext4"
+    ],
+    "outputs": {
+      "initramfs_sha256": "f7219cd06aa6a3d47423010a04635b56404a5e644a65c67bbd2ad2db5029ce19",
+      "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+    },
+    "protocol": 1,
+    "reference_lock_sha256": "74fa1ddefa38676ab63fbd729ca3991a8a24d6382ee6e6c25f6739c6c171d42f",
+    "schema_version": 1,
+    "selection": {
+      "libcs": [
+        "glibc",
+        "musl"
+      ],
+      "network_dummy": false,
+      "release": "6.18.63-0-lts",
+      "scripts": [
+        "lua_testcode.sh"
+      ]
+    },
+    "zlib_version": "1.3.1.zlib-ng"
+  },
+  "real_qemu_lua": {
+    "glibc": {
+      "status": "PASS",
+      "pass": 9,
+      "count": 9,
+      "serial_sha256": "6d71b5df5a8b7a66d8b07b45bc5159e3d7ef8e064396e70108c7e3d71a291e7e"
+    },
+    "musl": {
+      "status": "PASS",
+      "pass": 9,
+      "count": 9,
+      "serial_sha256": "6d71b5df5a8b7a66d8b07b45bc5159e3d7ef8e064396e70108c7e3d71a291e7e"
+    }
+  },
+  "test001_tests_passed": 58,
+  "historical_replays_matched": 15,
+  "source_sha256": {
+    "scripts/ref/build_initramfs.py": "da2c74f12cc89d7bffd5713eea7951cbe484fcb1731d91c074d224adcfc73793",
+    "scripts/run_tests.py": "27c56e783d0e7f4820af25f74aa86ea6a78a2eff769a0e88111c531b3b7300d8",
+    "scripts/judge_team/common.py": "8998c76199bd906dabe2b445a8ddbfd2a100eb1438fb5956e129d46b433c536c"
+  }
+}

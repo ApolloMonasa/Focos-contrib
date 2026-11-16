@@ -33,6 +33,9 @@ class BuildTests(unittest.TestCase):
 
     def write_apk(self, modules, release=RELEASE):
         with tarfile.open(self.apk, 'w:gz') as archive:
+            data = ''.join(f'kernel/{m}.ko.gz:\n' for m in modules).encode()
+            item = tarfile.TarInfo(f'lib/modules/{release}/modules.dep');item.size=len(data)
+            archive.addfile(item, io.BytesIO(data))
             for name, raw in [('boot/vmlinuz-lts', b'kernel')] + [
                 (f'lib/modules/{release}/kernel/{m}.ko.gz', b'module:' + m.encode()) for m in modules
             ]:
@@ -90,6 +93,12 @@ class BuildTests(unittest.TestCase):
                      ('--libcs', 'glibc', 'glibc')]:
             with self.subTest(args=args), self.assertRaises((ValueError, SystemExit)):
                 self.invoke(self.root/'bad.gz', args)
+
+    def test_module_dependency_sort_rejects_missing_and_cycles(self):
+        dep = 'a.ko.gz: b.ko.gz\nb.ko.gz:\n'
+        self.assertEqual(build.module_order(['a','b'],dep),['b','a'])
+        with self.assertRaises(ValueError): build.module_order(['a'],dep)
+        with self.assertRaises(ValueError): build.module_order(['a','b'],'a.ko.gz: b.ko.gz\nb.ko.gz: a.ko.gz\n')
 
 
 class InitTests(unittest.TestCase):

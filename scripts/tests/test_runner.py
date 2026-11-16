@@ -164,6 +164,7 @@ class RunnerContractTests(unittest.TestCase):
                     str(RUNNER),
                     "--capture-cmd",
                     cmd,
+                    "--capture-artifact", str(RUNNER),
                     "--timeout",
                     "1",
                     "--out",
@@ -235,7 +236,7 @@ class RunnerSafetyTests(unittest.TestCase):
         cmd = [sys.executable, '-B', str(RUNNER), '--out', str(out),
                '--libc', 'musl', '--group', 'iperf', '--inventory', str(INVENTORY),
                '--team-judge-dir', str(TEAM_DIR)]
-        cmd += ['--capture-cmd', capture] if capture else ['--log', str(log)]
+        cmd += ['--capture-cmd', capture, '--capture-artifact', str(RUNNER)] if capture else ['--log', str(log)]
         proc = subprocess.run(cmd + list(extra), capture_output=True, timeout=8)
         payload = json.loads((out / 'summary.json').read_text()) if (out / 'summary.json').exists() else None
         return proc, payload, out
@@ -434,7 +435,7 @@ class RunnerSafetyTests(unittest.TestCase):
             return original_digest(path)
         with tempfile.TemporaryDirectory() as tmp:
             with patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'digest', side_effect=digest), contextlib.redirect_stdout(io.StringIO()):
-                code = run_tests.main(['--capture-cmd', 'fake', '--out', tmp, '--libc', 'musl',
+                code = run_tests.main(['--capture-cmd', 'fake', '--capture-artifact', str(RUNNER), '--out', tmp, '--libc', 'musl',
                                        '--group', 'iperf', '--inventory', str(INVENTORY),
                                        '--team-judge-dir', str(TEAM_DIR)])
             data = json.loads((Path(tmp)/'summary.json').read_text())
@@ -485,7 +486,7 @@ class RunnerSafetyTests(unittest.TestCase):
                     if stage == 'judge': mutate()
                     return result
                 with patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'judge_group', side_effect=judge), contextlib.redirect_stdout(io.StringIO()):
-                    code = run_tests.main(['--capture-cmd', 'fake', '--out', tmp, '--libc', 'musl',
+                    code = run_tests.main(['--capture-cmd', 'fake', '--capture-artifact', str(RUNNER), '--out', tmp, '--libc', 'musl',
                                            '--group', 'iperf', '--inventory', str(inventory), '--team-judge-dir', str(TEAM_DIR)])
                 data = json.loads((Path(tmp)/'summary.json').read_text())
                 self.assertEqual(code, 1)
@@ -514,13 +515,76 @@ class RunnerSafetyTests(unittest.TestCase):
                     target.write_bytes(target.read_bytes()+b' ')
                     return self.complete(), False, 0
                 with patch.object(run_tests, 'REFERENCE_LOCK', lock), patch.object(run_tests, 'capture', side_effect=capture), patch.object(run_tests, 'run_judge', side_effect=AssertionError('changed judge executed')), contextlib.redirect_stdout(io.StringIO()):
-                    code = run_tests.main(['--capture-cmd', 'fake', '--out', str(root/'out'), '--libc', 'musl',
+                    code = run_tests.main(['--capture-cmd', 'fake', '--capture-artifact', str(RUNNER), '--out', str(root/'out'), '--libc', 'musl',
                                            '--group', 'iperf', '--inventory', str(INVENTORY), '--team-judge-dir', str(team)])
                 data = json.loads((root/'out/summary.json').read_text())
                 self.assertEqual(code, 1)
                 self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
                 self.assertIn(str(target), data['meta']['changed_inputs'])
                 if kind == 'judge': self.assertEqual(data['meta']['judge_sha256'][str(judge)], before)
+
+    def test_reused_output_removes_stale_sections(self):
+        import run_tests, contextlib, io
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); log = root/'input.log'; out = root/'out'
+            base = ['--log', str(log), '--out', str(out), '--libc', 'musl', '--group', 'iperf',
+                    '--inventory', str(INVENTORY), '--team-judge-dir', str(TEAM_DIR)]
+            log.write_bytes(self.complete())
+            with contextlib.redirect_stdout(io.StringIO()): self.assertEqual(run_tests.main(base), 0)
+            self.assertTrue((out/'sections/iperf-musl.log').exists())
+            log.write_bytes(b'')
+            with contextlib.redirect_stdout(io.StringIO()): self.assertEqual(run_tests.main(base), 1)
+            self.assertEqual(list((out/'sections').iterdir()), [])
+
+    def test_alternative_team_case_list_is_rejected_before_capture(self):
+        import run_tests, contextlib, io
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'inventory.json'; data=json.loads(INVENTORY.read_text())
+            data['groups']['iperf']['subcases'][0]='NEW_CASE';path.write_text(json.dumps(data))
+            with patch.object(run_tests, 'capture', side_effect=AssertionError('capture executed')), contextlib.redirect_stderr(io.StringIO()):
+                code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(Path(tmp)/'out'),
+                                    '--libc','musl','--group','iperf','--inventory',str(path)])
+            self.assertEqual(code,2)
+
+    def test_plain_capture_artifact_is_hashed_and_changes_invalidate(self):
+        import run_tests, contextlib, io
+        from inventory import digest
+        from unittest.mock import patch
+        for mutate in [False,True]:
+            with self.subTest(mutate=mutate), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp); artifact=root/'kernel';artifact.write_bytes(b'kernel v1');before=digest(artifact)
+                def capture(cmd, timeout):
+                    if mutate: artifact.write_bytes(b'kernel v2')
+                    return self.complete(),False,0
+                with patch.object(run_tests,'capture',side_effect=capture), contextlib.redirect_stdout(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(artifact),'--out',str(root/'out'),
+                                        '--libc','musl','--group','iperf','--team-judge-dir',str(TEAM_DIR)])
+                result=json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(result['meta']['artifact_sha256'][str(artifact)],before)
+                self.assertEqual(code,1 if mutate else 0)
+                self.assertEqual(result['groups'][0]['status'],'ENV_ERROR' if mutate else 'PASS')
+
+    def test_managed_output_cannot_replace_artifact_or_follow_sections_symlink(self):
+        import run_tests,contextlib,io
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); out=root/'out';out.mkdir()
+            artifact=out/'serial.log';artifact.write_bytes(b'kernel')
+            args=['--capture-cmd','fake','--capture-artifact',str(artifact),'--out',str(out),'--libc','musl','--group','iperf']
+            with patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(run_tests.main(args),2)
+            self.assertEqual(artifact.read_bytes(),b'kernel')
+            target=root/'external';target.mkdir();(target/'keep').write_text('keep')
+            (out/'sections').symlink_to(target,target_is_directory=True)
+            with contextlib.redirect_stderr(io.StringIO()):self.assertEqual(run_tests.main(args),2)
+            self.assertEqual((target/'keep').read_text(),'keep')
+
+    def test_capture_without_declared_artifacts_fails_before_execution(self):
+        import run_tests,contextlib,io
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp,patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(run_tests.main(['--capture-cmd','fake','--out',tmp,'--libc','musl']),2)
 
 if __name__ == '__main__':
     unittest.main()

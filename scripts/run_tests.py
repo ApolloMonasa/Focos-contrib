@@ -20,6 +20,7 @@ import os
 import math
 import signal
 import hashlib
+import shutil
 import re
 import subprocess
 import sys
@@ -365,6 +366,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--group", action="append", default=None, help="group to judge; repeatable; default all")
     parser.add_argument("--libc", required=True, choices=["musl", "glibc"])
     parser.add_argument("--reference", choices=["strict", "legacy"], help="严格新协议或显式回放未验证的旧环境")
+    parser.add_argument('--capture-artifact', action='append', type=Path, default=[], help='被测内核/镜像等文件，可重复；普通 capture 必填')
     parser.add_argument('--reference-manifest', type=Path)
     parser.add_argument('--reference-artifacts', nargs=2, metavar=('KERNEL', 'INITRAMFS'))
     parser.add_argument("--timeout", type=int, default=600, help="capture timeout in seconds")
@@ -375,6 +377,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--platform", default="qemu")
     args = parser.parse_args(argv)
 
+    out_dir = Path(args.out)
+    sections_dir = out_dir/'sections'
+    if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()):
+        print('sections must be a real directory', file=sys.stderr)
+        return 2
+    inputs = [Path(args.inventory)] + ([Path(args.log)] if args.log else []) + args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])] + ([args.reference_manifest] if args.reference_manifest else [])
+    if any(p.resolve().is_relative_to(sections_dir.resolve()) for p in inputs):
+        print('input files cannot be stored in managed output sections', file=sys.stderr)
+        return 2
+    if args.capture_cmd and not (args.capture_artifact or args.reference_artifacts):
+        print('capture requires --capture-artifact or --reference-artifacts', file=sys.stderr)
+        return 2
+    artifact_paths = args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])]
+    if any(not p.is_file() for p in artifact_paths):
+        print('capture artifacts must be existing regular files', file=sys.stderr)
+        return 2
+    artifact_hashes = {str(p): digest(p) for p in artifact_paths}
     inventory_path = Path(args.inventory)
     if not inventory_path.exists():
         print(f"inventory not found: {inventory_path}", file=sys.stderr)
@@ -399,6 +418,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unknown group(s): {', '.join(unknown)}", file=sys.stderr)
         return 2
 
+    canonical = load_inventory()
+    for group in selected:
+        cfg = groups_cfg[group]
+        if cfg['kind'] == 'team' and (group not in canonical['groups'] or
+                cfg['subcases'] != canonical['groups'][group]['subcases'] or
+                cfg.get('mode', 'pass_fail') != canonical['groups'][group].get('mode', 'pass_fail')):
+            print('team parser does not support this inventory snapshot: '+group, file=sys.stderr)
+            return 2
+
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
     source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in
                           [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
@@ -411,11 +439,18 @@ def main(argv: list[str] | None = None) -> int:
     judge_hashes = {str(p): digest(p) for p in sorted(judge_paths) if p.is_file()}
     watched = {Path(ROOT/name): sha for name, sha in source_hashes.items()}
     watched.update({p: judge_hashes.get(str(p)) for p in judge_paths})
+    watched.update({Path(p): sha for p, sha in artifact_hashes.items()})
     for p in {inventory_path, INVENTORY, REFERENCE_LOCK}:
         watched[p] = digest(p) if p.is_file() else None
     watched[inventory_path] = inventory_hash
     for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
         watched[p] = digest(p) if p.is_file() else None
+    managed_files = [out_dir/name for name in ('serial.log', 'summary.json', 'summary.md')]
+    if any(p.is_symlink() for p in managed_files) or any(
+            p.resolve().is_relative_to(sections_dir.resolve()) or
+            p.resolve() in {target.resolve() for target in managed_files} for p in watched):
+        print('managed output aliases an execution input or symlink', file=sys.stderr)
+        return 2
     def changed_inputs():
         changed = []
         for path, original in watched.items():
@@ -516,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
         "capture_truncated": truncated,
         "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
         'inventory_sha256': inventory_hash,
+        'artifact_sha256': artifact_hashes,
         'log_sha256': hashlib.sha256(raw_log).hexdigest(),
         'environment': environment,
         'reference_provenance': provenance,
@@ -530,7 +566,9 @@ def main(argv: list[str] | None = None) -> int:
     (out_dir / 'serial.log').write_bytes(raw_log)
 
     sections_dir = out_dir / "sections"
-    sections_dir.mkdir(exist_ok=True)
+    if sections_dir.exists():
+        shutil.rmtree(sections_dir)
+    sections_dir.mkdir()
     for result in results:
         key = (result["group"], result["libc"] or args.libc)
         section = sections.get(key)
