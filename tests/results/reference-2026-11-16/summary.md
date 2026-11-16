@@ -52,8 +52,10 @@
 
 ## 原始证据与复现
 
-- 归档与同字节 APK 缓存：[test-001-pr29-validation-2026-11-16](https://github.com/ApolloMonasa/Focos-contrib/releases/tag/test-001-pr29-validation-2026-11-16)。
-- 归档 `test-001-pr29-validation-2026-11-16.tar.gz` 的 SHA256：`2bee84da2c6e7b5c8d3f586b9605ef8ec48ed2cb2c1edd58143542644fba14ae`。
+- 当前证据归档（v1 与原始 APK 缓存保留原路径）：[test-001-pr29-validation-2026-11-16-v2](https://github.com/ApolloMonasa/Focos-contrib/releases/tag/test-001-pr29-validation-2026-11-16-v2)。
+- 归档 `test-001-pr29-validation-2026-11-16-v2.tar.gz` 的 SHA256：`34c0a8ecd72acedf73152df53e737ba9fad38af6b4174a78984d2fe769c5d5e4`。
 - 归档包含原始串口、捕获状态、逐项结果、实际内核/initramfs、manifest、SOURCE.json、SHA256SUMS、确定性对照与坏盘负例。历史原包不覆盖。
 - 构建、重跑与协议说明见 [scripts/ref/README.md](../../../scripts/ref/README.md)；包内 README 给出 `verify_current.py` 回放命令，先校验包和内部 SHA256。
 - 旧 Alpine 6.18.60 滚动 URL 已不可用；本次明确使用新的冻结输入，不能把新测量说成重建了旧环境。
+
+CI 补充：Ubuntu dash 的 echo 会展开测试桩命令中的反斜杠，现改为 printf 并核对记录条数与调用计数；测试目标和断言未放宽。v2 证据只将源码身份核对限定为实际执行代码，排除测试桩文件；原始串口、构件和判分结果不变，v1 归档不覆盖。
