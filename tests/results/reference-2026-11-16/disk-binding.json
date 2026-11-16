@@ -1,0 +1,27 @@
+{
+  "kind": "strict_reference_disk_and_output_alias_regression",
+  "test001_tests_passed": 64,
+  "historical_replays_matched": 15,
+  "source_sha256": {
+    "scripts/reference_manifest.py": "04596738181329edd3ae23d20d57ac41f731f2fbdc38bc7ae450576a80ddc0f5",
+    "scripts/run_tests.py": "2f403d30dd0562241b3c1001c44e73bd72cb675889b419298d728dac62da4c57"
+  },
+  "real_qemu": {
+    "glibc": {
+      "pass": 9,
+      "count": 9,
+      "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "serial_sha256": "41eb25704a5d086292458edfb6c32b1f22481793ec43ed32ed78c885b5f3bd4e",
+      "command_verified": true,
+      "method": "live QEMU capture"
+    },
+    "musl": {
+      "pass": 9,
+      "count": 9,
+      "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "serial_sha256": "41eb25704a5d086292458edfb6c32b1f22481793ec43ed32ed78c885b5f3bd4e",
+      "command_verified": false,
+      "method": "same capture log replay; no second QEMU boot"
+    }
+  }
+}

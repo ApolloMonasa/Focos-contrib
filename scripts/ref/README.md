@@ -47,13 +47,15 @@ target/ref-env/bin/python -B scripts/ref/build_initramfs.py \
 python3 -B scripts/run_tests.py \
   --capture-cmd "$(head -n 1 target/ref-build.log)" \
   --out target/ref/results/glibc --libc glibc --group lua --timeout 180 \
-  --reference strict --reference-manifest target/ref/lua.cpio.manifest.json \
+  --reference strict --reference-image target/ref-inputs/sdcard-rv.img \
+  --reference-manifest target/ref/lua.cpio.manifest.json \
   --reference-artifacts target/ref/Image target/ref/lua.cpio.gz
 
 python3 -B scripts/run_tests.py \
   --log target/ref/results/glibc/serial.log \
   --out target/ref/results/musl --libc musl --group lua \
-  --reference strict --reference-manifest target/ref/lua.cpio.manifest.json \
+  --reference strict --reference-image target/ref-inputs/sdcard-rv.img \
+  --reference-manifest target/ref/lua.cpio.manifest.json \
   --reference-artifacts target/ref/Image target/ref/lua.cpio.gz
 ```
 
@@ -101,3 +103,11 @@ cpio 的顺序、权限、属主和时间固定；gzip 固定 `mtime=0` 且不�
 普通 `--capture-cmd` 现在必须声明实际构件，例如 `--capture-artifact target/kernel --capture-artifact path/to/sdcard.img`，可重复传入；参考模式已有的 `--reference-artifacts` 仍有效。所有声明构件的初始哈希写入 `artifact_sha256`，运行期变化使结果失效；调用方应列全实际依赖文件。
 
 `--inventory` 的团队组仅接受与冻结判据具有相同名称顺序和模式的快照，不兼容快照在执行前明确失败。复用 `--out` 会重新生成受管 `sections/`，不会夹带上次缺组或少选组的日志；不要在该目录存放输入文件。旧 Release 与 SOURCE 校验仍针对旧源码，不覆盖历史构建值。
+
+严格参考模式现须提供 `--reference-image`：实际磁盘 SHA256 必须同时匹配所选清单与构建 manifest，磁盘加入构件哈希和变化监视。strict capture 仅接受构建器打印的直接 QEMU 命令（固定 virt/1 GiB/1 hart/snapshot 布局），核对命令中的 kernel/initrd/drive 路径及选项后，以 argv 直接执行；不接受 shell 包装、额外挂盘或路径错配。普通 capture 仍支持自定义命令与声明构件。
+
+严格日志回放也要提供磁盘；它核对当前磁盘和构件内容，`reference_command_verified` 为 false，不表示重新执行或独立证明历史命令。历史完整证据仍需保留当时的采集记录。缺盘、错盘不能获得严格通过。
+
+回放日志不得与 summary.json/summary.md 重叠，包括硬链接和符号链接别名；受管输出不得指向执行输入。唯一允许的原地模式是普通文件 `--log <out>/serial.log`，成功输出仍保留完全相同的字节。
+
+受管输出别名在启动前和落盘前分别检查；采集命令运行期间新建的输出符号链接同样被拒绝，不能借输出写入覆盖原始输入。

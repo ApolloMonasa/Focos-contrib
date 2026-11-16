@@ -215,13 +215,18 @@ class RunnerSafetyTests(unittest.TestCase):
             from inventory import load_inventory, REFERENCE_LOCK, digest
             inventory = load_inventory()
             lock = json.loads(REFERENCE_LOCK.read_text())
+            image = root/'disk.img'
+            image.write_bytes(b'synthetic disk')
+            inventory['image']['uncompressed_sha256'] = digest(image)
+            inventory_path = root/'inventory.json'
+            inventory_path.write_text(json.dumps(inventory))
             kernel, initramfs = root/'Image', root/'initramfs.gz'
             kernel.write_bytes(b'synthetic kernel')
             initramfs.write_bytes(b'synthetic initramfs')
             manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': True,
                         'inputs': {'image': inventory['image']['uncompressed_sha256'],
                                    'kernel_apk': lock['kernel']['sha256']},
-                        'inventory_sha256': digest(INVENTORY), 'reference_lock_sha256': digest(REFERENCE_LOCK),
+                        'inventory_sha256': digest(inventory_path), 'reference_lock_sha256': digest(REFERENCE_LOCK),
                         'selection': {'libcs': ['musl'], 'scripts': ['iperf_testcode.sh'],
                                       'release': lock['kernel']['release']},
                         'outputs': {'kernel_sha256': digest(kernel), 'initramfs_sha256': digest(initramfs)}}
@@ -230,7 +235,7 @@ class RunnerSafetyTests(unittest.TestCase):
             path.write_text(json.dumps(manifest))
             newline = b'\r\n' if data.startswith(b'REF_PROTOCOL 1\r\n') else b'\n'
             data = data.replace(b'REF_PROTOCOL 1'+newline, b'REF_PROTOCOL 1'+newline+f"REF_BUILD_ID {manifest['build_id']}".encode()+newline, 1)
-            extra = list(extra) + ['--reference-manifest', str(path), '--reference-artifacts', str(kernel), str(initramfs)]
+            extra = list(extra) + ['--inventory', str(inventory_path), '--reference-image', str(image), '--reference-manifest', str(path), '--reference-artifacts', str(kernel), str(initramfs)]
         log.write_bytes(data)
         out = root / 'out'
         cmd = [sys.executable, '-B', str(RUNNER), '--out', str(out),
@@ -386,14 +391,14 @@ class RunnerSafetyTests(unittest.TestCase):
         text = (out/'serial.log').read_bytes().decode()
         (root/'Image').write_bytes(b'changed')
         with self.assertRaisesRegex(ValueError, 'artifact hash'):
-            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text, load_inventory(), ['iperf'], 'musl')
+            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text, load_inventory(root/'inventory.json'), ['iperf'], 'musl', root/'inventory.json', image=root/'disk.img')
         (root/'Image').write_bytes(b'synthetic kernel')
         old = manifest['build_id']
         manifest['inputs_pinned'] = False
         manifest['build_id'] = build_identity(manifest)
         path.write_text(json.dumps(manifest))
         with self.assertRaisesRegex(ValueError, 'not the frozen inputs'):
-            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text.replace(old, manifest['build_id']), load_inventory(), ['iperf'], 'musl')
+            verify_manifest(path, [root/'Image', root/'initramfs.gz'], text.replace(old, manifest['build_id']), load_inventory(root/'inventory.json'), ['iperf'], 'musl', root/'inventory.json', image=root/'disk.img')
 
 
 
@@ -585,6 +590,101 @@ class RunnerSafetyTests(unittest.TestCase):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory() as tmp,patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(run_tests.main(['--capture-cmd','fake','--out',tmp,'--libc','musl']),2)
+
+    def test_log_cannot_alias_managed_summaries(self):
+        import run_tests,contextlib,io,os
+        for name in ['summary.json','summary.md']:
+            for hardlink in [False,True]:
+                with self.subTest(name=name,hardlink=hardlink),tempfile.TemporaryDirectory() as tmp:
+                    root=Path(tmp);out=root/'out';out.mkdir();source=out/name;source.write_bytes(self.complete())
+                    log=root/'input.log' if hardlink else source
+                    if hardlink: os.link(source,log)
+                    with contextlib.redirect_stderr(io.StringIO()),contextlib.redirect_stdout(io.StringIO()):
+                        code=run_tests.main(['--log',str(log),'--out',str(out),'--libc','musl','--group','iperf','--team-judge-dir',str(TEAM_DIR)])
+                    self.assertEqual(code,2)
+                    self.assertEqual(source.read_bytes(),self.complete())
+                    self.assertEqual(log.read_bytes(),self.complete())
+
+    def test_strict_capture_checks_declared_qemu_paths_and_no_extra_drives(self):
+        from reference_manifest import strict_qemu_command
+        import shlex
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);kernel=root/'Image';init=root/'init.gz';image=root/'disk.img'
+            args=['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                  '-bios','default','-kernel',str(kernel),'-initrd',str(init),'-append','console=ttyS0 rdinit=/init',
+                  '-drive',f'file={image},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0']
+            self.assertEqual(strict_qemu_command(shlex.join(args),[kernel,init],image),args)
+            for old,new in [(str(kernel),str(root/'wrong-kernel')), (str(init),str(root/'wrong-init')),
+                            (f'file={image},if=none,format=raw,id=x0',f'file={root}/wrong.img,if=none,format=raw,id=x0')]:
+                bad=[new if arg==old else arg for arg in args]
+                with self.subTest(new=new),self.assertRaises(ValueError): strict_qemu_command(shlex.join(bad),[kernel,init],image)
+            for extra in [['-drive','file=other.img'],[';','echo','ignored']]:
+                with self.assertRaises(ValueError):strict_qemu_command(shlex.join(args+extra),[kernel,init],image)
+
+    def test_reference_disk_replacement_or_missing_disk_is_not_accepted(self):
+        from reference_manifest import verify_manifest
+        from inventory import load_inventory
+        proc, data, out = self.invoke(self.reference(), ['--reference','strict'])
+        self.assertEqual(proc.returncode,0)
+        root=out.parent;image=root/'disk.img';inventory=root/'inventory.json'
+        args=[root/'build.manifest.json',[root/'Image',root/'initramfs.gz'],(out/'serial.log').read_text(),load_inventory(inventory),['iperf'],'musl',inventory]
+        with self.assertRaisesRegex(ValueError,'disk'):verify_manifest(*args)
+        image.write_bytes(b'other disk')
+        with self.assertRaisesRegex(ValueError,'disk'):verify_manifest(*args,image=image)
+
+    def test_inplace_serial_replay_preserves_exact_bytes(self):
+        import run_tests,contextlib,io
+        with tempfile.TemporaryDirectory() as tmp:
+            out=Path(tmp);raw=out/'serial.log';raw.write_bytes(self.complete())
+            with contextlib.redirect_stdout(io.StringIO()):
+                code=run_tests.main(['--log',str(raw),'--out',str(out),'--libc','musl','--group','iperf','--team-judge-dir',str(TEAM_DIR)])
+            self.assertEqual(code,0)
+            self.assertEqual(raw.read_bytes(),self.complete())
+
+    def test_strict_disk_changed_before_or_during_capture_never_passes(self):
+        import run_tests,contextlib,io,shlex
+        from unittest.mock import patch
+        for stage in ['before','during']:
+            proc,data,out=self.invoke(self.reference(),['--reference','strict']);root=out.parent
+            image=root/'disk.img';kernel=root/'Image';init=root/'initramfs.gz'
+            command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                               '-bios','default','-kernel',str(kernel),'-initrd',str(init),'-append','console=ttyS0 rdinit=/init',
+                               '-drive',f'file={image},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+            if stage=='before':image.write_bytes(b'replaced disk')
+            def capture(cmd,timeout):
+                self.assertIsInstance(cmd,list)
+                image.write_bytes(b'mutated while running')
+                return (out/'serial.log').read_bytes(),False,0
+            dest=root/'capture-out'
+            with self.subTest(stage=stage),patch.object(run_tests,'capture',side_effect=capture) as mocked,contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                code=run_tests.main(['--capture-cmd',command,'--out',str(dest),'--libc','musl','--group','iperf',
+                                     '--reference','strict','--reference-image',str(image),'--inventory',str(root/'inventory.json'),
+                                     '--reference-manifest',str(root/'build.manifest.json'),'--reference-artifacts',str(kernel),str(init),
+                                     '--team-judge-dir',str(TEAM_DIR)])
+            self.assertEqual(code,2 if stage=='before' else 1)
+            if stage=='before':mocked.assert_not_called()
+            else:
+                result=json.loads((dest/'summary.json').read_text())
+                self.assertEqual(result['groups'][0]['status'],'ENV_ERROR')
+                self.assertEqual(result['totals']['pass'],0)
+
+    def test_output_symlink_created_during_capture_cannot_overwrite_input(self):
+        import run_tests,contextlib,io
+        from unittest.mock import patch
+        for name in ['serial.log','summary.json','summary.md','sections']:
+            with self.subTest(name=name),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);out=root/'out';artifact=root/'kernel';artifact.write_bytes(b'original kernel')
+                external=root/'external';external.mkdir();(external/'keep').write_text('keep')
+                def capture(cmd,timeout):
+                    out.mkdir()
+                    (out/name).symlink_to(external if name=='sections' else artifact,target_is_directory=name=='sections')
+                    return self.complete(),False,0
+                with patch.object(run_tests,'capture',side_effect=capture),contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(artifact),'--out',str(out),
+                                        '--libc','musl','--group','iperf','--team-judge-dir',str(TEAM_DIR)])
+                self.assertEqual(code,2)
+                self.assertEqual(artifact.read_bytes(),b'original kernel')
+                self.assertEqual((external/'keep').read_text(),'keep')
 
 if __name__ == '__main__':
     unittest.main()

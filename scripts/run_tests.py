@@ -29,7 +29,7 @@ from pathlib import Path
 
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
-from reference_manifest import verify_manifest
+from reference_manifest import verify_manifest, strict_qemu_command
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -274,9 +274,9 @@ def judge_group(
     return result
 
 
-def capture(cmd: str, timeout: int) -> tuple[bytes, bool, int | None]:
+def capture(cmd: str | list[str], timeout: int) -> tuple[bytes, bool, int | None]:
     """超时关闭整个进程组，避免 QEMU/后代继续持有串口管道。"""
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+    proc = subprocess.Popen(cmd, shell=isinstance(cmd, str), stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, start_new_session=True)
     truncated = False
     try:
@@ -367,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--libc", required=True, choices=["musl", "glibc"])
     parser.add_argument("--reference", choices=["strict", "legacy"], help="严格新协议或显式回放未验证的旧环境")
     parser.add_argument('--capture-artifact', action='append', type=Path, default=[], help='被测内核/镜像等文件，可重复；普通 capture 必填')
+    parser.add_argument('--reference-image', type=Path, help='严格参考环境实际使用的磁盘镜像')
     parser.add_argument('--reference-manifest', type=Path)
     parser.add_argument('--reference-artifacts', nargs=2, metavar=('KERNEL', 'INITRAMFS'))
     parser.add_argument("--timeout", type=int, default=600, help="capture timeout in seconds")
@@ -382,14 +383,14 @@ def main(argv: list[str] | None = None) -> int:
     if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()):
         print('sections must be a real directory', file=sys.stderr)
         return 2
-    inputs = [Path(args.inventory)] + ([Path(args.log)] if args.log else []) + args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])] + ([args.reference_manifest] if args.reference_manifest else [])
+    inputs = ([args.reference_image] if args.reference_image else []) + [Path(args.inventory)] + ([Path(args.log)] if args.log else []) + args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])] + ([args.reference_manifest] if args.reference_manifest else [])
     if any(p.resolve().is_relative_to(sections_dir.resolve()) for p in inputs):
         print('input files cannot be stored in managed output sections', file=sys.stderr)
         return 2
     if args.capture_cmd and not (args.capture_artifact or args.reference_artifacts):
         print('capture requires --capture-artifact or --reference-artifacts', file=sys.stderr)
         return 2
-    artifact_paths = args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])]
+    artifact_paths = ([args.reference_image] if args.reference_image else []) + args.capture_artifact + [Path(p) for p in (args.reference_artifacts or [])]
     if any(not p.is_file() for p in artifact_paths):
         print('capture artifacts must be existing regular files', file=sys.stderr)
         return 2
@@ -446,9 +447,19 @@ def main(argv: list[str] | None = None) -> int:
     for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
         watched[p] = digest(p) if p.is_file() else None
     managed_files = [out_dir/name for name in ('serial.log', 'summary.json', 'summary.md')]
+    def aliases(a, b):
+        if a.resolve() == b.resolve(): return True
+        try: return a.samefile(b)
+        except OSError: return False
+    for p in inputs:
+        for target in managed_files:
+            inplace_log = args.log and p.resolve() == Path(args.log).resolve() == (out_dir/'serial.log').resolve() and target.name == 'serial.log'
+            if aliases(p, target) and not inplace_log:
+                print('input aliases managed output', file=sys.stderr)
+                return 2
     if any(p.is_symlink() for p in managed_files) or any(
             p.resolve().is_relative_to(sections_dir.resolve()) or
-            p.resolve() in {target.resolve() for target in managed_files} for p in watched):
+            any(aliases(p, target) for target in managed_files) for p in watched):
         print('managed output aliases an execution input or symlink', file=sys.stderr)
         return 2
     def changed_inputs():
@@ -461,13 +472,26 @@ def main(argv: list[str] | None = None) -> int:
             if current != original:
                 changed.append(str(path))
         return sorted(changed)
+    capture_command = args.capture_cmd
+    command_verified = False
+    if args.capture_cmd and (args.reference == 'strict' or args.reference_manifest):
+        try:
+            capture_command = strict_qemu_command(args.capture_cmd, args.reference_artifacts or [], args.reference_image)
+            manifest = json.loads(args.reference_manifest.read_text()) if args.reference_manifest else {}
+            image_hash = artifact_hashes.get(str(args.reference_image))
+            if image_hash != inventory['image']['uncompressed_sha256'] or image_hash != manifest.get('inputs', {}).get('image'):
+                raise ValueError('actual reference disk does not match frozen manifest')
+            command_verified = True
+        except (ValueError, OSError, TypeError) as exc:
+            print(f'invalid strict capture: {exc}', file=sys.stderr)
+            return 2
     truncated = False
     if args.log:
         raw_log = Path(args.log).read_bytes()
         log_label = str(Path(args.log))
         exit_code = None
     else:
-        raw_log, truncated, exit_code = capture(args.capture_cmd, args.timeout)
+        raw_log, truncated, exit_code = capture(capture_command, args.timeout)
         log_label = args.capture_cmd
 
     log_text = raw_log.decode('utf-8', errors='replace')
@@ -484,8 +508,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             if args.reference_manifest is None or args.reference_artifacts is None:
                 raise ValueError('strict reference requires --reference-manifest and --reference-artifacts KERNEL INITRAMFS')
+            if args.capture_cmd and not command_verified:
+                raise ValueError('strict capture command was not validated before execution')
             provenance = verify_manifest(args.reference_manifest, args.reference_artifacts, log_text,
-                                         inventory, selected, args.libc, inventory_path)
+                                         inventory, selected, args.libc, inventory_path, image=args.reference_image)
         except (ValueError, OSError, KeyError, TypeError) as exc:
             environment['status'] = 'ERROR'
             environment['errors'].append(str(exc))
@@ -555,12 +581,23 @@ def main(argv: list[str] | None = None) -> int:
         'log_sha256': hashlib.sha256(raw_log).hexdigest(),
         'environment': environment,
         'reference_provenance': provenance,
+        'reference_command_verified': command_verified,
         'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
         'log_error': log_error,
         'source_sha256': source_hashes,
         'judge_sha256': judge_hashes,
         'changed_inputs': changed,
     }
+    # 外部采集命令也可能新建别名；落盘前再次检查，不能只检查启动时的目录。
+    if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()) or any(p.is_symlink() for p in managed_files):
+        print('managed output changed into a symlink or non-directory', file=sys.stderr)
+        return 2
+    for p in list(watched) + inputs:
+        for target in managed_files:
+            inplace_log = args.log and p.resolve() == Path(args.log).resolve() == (out_dir/'serial.log').resolve() and target.name == 'serial.log' and p not in watched
+            if (aliases(p, target) and not inplace_log) or p.resolve().is_relative_to(sections_dir.resolve()):
+                print('managed output aliases input at write time', file=sys.stderr)
+                return 2
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / 'serial.log').write_bytes(raw_log)

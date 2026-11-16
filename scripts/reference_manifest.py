@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shlex
 
 from inventory import REFERENCE_LOCK, INVENTORY, digest
 
@@ -12,7 +13,37 @@ def build_identity(manifest):
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY):
+def strict_qemu_command(command, artifacts, image):
+    """严格采集仅允许构建器的直接 QEMU 命令，路径绑定后以 argv 执行。"""
+    if len(artifacts) != 2 or image is None:
+        raise ValueError('strict capture requires kernel, initramfs and reference image')
+    args = shlex.split(command)
+    if len(args) != 22 or Path(args[0]).name != 'qemu-system-riscv64':
+        raise ValueError('strict capture requires the direct builder QEMU command')
+    kernel, initramfs = [str(Path(p).resolve()) for p in artifacts]
+    disk = str(Path(image).resolve())
+    if ',' in disk:
+        raise ValueError('commas in reference disk paths are unsupported')
+    expected = [args[0], '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
+                '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', kernel,
+                '-initrd', initramfs, '-append', 'console=ttyS0 rdinit=/init',
+                '-drive', f'file={disk},if=none,format=raw,id=x0', '-device', 'virtio-blk-device,drive=x0']
+    normalized = list(args)
+    normalized[13] = str(Path(args[13]).resolve())
+    normalized[15] = str(Path(args[15]).resolve())
+    prefix, suffix = 'file=', ',if=none,format=raw,id=x0'
+    if not args[19].startswith(prefix) or not args[19].endswith(suffix):
+        raise ValueError('strict capture disk format does not match builder command')
+    disk_argument = args[19][len(prefix):-len(suffix)]
+    if ',' in disk_argument:
+        raise ValueError('ambiguous QEMU drive path')
+    normalized[19] = f'file={Path(disk_argument).resolve()}{suffix}'
+    if normalized != expected:
+        raise ValueError('QEMU command paths/options do not match declared reference artifacts')
+    return args
+
+
+def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):
     manifest = json.loads(Path(path).read_text())
     if not isinstance(manifest, dict):
         raise ValueError('reference manifest must be an object')
@@ -34,6 +65,8 @@ def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_
         raise ValueError('reference inputs are not the frozen inputs')
     if manifest.get('inventory_sha256') != digest(inventory_path) or manifest.get('reference_lock_sha256') != digest(REFERENCE_LOCK):
         raise ValueError('reference input lock changed since build')
+    if image is None or digest(Path(image)) != manifest['inputs']['image']:
+        raise ValueError('actual reference disk hash does not match manifest')
     selection = manifest['selection']
     if (len(artifacts) != 2 or not isinstance(selection.get('libcs'), list) or not selection['libcs'] or
             any(c not in ('musl', 'glibc') for c in selection['libcs']) or
@@ -51,4 +84,4 @@ def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_
         if digest(Path(artifact)) != manifest['outputs'][key]:
             raise ValueError('reference artifact hash mismatch: ' + key)
     return {'manifest_sha256': digest(Path(path)),
-            'build_id': manifest['build_id'], 'inputs_pinned': True}
+            'build_id': manifest['build_id'], 'inputs_pinned': True, 'image_sha256': manifest['inputs']['image']}
