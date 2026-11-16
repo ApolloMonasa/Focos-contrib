@@ -22,6 +22,8 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。页表、用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
+本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
+
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
@@ -68,7 +70,7 @@ Focos/
 │       │   ├── boot_check.rs          # 启动时整页写读、释放后再分配与测试页清理
 │       │   └── boot_check/            # 启动页读写检查的开发机验证
 │       │       └── tests.rs           # 页内容、回收与读回错误测试
-│       ├── hal.rs                     # 供内核调用的早期输出和关机接口
+│       ├── hal.rs                     # 内核使用的控制台、关机、本核中断与自检接口
 │       ├── platform/                  # 板级资源、加载布局与启动装配
 │       │   ├── mod.rs                 # 统一导出当前板型接口
 │       │   └── qemu_riscv64/          # QEMU virt 固定配置
@@ -79,11 +81,13 @@ Focos/
 │       │           └── tests.rs       # 保留区、地址边界与标记容量测试
 │       └── arch/                      # 与 CPU 架构相关的实现
 │           ├── mod.rs                 # 选择目标架构并导出接口
-│           └── riscv64/               # RISC-V 启动与 SBI 实现
+│           └── riscv64/               # RISC-V 启动、SBI 与中断开关
 │               ├── entry.S            # 设置栈、清理 BSS 并进入 Rust
+│               ├── irq.rs             # 保存/关闭/恢复 sstatus.SIE 与编译器屏障
+│               ├── irq_check.rs       # QEMU 单层/嵌套中断状态自检
 │               └── mod.rs             # 调用 SBI 输出字符和关机
 ├── specs/                             # 接口行为与验收条件
-│   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（草案）
+│   ├── ARCH-001.md                    # CPU 机制与架构 ABI 边界（本核临界区已实现，待审阅）
 │   ├── PLAT-001.md                    # 板型选择、启动资源与装配（草案）
 │   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
@@ -96,8 +100,9 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
-│   ├── smoke.py                       # 检查 QEMU 启动与真实页读写结果
+│   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
+│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
@@ -116,6 +121,7 @@ Focos/
 │   └── reference/                     # 按需查阅的技术细节
 │       ├── delivery-details.md        # 模块接口与兼容风险
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
+│       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
@@ -126,7 +132,7 @@ Focos/
 │   ├── pull_request_template.md       # 改动、验证与限制
 │   ├── main-protection.json           # main 分支保护的可复用配置
 │   └── workflows/                     # GitHub Actions 工作流
-│       └── ci.yml                     # PR 与 main 的构建、启动和真实页检查
+│       └── ci.yml                     # PR 与 main 的构建、启动、内存与中断检查
 ├── .gitignore                         # Git 忽略规则
 ├── Cargo.toml                         # Rust 工作区与构建配置
 ├── Cargo.lock                         # 锁定 Cargo 依赖版本
