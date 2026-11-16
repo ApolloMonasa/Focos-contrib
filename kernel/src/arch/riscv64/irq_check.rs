@@ -31,25 +31,36 @@ pub enum IrqCheckError {
 ///
 /// 自检只切换 `sstatus.SIE`，不接入定时器或外部中断源，因此不能替代
 /// ARCH-001 的待处理定时中断验收。
-pub fn check_local_irq_state() -> Result<(), IrqCheckError> {
+///
+/// # Safety
+/// 仅供当前 hart 独占的启动流程调用。调用期间 `sie` 必须始终为 0，
+/// 不得由其他代码启用中断源；本函数会临时置位 SIE，不能在仅清除 SIE、
+/// 仍保留已启用中断源的运行期临界区中调用。返回时 SIE 为 0，不恢复入口状态。
+pub unsafe fn check_local_irq_state() -> Result<(), IrqCheckError> {
     if local_irqs_enabled() {
         // SAFETY: 只清除 SIE；返回前恢复本函数承诺的关闭中断状态。
         unsafe { set_local_irqs_enabled(false) };
         return Err(IrqCheckError::InitialStateEnabled);
     }
 
-    check_single(false)?;
-    check_single(true)?;
-    check_nested(false)?;
-    check_nested(true)?;
+    // SAFETY: 调用者保证启动流程独占当前 hart，且整个自检期间 sie 为 0。
+    unsafe {
+        check_single(false)?;
+        check_single(true)?;
+        check_nested(false)?;
+        check_nested(true)?;
+    }
 
     expect_state("final", false)
 }
 
 /// 验证单层闭包只执行一次、返回原值，并在退出后恢复进入前的 SIE。
-fn check_single(initial: bool) -> Result<(), IrqCheckError> {
+///
+/// # Safety
+/// 与 `check_local_irq_state` 相同：启动流程独占当前 hart，调用期间 sie 始终为 0。
+unsafe fn check_single(initial: bool) -> Result<(), IrqCheckError> {
     let scenario = if initial { "single-on" } else { "single-off" };
-    // SAFETY: 启动流程尚未设置 sie，切换 SIE 不会触发中断；自检在返回前恢复关闭。
+    // SAFETY: 调用者保证 sie 始终为 0，切换 SIE 不会触发中断；返回前恢复关闭。
     unsafe { set_local_irqs_enabled(initial) };
     let result = (|| {
         expect_state(scenario, initial)?;
@@ -74,9 +85,12 @@ fn check_single(initial: bool) -> Result<(), IrqCheckError> {
 }
 
 /// 验证两层闭包只各执行一次、内层返回原值，且内层退出后仍关闭、外层退出恢复原态。
-fn check_nested(initial: bool) -> Result<(), IrqCheckError> {
+///
+/// # Safety
+/// 与 `check_local_irq_state` 相同：启动流程独占当前 hart，调用期间 sie 始终为 0。
+unsafe fn check_nested(initial: bool) -> Result<(), IrqCheckError> {
     let scenario = if initial { "nested-on" } else { "nested-off" };
-    // SAFETY: 启动流程尚未设置 sie，切换 SIE 不会触发中断；自检在返回前恢复关闭。
+    // SAFETY: 调用者保证 sie 始终为 0，切换 SIE 不会触发中断；返回前恢复关闭。
     unsafe { set_local_irqs_enabled(initial) };
     let result = (|| {
         expect_state(scenario, initial)?;

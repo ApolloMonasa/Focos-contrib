@@ -43,6 +43,10 @@ unsafe { asm!("csrsi sstatus, 2", options(nomem, nostack)); }
 
 [启动自检](../../kernel/src/arch/riscv64/irq_check.rs)依次验证初态开/关与单层/两层闭包，核对每次读到的 SIE、闭包执行次数和返回值。启动流程经 HAL 入口调用；`make irq-smoke` 在 QEMU 中运行，要求 `FOCOS_IRQ_OK` 唯一出现且在 `FOCOS_BOOT_OK` 之前；日志写入 `target/evidence/irq-qemu-rv.log`。
 
+自检入口为 `pub unsafe fn check_local_irq_state() -> Result<(), IrqCheckError>`，其单层/嵌套辅助函数也要求相同的启动期前提。调用方须保证启动流程独占当前 hart、整个调用期间 `sie` 始终为 0。`kernel_main` 的唯一调用点依据 `entry.S` 清零 `sie`、后续尚未启用中断源满足前提；仅有 SIE 为 0 不足以安全调用。成功和错误返回均保持 SIE 为 0；若入口 SIE 已开，先关闭再返回 `InitialStateEnabled`。
+
+[调用方编译测试](../../scripts/test_irq_api.py)随 `make test` 执行：从本次 Cargo 构建产物取真实 RISC-V 库，分别通过 HAL 和架构层编译调用方。普通调用必须报 E0133，显式 `unsafe` 调用与安全的普通临界区调用必须可编译；不运行裸机代码。修复前两个导出的普通调用都编译成功，新增回归测试失败。
+
 实现前先加入自检，`make build` 因缺少 `irq` 模块失败；实现后通过。另做过两次临时变异核对测试有效性：
 
 - 去掉关中断（只读取 SIE 作为保存值，不执行 `csrrc`）：`single-on` 在闭包内的状态检查报告 `expected: false, actual: true` 并 panic。
@@ -54,7 +58,7 @@ unsafe { asm!("csrsi sstatus, 2", options(nomem, nostack)); }
 
 - 闭包不得阻塞、让出 CPU、迁移到其他核或自行修改中断状态。
 - 只屏蔽当前 hart 的可屏蔽中断，不提供跨核互斥。
-- 入口汇编已清 `sie`；自检只在没有已启用中断源时短暂切换 SIE，返回前恢复关闭。
+- 入口汇编已清 `sie`；自检的 `unsafe` 调用方须保证整个调用期间 `sie` 为 0，返回前保持 SIE 关闭。
 - 内核 panic 的终止路径不承诺恢复后继续运行。
 - 真实定时中断验收仍须与 #2/#5 的 QEMU 时钟/异常入口联调；本次未实现，Issue #35 保持开放。
 - QEMU 结果不代表真板。

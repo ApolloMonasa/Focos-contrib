@@ -20,7 +20,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支已实现 [MM-001](specs/MM-001.md) 的页分配、回收与错误处理，并按 [MM-002](specs/MM-002.md) 接入 QEMU 真实内存，完成整页写入、读回、释放和再次分配。运行 `make test` 验证开发机行为，`make mm-smoke` 验证 QEMU 内存自检。页表、用户映射与真板内存接入尚未实现，本阶段仍待队友审阅与验收。
 
-本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
+本分支新增可嵌套的本核临界区 `with_local_irqs_disabled`：保存并恢复 RISC-V `sstatus.SIE`，闭包只执行一次并透传返回值。单层/两层与初态开/关由 `make irq-smoke` 的 QEMU 状态自检核对；自检入口为仅限启动期的 `unsafe` 接口，`make test` 编译调用方验证此边界。编译器屏障的静态审阅和负例见[参考页](docs/reference/local-irq-critical-section.md)。真实定时中断屏蔽仍待 #2/#5 的时钟与异常入口联调。
 
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
 
@@ -96,6 +96,7 @@ Focos/
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
+│   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单

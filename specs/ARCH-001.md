@@ -20,6 +20,8 @@
 
 先写下表的状态测试，再接架构指令。后续页表/上下文各自拆专项 SPEC；不要在同一任务中实现全部架构接口。RISC-V 的状态自检、编译器屏障审阅与 QEMU 证据见[实现参考页](../docs/reference/local-irq-critical-section.md)；真实定时中断验收仍待 #2/#5。
 
+启动自检 `unsafe fn check_local_irq_state() -> Result<(), IrqCheckError>` 会主动切换 SIE。调用方必须保证启动流程独占当前 hart，整个调用期间 `sie` 始终为 0；仅关闭 SIE 的运行期临界区不满足前提。无论返回成功或错误，SIE 均为 0；入口 SIE 为 1 时清零并返回 `InitialStateEnabled`。HAL 与架构层导出均保留 `unsafe` 要求，`make test` 用真实 RISC-V 库编译调用方：普通调用报 E0133，显式 `unsafe` 调用可编译。
+
 ## 怎样验收
 
 下列是验收门槛；本 PR 已新增 RISC-V 本核临界区的 `make irq-smoke` 状态自检，其余行仍待对应实现。

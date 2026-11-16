@@ -71,8 +71,8 @@ unsafe fn disable_local_irqs() -> usize {
 /// 按保存值恢复 SIE；只写 SIE 位，避免覆盖其他 sstatus 位。
 ///
 /// # Safety
-/// `saved` 必须来自同一 hart 上成对的 `disable_local_irqs`，且中间没有
-/// 其他代码修改 sstatus；调用者须先完成受保护访存。
+/// `saved` 必须来自同一 hart 上按嵌套调用栈配对的 `disable_local_irqs`；
+/// 调用者须先完成受保护访存，且闭包未自行修改中断状态。
 #[inline]
 unsafe fn restore_local_irqs(saved: usize) {
     if saved & SSTATUS_SIE != 0 {
