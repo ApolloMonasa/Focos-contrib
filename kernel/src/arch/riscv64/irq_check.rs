@@ -33,6 +33,8 @@ pub enum IrqCheckError {
 /// ARCH-001 的待处理定时中断验收。
 pub fn check_local_irq_state() -> Result<(), IrqCheckError> {
     if local_irqs_enabled() {
+        // SAFETY: 只清除 SIE；返回前恢复本函数承诺的关闭中断状态。
+        unsafe { set_local_irqs_enabled(false) };
         return Err(IrqCheckError::InitialStateEnabled);
     }
 

@@ -99,7 +99,8 @@ unsafe fn restore_local_irqs(saved: usize) {
 /// 仅供启动自检切换 SIE 初始状态；不用于生产临界区。
 ///
 /// # Safety
-/// 只能在尚未启用任何中断源、且调用者会在返回前恢复关闭状态时调用。
+/// `enabled = true` 只能在尚未启用任何中断源时调用；`enabled = false`
+/// 只清除 SIE，可在任何上下文调用。
 #[inline]
 pub(super) unsafe fn set_local_irqs_enabled(enabled: bool) {
     if enabled {
