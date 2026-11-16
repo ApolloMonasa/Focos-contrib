@@ -119,3 +119,7 @@ strict capture 还会解析 QEMU 的实际可执行文件，先取 SHA256，运�
 构建器在处理镜像/APK 前固定 builder、inventory.py、reference_manifest.py、清单与锁的身份；重操作后、发布 manifest 前复查源码和输入。输出不能覆盖这些源码/配置或其硬链接。清单与锁从同一字节快照解析、计算哈希，避免归因到后来编辑的版本。
 
 原生 --log 输出现在包含 mode=replay、replayed_at 和 replayed_from（路径与原始字节哈希），不写 captured_at。真实 capture 才记录 captured_at；旧包的包装回放仍按其冻结 SOURCE 解释。脚本非零退出仅覆盖可判分状态，judge 缺失、崩溃或非法输出仍为 JUDGE_ERROR。
+
+新构建使用 schema 2 manifest。构建 ID 同时包含实际内核 SHA256，以及 initramfs 解压后整份 newc 归档的 SHA256；后者仅将 `/init` 中唯一的 64 位 ID 字段归零，避免自引用，其他文件、脚本和元数据不变。严格回放重新解析实际 initramfs 并计算该值，同时核对归档里的 ID；仅改写 `outputs` 不能让旧日志通过新构件校验。重名路径、路径别名、非普通文件/目录、硬链接、截断和尾随归档均拒绝。压缩文件本身另以 `outputs.initramfs_sha256` 校验。
+
+schema 1 的归档和记录保留原样，但不能声明 schema 2 的严格身份保证；重测请重新构建，历史对照可使用明确标为未验证的 legacy 回放。构建输出和 runner 的受管输出都检查彼此的路径/inode 冲突，拒绝复用目录中的硬链接覆盖。

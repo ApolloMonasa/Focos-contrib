@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import os
-import os
 import subprocess
 import sys
 import tempfile
@@ -212,7 +211,9 @@ class RunnerSafetyTests(unittest.TestCase):
         if data.startswith(b'REF_PROTOCOL 1'):
             import hashlib
             sys.path.insert(0, str(ROOT/'scripts'))
-            from reference_manifest import build_identity
+            import gzip
+            from reference_manifest import build_identity, initramfs_payload_sha256
+            from ref.build_initramfs import archive_bytes
             from inventory import load_inventory, REFERENCE_LOCK, digest
             inventory = load_inventory()
             lock = json.loads(REFERENCE_LOCK.read_text())
@@ -223,15 +224,20 @@ class RunnerSafetyTests(unittest.TestCase):
             inventory_path.write_text(json.dumps(inventory))
             kernel, initramfs = root/'Image', root/'initramfs.gz'
             kernel.write_bytes(b'synthetic kernel')
-            initramfs.write_bytes(b'synthetic initramfs')
-            manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': True,
+            placeholder='0'*64
+            init=b'#!/busybox sh\n/busybox echo REF_BUILD_ID '+placeholder.encode()+b'\n'
+            files={'init':(0o100755,init),'busybox':(0o100755,b'synthetic busybox')}
+            manifest = {'schema_version': 2, 'protocol': 1, 'inputs_pinned': True,
                         'inputs': {'image': inventory['image']['uncompressed_sha256'],
                                    'kernel_apk': lock['kernel']['sha256']},
                         'inventory_sha256': digest(inventory_path), 'reference_lock_sha256': digest(REFERENCE_LOCK),
                         'selection': {'libcs': ['musl'], 'scripts': ['iperf_testcode.sh'],
                                       'release': lock['kernel']['release']},
-                        'outputs': {'kernel_sha256': digest(kernel), 'initramfs_sha256': digest(initramfs)}}
+                        'content': {'kernel_sha256':digest(kernel),'initramfs_payload_sha256':initramfs_payload_sha256(archive_bytes(files),placeholder)}}
             manifest['build_id'] = build_identity(manifest)
+            files['init']=(0o100755,init.replace(placeholder.encode(),manifest['build_id'].encode()))
+            initramfs.write_bytes(gzip.compress(archive_bytes(files),mtime=0))
+            manifest['outputs']={'kernel_sha256':digest(kernel),'initramfs_sha256':digest(initramfs)}
             path = root/'build.manifest.json'
             path.write_text(json.dumps(manifest))
             newline = b'\r\n' if data.startswith(b'REF_PROTOCOL 1\r\n') else b'\n'
@@ -738,6 +744,82 @@ class RunnerSafetyTests(unittest.TestCase):
             self.assertEqual(info['version'],'QEMU emulator version test')
             binary.write_text('#!/bin/sh\necho "# changed" >> "$0"\necho "QEMU emulator version test"\n')
             with self.assertRaises(ValueError):qemu_identity(str(alias))
+
+    def test_old_log_cannot_be_paired_with_different_artifacts_and_updated_manifest(self):
+        from reference_manifest import verify_manifest, build_identity
+        from inventory import load_inventory, digest
+        for artifact in ['Image','initramfs.gz']:
+            for rewrite_content in [False,True]:
+                with self.subTest(artifact=artifact,rewrite_content=rewrite_content):
+                    proc,data,out=self.invoke(self.reference(),['--reference','strict'])
+                    self.assertEqual(proc.returncode,0)
+                    root=out.parent;path=root/'build.manifest.json';manifest=json.loads(path.read_text())
+                    changed=root/artifact;changed.write_bytes(changed.read_bytes()+b'changed artifact')
+                    key='kernel_sha256' if artifact=='Image' else 'initramfs_sha256'
+                    manifest['outputs'][key]=digest(changed)
+                    if rewrite_content and 'content' in manifest:
+                        manifest['content'][key if artifact=='Image' else 'initramfs_payload_sha256']=digest(changed)
+                        manifest['build_id']=build_identity(manifest)
+                    path.write_text(json.dumps(manifest))
+                    with self.assertRaises(ValueError):
+                        verify_manifest(path,[root/'Image',root/'initramfs.gz'],(out/'serial.log').read_text(),
+                                        load_inventory(root/'inventory.json'),['iperf'],'musl',root/'inventory.json',image=root/'disk.img')
+
+    def test_truncated_section_retains_timeout_when_judge_fails(self):
+        import run_tests
+        from unittest.mock import patch
+        cfg={'kind':'team','judge_file':'judge_iperf.py','subcases':['one']}
+        cases=[run_tests.JudgeResult([], 'error', 'missing/crashed judge'),
+               run_tests.JudgeResult([{'name':'one','all':1,'pass':2}], 'ok'),
+               run_tests.JudgeResult([{'name':'one','all':1,'pass':1}]*2, 'ok')]
+        for judged in cases:
+            with self.subTest(judged=judged), patch.object(run_tests,'run_judge',return_value=judged):
+                result=run_tests.judge_group('iperf',run_tests.Section('iperf','musl',[],True),cfg,Path('.'),Path('.'),1)
+                self.assertEqual(result['status'],'TIMEOUT')
+                self.assertTrue(result['judge_error'])
+                self.assertTrue(all(sub['status']=='TIMEOUT' and sub['pass']==0 for sub in result['subcases']))
+        for contents in [None,'raise SystemExit(3)','print("not json")']:
+            with self.subTest(contents=contents),tempfile.TemporaryDirectory() as tmp:
+                if contents is not None:(Path(tmp)/'judge_iperf.py').write_text(contents)
+                raw=self.complete().replace(b'#### OS COMP TEST GROUP END iperf-musl ####\n',b'')
+                proc,data,_=self.invoke(raw,['--team-judge-dir',tmp])
+                self.assertEqual(proc.returncode,1)
+                self.assertEqual(data['groups'][0]['status'],'TIMEOUT')
+                self.assertTrue(data['groups'][0]['judge_error'])
+                self.assertFalse(data['meta']['execution_valid'])
+
+    def test_schema_one_manifest_cannot_claim_strict_artifact_binding(self):
+        from reference_manifest import verify_manifest,build_identity
+        from inventory import load_inventory
+        _,_,out=self.invoke(self.reference(),['--reference','strict'])
+        root=out.parent;path=root/'build.manifest.json';manifest=json.loads(path.read_text())
+        manifest['schema_version']=1;manifest.pop('content')
+        manifest['build_id']=build_identity(manifest);path.write_text(json.dumps(manifest))
+        with self.assertRaises(ValueError):
+            verify_manifest(path,[root/'Image',root/'initramfs.gz'],(out/'serial.log').read_text(),
+                            load_inventory(root/'inventory.json'),['iperf'],'musl',root/'inventory.json',image=root/'disk.img')
+
+    def test_managed_output_hardlinks_are_rejected_before_capture_and_before_write(self):
+        import run_tests,contextlib,io
+        from itertools import combinations
+        from unittest.mock import patch
+        for left,right in combinations(['serial.log','summary.json','summary.md'],2):
+            for stage in ['before','capture']:
+                with self.subTest(left=left,right=right,stage=stage),tempfile.TemporaryDirectory() as tmp:
+                    root=Path(tmp);out=root/'out';out.mkdir()
+                    def link():
+                        (out/left).write_bytes(b'preserve');os.link(out/left,out/right)
+                    if stage=='before':link()
+                    def capture(cmd,timeout):
+                        if stage=='before':self.fail('capture executed with colliding outputs')
+                        link()
+                        return self.complete(),False,0
+                    with patch.object(run_tests,'capture',side_effect=capture),contextlib.redirect_stderr(io.StringIO()),contextlib.redirect_stdout(io.StringIO()):
+                        code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',str(out),
+                                            '--libc','musl','--group','iperf','--team-judge-dir',str(TEAM_DIR)])
+                    self.assertEqual(code,2)
+                    self.assertEqual((out/left).read_bytes(),b'preserve')
+                    self.assertEqual((out/right).read_bytes(),b'preserve')
 
 if __name__ == '__main__':
     unittest.main()

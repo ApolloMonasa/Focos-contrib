@@ -1,6 +1,7 @@
 """实际执行生成的 shell（仅替换机器操作），验证失败边界和确定性归档。"""
 import contextlib
 import gzip
+import hashlib
 import importlib.util
 import io
 import json
@@ -121,6 +122,74 @@ class BuildTests(unittest.TestCase):
             with self.subTest(out=out),patch.object(build,'IMPLEMENTATION_FILES',{'builder_sha256':source}),self.assertRaisesRegex(ValueError,'overlap'):
                 self.invoke(out)
         self.assertEqual(source.read_bytes(),b'implementation')
+
+    def test_build_identity_changes_with_extracted_kernel_or_module_content(self):
+        baseline = self.root/'base/init.gz'
+        self.invoke(baseline)
+        old = json.loads(baseline.with_suffix('.manifest.json').read_text())['build_id']
+        original = build.extract_kernel_and_modules
+        for target in ['kernel', 'module']:
+            def extract(apk, release, kernel, modules, extra):
+                order = original(apk, release, kernel, modules, extra)
+                path = kernel if target == 'kernel' else modules/(order[0]+'.ko')
+                path.write_bytes(path.read_bytes()+b'changed payload')
+                return order
+            out = self.root/target/'init.gz'
+            with self.subTest(target=target), patch.object(build, 'extract_kernel_and_modules', side_effect=extract):
+                self.invoke(out)
+                changed = json.loads(out.with_suffix('.manifest.json').read_text())
+                self.assertNotEqual(old, changed['build_id'])
+
+    def test_output_hardlinks_are_rejected_before_any_write(self):
+        from itertools import combinations
+        for left, right in combinations(['Image','init.gz','init.manifest.json','modules/virtio.ko','modules/ext4.ko'],2):
+            with self.subTest(left=left,right=right), tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp)
+                a,b=root/left,root/right
+                a.parent.mkdir(parents=True,exist_ok=True);b.parent.mkdir(parents=True,exist_ok=True)
+                a.write_bytes(b'preserve');os.link(a,b)
+                with self.assertRaisesRegex(ValueError,'overlap'):
+                    self.invoke(root/'init.gz')
+                self.assertEqual(a.read_bytes(),b'preserve')
+                self.assertEqual(b.read_bytes(),b'preserve')
+
+
+class PayloadIdentityTests(unittest.TestCase):
+    def test_only_embedded_init_id_is_normalized_and_all_other_content_is_bound(self):
+        from reference_manifest import initramfs_payload_sha256
+        identity='a'*64
+        init=b'#!/busybox sh\n/busybox echo REF_BUILD_ID '+identity.encode()+b'\necho ready\n'
+        # 同形字串可出现在其他文件；不能从其内容中删去或归零。
+        files={'init':(0o100755,init),'lib/module.ko':(0o100644,init),'busybox':(0o100755,b'busybox')}
+        raw=build.archive_bytes(files)
+        normalized=dict(files);normalized['init']=(0o100755,init.replace(identity.encode(),b'0'*64))
+        expected=hashlib.sha256(build.archive_bytes(normalized)).hexdigest()
+        self.assertEqual(initramfs_payload_sha256(raw,identity),expected)
+        for name in files:
+            changed=dict(files);mode,data=files[name];changed[name]=(mode,data+b'# changed\n')
+            with self.subTest(name=name):
+                self.assertNotEqual(initramfs_payload_sha256(build.archive_bytes(changed),identity),expected)
+
+    def test_ambiguous_truncated_or_overlaid_cpio_cannot_claim_payload_identity(self):
+        from reference_manifest import initramfs_payload_sha256
+        identity='a'*64
+        init=b'#!/busybox sh\n/busybox echo REF_BUILD_ID '+identity.encode()+b'\n'
+        record=build.entry('init',0o100755,init,1)
+        trailer=build.entry('TRAILER!!!',0,b'',0)
+        raw=record+trailer
+        hardlink=raw[:38]+b'00000002'+raw[46:]
+        invalid=[b'',raw[:109],raw[:-1],raw+raw,record+record+trailer,hardlink,
+                 raw[:54]+b'ffffffff'+raw[62:],raw[:94]+b'ffffffff'+raw[102:],
+                 raw[:115]+b'x'+raw[116:],
+                 build.entry('init',0o120777,init,1)+trailer,
+                 build.entry('init',0o100755,init+init,1)+trailer,
+                 build.entry('init',0o100755,b'no ID',1)+trailer]
+        invalid += [build.entry(alias,0o100755,init,1)+trailer for alias in ['./init','/init','a/../init']]
+        for blob in invalid:
+            with self.subTest(blob=blob[:40]),self.assertRaises(ValueError):
+                initramfs_payload_sha256(blob,identity)
+        with self.assertRaisesRegex(ValueError,'identity'):
+            initramfs_payload_sha256(raw,'b'*64)
 
 
 class InitTests(unittest.TestCase):

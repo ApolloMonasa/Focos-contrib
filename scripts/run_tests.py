@@ -222,14 +222,15 @@ def judge_group(
     else:
         judged = run_judge(judge_path, section.text, judge_timeout)
     result["judge_source"] = cfg.get("kind", "unknown")
-    if judged.error:
-        result["status"] = "JUDGE_ERROR"
-        result["judge_error"] = judged.error
-        result["subcases"] = [
-            {"name": n, "status": "JUDGE_ERROR", "all": 1, "pass": 0, "score": 0.0}
-            for n in expected
-        ]
+    def judge_error(message):
+        result['status'] = 'TIMEOUT' if section.truncated else 'JUDGE_ERROR'
+        result['judge_error'] = message
+        result['subcases'] = [
+            {'name': name, 'status': result['status'], 'all': 1, 'pass': 0, 'score': 0.0}
+            for name in expected]
         return result
+    if judged.error:
+        return judge_error(judged.error)
 
     by_name = {}
     try:
@@ -239,12 +240,7 @@ def judge_group(
                 raise ValueError('duplicate judge name: ' + name)
             by_name[name] = {'all': all_count, 'pass': passed, 'score': score}
     except (ValueError, TypeError, OverflowError) as exc:
-        result['status'] = 'JUDGE_ERROR'
-        result['judge_error'] = str(exc)
-        result['subcases'] = [
-            {'name': name, 'status': 'JUDGE_ERROR', 'all': 1, 'pass': 0, 'score': 0.0}
-            for name in expected]
-        return result
+        return judge_error(str(exc))
 
     subcases = []
     for name in expected:
@@ -476,6 +472,12 @@ def main(argv: list[str] | None = None) -> int:
         if a.resolve() == b.resolve(): return True
         try: return a.samefile(b)
         except OSError: return False
+    def managed_outputs_overlap():
+        from itertools import combinations
+        return any(aliases(a,b) for a,b in combinations(managed_files,2))
+    if managed_outputs_overlap():
+        print('managed output paths overlap',file=sys.stderr)
+        return 2
     for p in inputs:
         for target in managed_files:
             inplace_log = args.log and p.resolve() == Path(args.log).resolve() == (out_dir/'serial.log').resolve() and target.name == 'serial.log'
@@ -596,7 +598,8 @@ def main(argv: list[str] | None = None) -> int:
         'reference_provenance': provenance,
         'reference_command_verified': command_verified,
         'qemu': qemu,
-        'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
+        'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED' and not any(
+            section.truncated for (group,libc),section in sections.items() if group in selected and libc == args.libc),
         'log_error': log_error,
         'source_sha256': source_hashes,
         'judge_sha256': judge_hashes,
@@ -610,8 +613,8 @@ def main(argv: list[str] | None = None) -> int:
         meta['replayed_from'] = {'path': str(Path(args.log)), 'sha256': meta['log_sha256']}
 
     # 外部采集命令也可能新建别名；落盘前再次检查，不能只检查启动时的目录。
-    if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()) or any(p.is_symlink() for p in managed_files):
-        print('managed output changed into a symlink or non-directory', file=sys.stderr)
+    if sections_dir.is_symlink() or (sections_dir.exists() and not sections_dir.is_dir()) or any(p.is_symlink() for p in managed_files) or managed_outputs_overlap():
+        print('managed outputs overlap or changed into a symlink/non-directory', file=sys.stderr)
         return 2
     for p in list(watched) + inputs:
         for target in managed_files:

@@ -1,0 +1,82 @@
+{
+  "kind": "schema2_content_bound_identity",
+  "test001_tests_passed": 78,
+  "historical_replays_matched": 15,
+  "old_implementation_regression_failures": 25,
+  "additional_truncation_validity_failures": 3,
+  "deterministic_rebuild": {
+    "different_directories_and_filenames": true,
+    "kernel_bytes_equal": true,
+    "initramfs_bytes_equal": true,
+    "manifests_equal": true
+  },
+  "schema_version": 2,
+  "build_id": "ae84f5e2bc50544f7bbb6870462b46bd021fa30b4fcbee77c270e7c692246afd",
+  "content": {
+    "initramfs_payload_sha256": "63d227d77d00883244ef3202004312ce54c282a6977e264a8fbb9c0d397befd1",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "outputs": {
+    "initramfs_sha256": "ca788e77f2a1e4634fa2719bed72f5b06e06c24f0eb8c840dc5ec71761bd91fc",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "runs": [
+    {
+      "libc": "glibc",
+      "mode": "capture",
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    },
+    {
+      "libc": "musl",
+      "mode": "replay",
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    }
+  ],
+  "evidence_sha256": {
+    "schema2-lua/build.manifest.json": "3edb6a145290918db6e9f94e76e7ad8db7ff8f0cf08a70c0fea6aa6f6f9e69aa",
+    "schema2-lua/capture.summary.json": "a424cad9bb84317257e8b4dd159a8e2f94a816c1255ffc8bc721afdd07fbddd1",
+    "schema2-lua/replay.summary.json": "2a5e082fc9a333592662099084c138bd81d38cd24e650aa229770915da6ab696",
+    "schema2-lua/serial.log": "ec5db4339ee2576c276dbe760c7000106138231f394cc988be2bd780cb4d1019"
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "2ac98abcddc8b0e21ecff43e9542e35b3791151994b1c05a50d58b3dbbafef75",
+    "scripts/reference_manifest.py": "5a6063a47bd8cee502920df14239c31e64342b92aae3bd3207da0e712f11af7a",
+    "scripts/ref/build_initramfs.py": "05c1c7b4a66153d0ae91268f7d09f602054ecbe77e01efc1854c48046a9c2adf"
+  },
+  "limits": [
+    "Only Lua was newly captured; musl is replayed from the same dual-libc capture.",
+    "Earlier archives are unchanged; schema 1 cannot claim schema 2 strict identity."
+  ]
+}

@@ -143,6 +143,8 @@ Focos/
 │   │       ├── unresolved-fixes.json   # 模块依赖核实、实际启动与本轮证据
 │   │       ├── disk-binding.json       # strict 磁盘绑定及输出别名的修复证据
 │   │       └── runtime-identity.json   # QEMU 身份、构建快照及回放时间证据
+│   │       └── payload-binding.json       # schema 2 内容身份、双构建与回归验证
+│   │       └── schema2-lua/               # 新协议原始串口、manifest 与采集/回放摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

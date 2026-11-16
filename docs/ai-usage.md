@@ -61,3 +61,5 @@
 2026-11-16，PR #29 再次按负责人要求处理 unresolved：补 actual disk 与 strict QEMU argv 的绑定，并把所有输入纳入受管摘要别名检查（含硬链接）。65 项专项及原有完整工程回归、15 份历史回放通过；实际冻结磁盘重新 strict 启动，双 libc Lua 9/9。回放不冒充新采集，旧归档不覆盖，证据见 disk-binding.json；仍需人工复审。
 
 2026-11-16，按负责人要求处理新四项 unresolved，并在修复后触发 @codex review：固定 strict QEMU 可执行文件身份、构建开始时的实现/输入快照，保留 JUDGE_ERROR，原生区分采集与回放时间。70 项专项与原有完整回归、15 份历史回放通过；真实重建与 strict QEMU 采集双 libc Lua 9/9，证据见 runtime-identity.json。旧证据保留，新评审结果以 PR 为准。
+
+- 2026-11-16：按用户要求触发新 Codex 评审并继续处理四项新意见。将构建身份改为 schema 2，绑定实际内核和仅归零嵌入 ID 的完整 cpio payload，严格解析拒绝歧义归档；修复输出之间硬链接冲突与截断/判分错误优先级，额外修复 execution_valid。新增负例先失败，78 项专项及工程/历史检查通过；双目录重建完全一致，真实 Lua glibc 采集及同日志 musl 回放各 9/9，原始证据入库。推送后再请求 @codex review；人工批准仍由队友完成。

@@ -1,5 +1,6 @@
 """把参考输入、构建身份、实际构件和串口协议绑定，拒绝未冻结实验输入。"""
 import hashlib
+import gzip
 import json
 from pathlib import Path
 import re
@@ -7,6 +8,7 @@ import shlex
 import shutil
 import subprocess
 import os
+import zlib
 
 from inventory import REFERENCE_LOCK, INVENTORY, digest
 
@@ -14,6 +16,51 @@ from inventory import REFERENCE_LOCK, INVENTORY, digest
 def build_identity(manifest):
     payload = {key: value for key, value in manifest.items() if key not in ('build_id', 'outputs')}
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def initramfs_payload_sha256(raw, build_id):
+    """只归零 newc 中 /init 的嵌入 ID，其余字节（含元数据）全部绑定。
+
+    仅接受构建器的单一 newc 归档；拒绝重名、路径别名、硬链接、尾随归档和截断。
+    不能对整个二进制做字符串替换：模块或 busybox 中可能也包含同形文本。
+    """
+    offset, names, identity_span = 0, set(), None
+    while True:
+        header = raw[offset:offset+110]
+        if not re.fullmatch(rb'070701[0-9a-fA-F]{104}', header):
+            raise ValueError('invalid/truncated initramfs newc header')
+        fields = [int(header[i:i+8],16) for i in range(6,110,8)]
+        _, mode, _, _, nlink, _, size, _, _, _, _, name_size, checksum = fields
+        name_start = offset+110
+        name_end = name_start+name_size
+        data_start = (name_end+3) & ~3
+        data_end = data_start+size
+        following = (data_end+3) & ~3
+        if (name_size < 1 or following > len(raw) or raw[name_end-1:name_end] != b'\0' or
+                b'\0' in raw[name_start:name_end-1] or checksum or nlink != 1 or
+                any(raw[name_end:data_start]) or any(raw[data_end:following])):
+            raise ValueError('invalid/truncated initramfs newc entry')
+        name = raw[name_start:name_end-1]
+        if name == b'TRAILER!!!':
+            if size or following != len(raw) or identity_span is None:
+                raise ValueError('invalid initramfs trailer, tail or missing init')
+            break
+        if (not re.fullmatch(rb'[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*', name) or
+                any(part in (b'.',b'..') for part in name.split(b'/')) or name in names or
+                mode & 0o170000 not in (0o100000,0o040000) or
+                (mode & 0o170000 == 0o040000 and size)):
+            raise ValueError('unsupported/duplicate initramfs path or entry')
+        names.add(name)
+        if name == b'init':
+            if mode != 0o100755:
+                raise ValueError('initramfs init must be an executable regular file')
+            matches = list(re.finditer(rb'^/busybox echo REF_BUILD_ID ([0-9a-f]{64})$',raw[data_start:data_end],re.M))
+            if len(matches) != 1 or matches[0][1] != build_id.encode('ascii'):
+                raise ValueError('initramfs embedded build identity mismatch')
+            identity_span = (data_start+matches[0].start(1),data_start+matches[0].end(1))
+        offset = following
+    start, end = identity_span
+    return hashlib.sha256(raw[:start]+b'0'*64+raw[end:]).hexdigest()
 
 
 def strict_qemu_command(command, artifacts, image):
@@ -72,9 +119,9 @@ def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_
     manifest = json.loads(Path(path).read_text())
     if not isinstance(manifest, dict):
         raise ValueError('reference manifest must be an object')
-    if any(not isinstance(manifest.get(key), dict) for key in ('inputs', 'selection', 'outputs')):
+    if any(not isinstance(manifest.get(key), dict) for key in ('inputs', 'selection', 'outputs', 'content')):
         raise ValueError('invalid reference manifest fields')
-    if manifest.get('schema_version') != 1 or manifest.get('protocol') != 1:
+    if manifest.get('schema_version') != 2 or manifest.get('protocol') != 1:
         raise ValueError('unsupported reference manifest')
     if manifest.get('build_id') != build_identity(manifest):
         raise ValueError('reference build identity mismatch')
@@ -108,5 +155,14 @@ def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_
     for artifact, key in zip(artifacts, ['kernel_sha256', 'initramfs_sha256']):
         if digest(Path(artifact)) != manifest['outputs'][key]:
             raise ValueError('reference artifact hash mismatch: ' + key)
+    content = manifest['content']
+    if content.get('kernel_sha256') != manifest['outputs']['kernel_sha256']:
+        raise ValueError('reference kernel content identity mismatch')
+    try:
+        payload = initramfs_payload_sha256(gzip.decompress(Path(artifacts[1]).read_bytes()),manifest['build_id'])
+    except (OSError, EOFError, zlib.error) as exc:
+        raise ValueError('invalid compressed reference initramfs') from exc
+    if payload != content.get('initramfs_payload_sha256'):
+        raise ValueError('reference initramfs payload identity mismatch')
     return {'manifest_sha256': digest(Path(path)),
             'build_id': manifest['build_id'], 'inputs_pinned': True, 'image_sha256': manifest['inputs']['image']}

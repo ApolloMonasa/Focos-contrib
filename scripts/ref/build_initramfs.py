@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
-import io
+from itertools import combinations
 import json
 from pathlib import Path
 import shlex
@@ -14,7 +14,7 @@ import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inventory import NAME, REFERENCE_LOCK, INVENTORY, digest, load_inventory
-from reference_manifest import build_identity
+from reference_manifest import build_identity, initramfs_payload_sha256
 
 MODULES = ['failover', 'net_failover', 'virtio_ring', 'virtio', 'virtio_net',
            'virtio_mmio', 'virtio_blk', 'crc16', 'mbcache', 'jbd2', 'ext4']
@@ -109,6 +109,13 @@ def entry(name: str, mode: int, data: bytes, ino: int) -> bytes:
         (ino, mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(encoded), 0))
     out = header + encoded
     return out + b'\0' * (-len(out) % 4) + data + b'\0' * (-len(data) % 4)
+
+
+def archive_bytes(files):
+    dirs = {str(parent) for name in files for parent in Path(name).parents if str(parent) != '.'}
+    records = [entry(directory,0o040755,b'',ino) for ino,directory in enumerate(sorted(dirs),1)]
+    records += [entry(name,mode,data,ino) for ino,(name,(mode,data)) in enumerate(sorted(files.items()),len(dirs)+1)]
+    return b''.join(records)+entry('TRAILER!!!',0,b'',0)
 
 
 def build_init(libcs: list[str], scripts: list[str], modules: list[str], release: str, network: bool, build_id: str | None = None) -> str:
@@ -213,10 +220,13 @@ def main(argv: list[str] | None = None) -> int:
     inputs_paths = {p.resolve() for p in protected_inputs}
     outputs_paths = [args.out, args.out.with_suffix('.manifest.json'), args.kernel_out] + [
         args.modules_dir/f'{m}.ko' for m in MODULES + (['dummy'] if args.network_dummy or 'netperf_testcode.sh' in args.scripts else [])]
-    resolved_outputs = [p.resolve() for p in outputs_paths]
-    hardlink_overlap = any(out.exists() and source.exists() and out.samefile(source) for out in outputs_paths for source in protected_inputs)
-    if inputs_paths.intersection(resolved_outputs) or hardlink_overlap or len(set(resolved_outputs)) != len(resolved_outputs):
-        raise ValueError('input/output paths overlap')
+    def check_outputs():
+        resolved_outputs = [p.resolve() for p in outputs_paths]
+        hardlink_overlap = any(out.exists() and source.exists() and out.samefile(source) for out in outputs_paths for source in protected_inputs)
+        shared_outputs = any(a.exists() and b.exists() and a.samefile(b) for a,b in combinations(outputs_paths,2))
+        if inputs_paths.intersection(resolved_outputs) or hardlink_overlap or shared_outputs or len(set(resolved_outputs)) != len(resolved_outputs):
+            raise ValueError('input/output paths overlap')
+    check_outputs()
     args.network_dummy = args.network_dummy or 'netperf_testcode.sh' in args.scripts
     inputs = {'image': digest(args.image), 'kernel_apk': digest(args.kernel_apk)}
     frozen.update({args.image: inputs['image'], args.kernel_apk: inputs['kernel_apk']})
@@ -231,10 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     busybox = extract_busybox(args.image, args.busybox)
     if not busybox:
         raise ValueError('empty busybox')
+    check_outputs()
     modules = extract_kernel_and_modules(args.kernel_apk, args.release, args.kernel_out,
                                         args.modules_dir, ('dummy',) if args.network_dummy else ())
     import hashlib
-    manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
+    manifest = {'schema_version': 2, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
                 'busybox_sha256': hashlib.sha256(busybox).hexdigest(), 'module_order': modules,
                 **implementation_hashes,
                 'inventory_sha256': inventory_hash,
@@ -242,25 +253,29 @@ def main(argv: list[str] | None = None) -> int:
                 'zlib_version': zlib.ZLIB_RUNTIME_VERSION,
                 'selection': {'libcs': args.libcs, 'scripts': args.scripts, 'release': args.release,
                               'network_dummy': args.network_dummy}}
-    manifest['build_id'] = build_identity(manifest)
-    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy, manifest['build_id'])
+    placeholder = '0'*64
+    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy, placeholder)
     files = {'init': (0o100755, init.encode()), 'busybox': (0o100755, busybox)}
     for module in modules:
         files[f'lib/modules/{args.release}/{module}.ko'] = (0o100644, (args.modules_dir/f'{module}.ko').read_bytes())
-    dirs = {str(parent) for name in files for parent in Path(name).parents if str(parent) != '.'}
-    buffer = io.BytesIO()
-    for ino, directory in enumerate(sorted(dirs), 1):
-        buffer.write(entry(directory, 0o040755, b'', ino))
-    for ino, (name, (mode, data)) in enumerate(sorted(files.items()), len(dirs)+1):
-        buffer.write(entry(name, mode, data, ino))
-    buffer.write(entry('TRAILER!!!', 0, b'', 0))
+    manifest['content'] = {'kernel_sha256': digest(args.kernel_out),
+                           'initramfs_payload_sha256': initramfs_payload_sha256(archive_bytes(files),placeholder)}
+    manifest['build_id'] = build_identity(manifest)
+    files['init'] = (0o100755,build_init(args.libcs,args.scripts,modules,args.release,args.network_dummy,manifest['build_id']).encode())
+    payload = archive_bytes(files)
+    if initramfs_payload_sha256(payload,manifest['build_id']) != manifest['content']['initramfs_payload_sha256']:
+        raise ValueError('initramfs payload changed while embedding identity')
     unchanged()
+    check_outputs()
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open('wb') as raw:
         with gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=9) as handle:
-            handle.write(buffer.getvalue())
+            handle.write(payload)
     manifest['outputs'] = {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}
+    if manifest['outputs']['kernel_sha256'] != manifest['content']['kernel_sha256']:
+        raise ValueError('kernel output changed while writing initramfs')
     unchanged()
+    check_outputs()
     args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
     command = ['qemu-system-riscv64', '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
                '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', str(args.kernel_out),

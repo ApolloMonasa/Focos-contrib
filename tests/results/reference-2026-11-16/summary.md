@@ -88,3 +88,12 @@ CI 补充：Ubuntu dash 的 echo 会展开测试桩命令中的反斜杠，现�
 最新四项 P2 均按实现遗漏修复：strict QEMU 解析真实文件，记录和监视版本/哈希；构建源码、清单、锁与输入在处理前固定，发布前复查，且禁止输出覆盖实现；脚本退出失败保留同时发生的 JUDGE_ERROR；原生日志回放明确使用 replayed_at/replayed_from，不伪造 captured_at。
 
 新增负例在旧实现暴露 3 个失败和 5 个错误；修复后专项共 70 项，完整工程检查与 15 份历史回放通过。重新构建真实参考环境并采集双 libc Lua，glibc 9/9；musl 从同一日志重判 9/9，原生元数据区分 capture/replay。真实 QEMU 路径、版本、哈希、构建开始时的实现身份见 [runtime-identity.json](runtime-identity.json)。旧归档不覆盖，未重跑 22 次全组测量。
+
+
+### 新评审后的构建身份重构
+
+构建 ID 未绑定实际产物是设计缺口，现改为 schema 2：ID 包含实际内核哈希及 initramfs 解压归档内容哈希，只有 /init 中唯一的 ID 字段归零。严格回放从实际归档重算，拒绝路径别名、重复、硬链接、截断与尾随归档；修改 manifest 输出字段不能把旧日志换配新构件。schema 1 保留历史记录，但不再作为严格身份证据。
+
+构建输出和 runner 受管输出两两检查路径/inode 冲突，含启动后新建硬链接；已知截断优先于 judge 错误，诊断仍保留，并将 execution_valid 标为 false。新增测试先在旧实现暴露 25 个失败断言，另以 3 个失败断言暴露截断有效性标记遗漏。修复后 78 项专项、52 Rust、15 原有 Python、三个内核 QEMU 检查与 15 份历史回放通过。
+
+同源同输入在不同目录/文件名下重建，内核、initramfs 与完整 manifest 一致。实际 QEMU 新采集 Lua glibc 9/9；musl 从同一双 libc 串口回放为 9/9，不算第二次启动，也没有重跑完整 22 次测量。详见 [结构化验证](payload-binding.json) 与 schema2-lua/ 下原始日志、构建 manifest、采集摘要和回放摘要。其哈希在结构化验证中；旧 Release 未覆盖。
