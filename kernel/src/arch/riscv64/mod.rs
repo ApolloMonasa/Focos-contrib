@@ -1,10 +1,19 @@
-//! RISC-V 的启动汇编与 SBI 调用。
+//! RISC-V 的启动汇编、SBI 调用与本核中断开关。
 
 #[cfg(target_arch = "riscv64")]
 use core::arch::{asm, global_asm};
+#[cfg(target_arch = "riscv64")]
+mod irq;
+#[cfg(target_arch = "riscv64")]
+mod irq_check;
 
 #[cfg(target_arch = "riscv64")]
 global_asm!(include_str!("entry.S"));
+
+#[cfg(target_arch = "riscv64")]
+pub use irq::{local_irqs_enabled, with_local_irqs_disabled};
+#[cfg(target_arch = "riscv64")]
+pub use irq_check::{IrqCheckError, check_local_irq_state};
 
 /// 通过 OpenSBI 控制台输出一个字节。
 #[cfg(target_arch = "riscv64")]

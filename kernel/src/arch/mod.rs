@@ -3,4 +3,7 @@
 #[cfg(target_arch = "riscv64")]
 mod riscv64;
 #[cfg(target_arch = "riscv64")]
-pub use riscv64::{console_putchar, shutdown};
+pub use riscv64::{
+    IrqCheckError, check_local_irq_state, console_putchar, local_irqs_enabled, shutdown,
+    with_local_irqs_disabled,
+};

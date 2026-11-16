@@ -1,4 +1,4 @@
-.PHONY: all build fmt lint test smoke mm-smoke check clean
+.PHONY: all build fmt lint test smoke mm-smoke irq-smoke check clean
 
 TARGET := riscv64gc-unknown-none-elf
 HOST_TARGET := $(shell rustc -vV | sed -n 's/^host: //p')
@@ -24,6 +24,9 @@ smoke: build
 
 mm-smoke: build
 	python3 scripts/smoke.py --mm
+
+irq-smoke: build
+	python3 scripts/smoke.py --irq
 
 check: fmt lint test smoke
 

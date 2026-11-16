@@ -1,9 +1,7 @@
 #![no_std]
 #![no_main]
 
-mod hal;
-
-use focos_kernel::arch;
+use focos_kernel::hal;
 
 #[cfg(not(target_arch = "riscv64"))]
 compile_error!("BOOT-001 currently supports only RISC-V; LoongArch is a future milestone");
@@ -29,6 +27,9 @@ extern "C" fn kernel_main(_hart_id: usize, dtb_start: usize) -> ! {
     unsafe { focos_kernel::mm::boot_check::check_pages(&mut allocator) }
         .unwrap_or_else(|error| panic!("memory self-test failed: {error:?}"));
     hal::console_write("FOCOS_MM_OK\n");
+    hal::check_local_irq_state()
+        .unwrap_or_else(|error| panic!("local IRQ state check failed: {error:?}"));
+    hal::console_write("FOCOS_IRQ_OK\n");
     hal::console_write("FocOS: early S-mode boot\nFOCOS_BOOT_OK\n");
     hal::shutdown(false)
 }

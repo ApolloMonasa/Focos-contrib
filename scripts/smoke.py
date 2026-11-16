@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""验收 BOOT-001；--mm 额外验收 MM-002 的 QEMU 真实页读写。"""
+"""验收 BOOT-001；--mm 验收 MM-002 真实页读写，--irq 验收 ARCH-001 中断状态。"""
 import argparse
 import hashlib
 import pathlib
@@ -11,23 +11,33 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 ELF = ROOT / "target/riscv64gc-unknown-none-elf/release/focos-kernel"
 LOG = ROOT / "target/evidence/boot-qemu-rv.log"
 MM_LOG = ROOT / "target/evidence/mm-qemu-rv.log"
+IRQ_LOG = ROOT / "target/evidence/irq-qemu-rv.log"
+
+# 合同名、必须唯一出现且按顺序排列的成功标记。
+CONTRACTS = {
+    "boot": ("BOOT-001", ("FOCOS_BOOT_OK",)),
+    "mm": ("MM-002", ("FOCOS_MM_OK", "FOCOS_BOOT_OK")),
+    "irq": ("ARCH-001", ("FOCOS_IRQ_OK", "FOCOS_BOOT_OK")),
+}
+LOG_PATHS = {"boot": LOG, "mm": MM_LOG, "irq": IRQ_LOG}
 
 
-def validate_result(output, returncode, memory=False):
-    """核对退出状态、panic 和唯一成功标记；内存验收还要求先自检后报启动成功。"""
+def validate_result(output, returncode, contract="boot"):
+    """核对退出状态、panic 和合同要求的唯一成功标记及其顺序。"""
     if returncode != 0:
         raise ValueError(f"QEMU exited with status {returncode}")
     if "FOCOS_PANIC" in output:
         raise ValueError("kernel reported FOCOS_PANIC")
 
-    markers = ("FOCOS_MM_OK", "FOCOS_BOOT_OK") if memory else ("FOCOS_BOOT_OK",)
+    _, markers = CONTRACTS[contract]
     lines = output.splitlines()
     for marker in markers:
         if output.count(marker) != 1 or lines.count(marker) != 1:
             raise ValueError(f"expected exactly one standalone {marker}")
-    if memory:
-        if lines.index("FOCOS_MM_OK") > lines.index("FOCOS_BOOT_OK"):
-            raise ValueError("memory self-test must finish before boot success")
+
+    positions = [lines.index(marker) for marker in markers]
+    if positions != sorted(positions):
+        raise ValueError(f"{contract} success markers are out of order")
 
 
 def write_log(path, version, command, output, result):
@@ -48,12 +58,12 @@ def write_log(path, version, command, output, result):
     )
 
 
-def run_check(memory=False):
+def run_check(contract="boot"):
     """在单核 QEMU 中运行内核；失败或超时保存日志并以非零状态结束检查。"""
     if not ELF.is_file():
         sys.exit("FAIL: kernel ELF missing; run make build")
-    log = MM_LOG if memory else LOG
-    contract = "MM-002" if memory else "BOOT-001"
+    name, _ = CONTRACTS[contract]
+    log = LOG_PATHS[contract]
     command = [
         "qemu-system-riscv64", "-machine", "virt", "-bios", "default",
         "-m", "128M", "-smp", "1", "-nographic", "-no-reboot",
@@ -72,21 +82,26 @@ def run_check(memory=False):
         if isinstance(output, bytes):
             output = output.decode(errors="replace")
         write_log(log, version, command, output, "TIMEOUT")
-        sys.exit(f"FAIL: {contract} timed out; see {log}")
+        sys.exit(f"FAIL: {name} timed out; see {log}")
     try:
-        validate_result(result.stdout, result.returncode, memory)
+        validate_result(result.stdout, result.returncode, contract)
     except ValueError as error:
         write_log(log, version, command, result.stdout, f"FAIL: {error}")
         sys.exit(f"FAIL: {error}; see {log}")
     write_log(log, version, command, result.stdout, "PASS")
-    print(f"PASS: {contract} ({version}); log: {log}")
+    print(f"PASS: {CONTRACTS[contract][0]} ({version}); log: {log}")
 
 
 def main():
     """读取检查类型；默认保持 BOOT-001 的命令入口。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mm", action="store_true", help="同时验收真实物理页读写")
-    run_check(parser.parse_args().mm)
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--mm", dest="contract", action="store_const", const="mm",
+                       help="验收 MM-002 真实物理页读写")
+    group.add_argument("--irq", dest="contract", action="store_const", const="irq",
+                       help="验收 ARCH-001 本核中断状态保存与恢复")
+    parser.set_defaults(contract="boot")
+    run_check(parser.parse_args().contract)
 
 
 if __name__ == "__main__":
