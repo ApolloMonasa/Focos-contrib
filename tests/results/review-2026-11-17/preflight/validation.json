@@ -1,0 +1,108 @@
+{
+  "kind": "strict_preflight_and_bounded_artifact_hashing",
+  "base_commit": "353adc59a78db8936356e8ce4da6d2bf00076ca4",
+  "date": "2026-11-17",
+  "checks": {
+    "test001": 97,
+    "rust": 52,
+    "existing_python": 15,
+    "qemu_kernel_checks": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "regressions": {
+    "initial_failures": 16,
+    "source_snapshot_timing_failure": 1,
+    "builder_duplicate_reads_failure": 1
+  },
+  "performance": [
+    {
+      "libc": "glibc",
+      "mode": "capture",
+      "image_sha256_reads": 2,
+      "image_bytes": 4294967296,
+      "image_bytes_hashed": 8589934592,
+      "elapsed_seconds": 3.702,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    },
+    {
+      "libc": "musl",
+      "mode": "replay",
+      "image_sha256_reads": 2,
+      "image_bytes": 4294967296,
+      "image_bytes_hashed": 8589934592,
+      "elapsed_seconds": 2.508,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    }
+  ],
+  "builder_image_hashes_with_relative_path": {
+    "before": 5,
+    "after": 3,
+    "boundaries": "initial plus two publication checks"
+  },
+  "historical_replays": {
+    "samples": 15,
+    "totals_unchanged": true,
+    "all_expected_match": true,
+    "exact_groups": 13,
+    "reviewed_diagnostic_additions": 2
+  },
+  "build_id": "5a996dbe8e03d4ae85a2168d93222cc6187ceea3d041d665f65384590ac2e6d7",
+  "content": {
+    "initramfs_payload_sha256": "63d227d77d00883244ef3202004312ce54c282a6977e264a8fbb9c0d397befd1",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "outputs": {
+    "initramfs_sha256": "edb0f3acd764d791fe677d9d1ef53a9f6dc966cacbb11604f33f13ebf9d03330",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "9f14b68d273fada9bae7140722566a1455bb968b36bb07a3549ea723c248b2fd",
+    "scripts/input_snapshot.py": "eec83f8c8fe091313a59b3d32f1f94b25b7d446aafc97e3e65fca63278d2ca6c",
+    "scripts/reference_manifest.py": "5230fbf18a25a24a01bb2d4dec85addf78bfd2e8eaf62463828d367813072a46",
+    "scripts/ref/build_initramfs.py": "8a38b9adc45726778f50150aa1589fc7a4f7a56d27933fc4959912280c02e7f7"
+  },
+  "evidence_sha256": {
+    "lua/build.manifest.json": "0e3a3b900767e5b4fc3655bf6e93167761c4b77c2834086915d1e6e6b3aa63b3",
+    "lua/capture.summary.json": "546cf1d50394e7d8793a88f73b45e850e8b7c215113727af7481b6043adc11b8",
+    "lua/replay.summary.json": "a0a7e0173fbd818bfb321f7c660df47e5dc01a21ca87972e5912ea454d7ccde4",
+    "lua/serial.log": "8c17c1b90c4758fb6192114a7afa1a58822a0dd127791f4c6f5809b7c8237b3c"
+  },
+  "limits": [
+    "One new reference Linux boot captured both libcs; musl result is replayed from that same serial log.",
+    "No complete 22-run benchmark rerun; elapsed seconds include this machine cache conditions and are not a comparative speed claim.",
+    "Byte totals count content processed by SHA256, not physical storage reads."
+  ]
+}

@@ -228,6 +228,10 @@ class RunnerSafetyTests(unittest.TestCase):
             init=b'#!/busybox sh\n/busybox echo REF_BUILD_ID '+placeholder.encode()+b'\n'
             files={'init':(0o100755,init),'busybox':(0o100755,b'synthetic busybox')}
             manifest = {'schema_version': 2, 'protocol': 1, 'inputs_pinned': True,
+                        'builder_sha256':digest(ROOT/'scripts/ref/build_initramfs.py'),
+                        'inventory_code_sha256':digest(ROOT/'scripts/inventory.py'),
+                        'manifest_code_sha256':digest(ROOT/'scripts/reference_manifest.py'),
+                        'busybox_sha256':hashlib.sha256(b'synthetic busybox').hexdigest(),
                         'inputs': {'image': inventory['image']['uncompressed_sha256'],
                                    'kernel_apk': lock['kernel']['sha256']},
                         'inventory_sha256': digest(inventory_path), 'reference_lock_sha256': digest(REFERENCE_LOCK),
@@ -824,6 +828,112 @@ class RunnerSafetyTests(unittest.TestCase):
                                                    '--reference-image',str(root/'disk.img'),'--reference-artifacts',str(root/'Image'),str(root/'initramfs.gz')])
                     self.assertEqual(code,2)
                     self.assertFalse(dest.exists())
+
+    def test_schema_two_requires_each_implementation_and_busybox_identity(self):
+        from reference_manifest import load_manifest,build_identity
+        for field in ['builder_sha256','inventory_code_sha256','manifest_code_sha256','busybox_sha256']:
+            with self.subTest(field=field):
+                _,_,out=self.invoke(self.reference(),['--reference','strict'])
+                path=out.parent/'build.manifest.json';manifest=json.loads(path.read_text())
+                del manifest[field];manifest['build_id']=build_identity(manifest)
+                path.write_text(json.dumps(manifest))
+                with self.assertRaises(ValueError):load_manifest(path)
+
+    def test_strict_artifact_errors_stop_before_any_qemu_or_judge_execution(self):
+        import contextlib,gzip,io,run_tests,shlex
+        from reference_manifest import build_identity
+        from inventory import digest
+        from unittest.mock import patch
+        for error in ['kernel','initramfs','gzip','kernel-content','payload-content','busybox-content','unpinned','selection']:
+            with self.subTest(error=error):
+                _,_,old_out=self.invoke(self.reference(),['--reference','strict'])
+                root=old_out.parent;path=root/'build.manifest.json';kernel=root/'Image';init=root/'initramfs.gz';image=root/'disk.img'
+                manifest=json.loads(path.read_text());old_id=manifest['build_id']
+                if error=='kernel':kernel.write_bytes(b'changed kernel')
+                elif error=='initramfs':init.write_bytes(b'changed initramfs')
+                elif error=='gzip':
+                    init.write_bytes(b'not gzip');manifest['outputs']['initramfs_sha256']=digest(init)
+                else:
+                    if error=='kernel-content':manifest['content']['kernel_sha256']='0'*64
+                    elif error=='payload-content':manifest['content']['initramfs_payload_sha256']='0'*64
+                    elif error=='busybox-content':manifest['busybox_sha256']='0'*64
+                    elif error=='unpinned':manifest['inputs_pinned']=False
+                    elif error=='selection':manifest['selection']['scripts']=['lua_testcode.sh']
+                    manifest['build_id']=build_identity(manifest)
+                    init.write_bytes(gzip.compress(gzip.decompress(init.read_bytes()).replace(old_id.encode(),manifest['build_id'].encode()),mtime=0))
+                    manifest['outputs']['initramfs_sha256']=digest(init)
+                path.write_text(json.dumps(manifest))
+                command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                                   '-bios','default','-kernel',str(kernel),'-initrd',str(init),'-append','console=ttyS0 rdinit=/init',
+                                   '-drive',f'file={image},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+                for mode in ['capture','replay']:
+                    dest=root/mode
+                    source=['--capture-cmd',command] if mode=='capture' else ['--log',str(old_out/'serial.log')]
+                    with patch.object(run_tests,'qemu_identity',side_effect=AssertionError('QEMU version probe ran')),patch.object(run_tests,'capture',side_effect=AssertionError('capture ran')),patch.object(run_tests,'run_judge',side_effect=AssertionError('judge ran')),contextlib.redirect_stderr(io.StringIO()):
+                        code=run_tests.main(source+['--out',str(dest),'--libc','musl','--group','iperf','--reference','strict',
+                                                   '--inventory',str(root/'inventory.json'),'--reference-manifest',str(path),
+                                                   '--reference-image',str(image),'--reference-artifacts',str(kernel),str(init)])
+                    self.assertEqual(code,2)
+                    self.assertFalse(dest.exists())
+
+    def test_large_artifact_is_hashed_twice_regardless_of_groups_and_aliases(self):
+        import contextlib,io,run_tests
+        from unittest.mock import patch
+        for groups in [['iperf'],None]:
+            with self.subTest(groups=groups),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);image=root/'disk';image.write_bytes(b'disk'*16384)
+                symbolic=root/'symbolic';symbolic.symlink_to(image)
+                hard=root/'hard';os.link(image,hard)
+                paths=[os.path.relpath(image),str(image),str(symbolic),str(hard)]
+                reads=[];original=run_tests.digest
+                def digest(path):
+                    if Path(path).is_file() and Path(path).samefile(image):reads.append(str(path))
+                    return original(path)
+                args=['--capture-cmd','fake','--out',str(root/'out'),'--libc','musl']
+                for path in paths:args+=['--capture-artifact',path]
+                for group in groups or []:args+=['--group',group]
+                with patch.object(run_tests,'digest',side_effect=digest),patch.object(run_tests,'capture',return_value=(self.complete(),False,0)),contextlib.redirect_stdout(io.StringIO()):
+                    run_tests.main(args)
+                self.assertEqual(len(reads),2,reads)
+                data=json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(len(data['meta']['artifact_sha256']),4)
+
+    def test_loaded_source_identity_is_frozen_before_artifact_hashing(self):
+        import contextlib,io,run_tests
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact=Path(tmp)/'disk';artifact.write_bytes(b'disk')
+            hashing_started=False;original=run_tests.digest
+            def digest(path):
+                nonlocal hashing_started
+                if Path(path).resolve()==artifact:
+                    hashing_started=True
+                if Path(path).resolve()==RUNNER:
+                    return 'b'*64 if hashing_started else 'a'*64
+                return original(path)
+            with patch.object(run_tests,'digest',side_effect=digest),patch.object(run_tests,'capture',side_effect=AssertionError('capture ran with changed source')),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(run_tests.main(['--capture-cmd','fake','--capture-artifact',str(artifact),'--out',str(Path(tmp)/'out'),'--libc','musl','--group','iperf']),2)
+
+    def test_artifact_alias_retarget_and_same_hash_rewrite_during_judging_are_detected(self):
+        import contextlib,io,run_tests
+        from unittest.mock import patch
+        for change in ['retarget','rewrite']:
+            with self.subTest(change=change),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);image=root/'disk';other=root/'other';image.write_bytes(b'disk');other.write_bytes(b'disk')
+                alias=root/'alias';alias.symlink_to(image);initial=image.stat();original=run_tests.judge_group
+                def judge(*args,**kwargs):
+                    result=original(*args,**kwargs)
+                    if change=='retarget':alias.unlink();alias.symlink_to(other)
+                    else:
+                        image.write_bytes(b'XXXX');image.write_bytes(b'disk')
+                        os.utime(image,ns=(initial.st_atime_ns,initial.st_mtime_ns))
+                    return result
+                with patch.object(run_tests,'capture',return_value=(self.complete(),False,0)),patch.object(run_tests,'judge_group',side_effect=judge),contextlib.redirect_stdout(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(alias),'--out',str(root/'out'),'--libc','musl','--group','iperf'])
+                data=json.loads((root/'out/summary.json').read_text())
+                self.assertEqual(code,1)
+                self.assertEqual(data['groups'][0]['status'],'ENV_ERROR')
+                self.assertFalse(data['meta']['execution_valid'])
 
     def test_unknown_testcase_lines_are_recorded_for_lua_and_busybox(self):
         from inventory import load_inventory

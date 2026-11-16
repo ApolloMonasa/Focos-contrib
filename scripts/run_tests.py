@@ -29,7 +29,8 @@ from pathlib import Path
 
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
-from reference_manifest import load_manifest, verify_manifest, strict_qemu_command, qemu_identity
+from input_snapshot import InputSnapshot
+from reference_manifest import load_manifest, verify_reference_inputs, verify_reference_log, strict_qemu_command, qemu_identity
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -378,6 +379,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory", default="tests/inventory.json")
     parser.add_argument("--platform", default="qemu")
     args = parser.parse_args(argv)
+    snapshot = InputSnapshot(digest)
+    # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
+    source_hashes = {str(p.relative_to(ROOT)): snapshot.digest(p) for p in
+                    [Path(__file__).resolve(), ROOT/'scripts/input_snapshot.py', ROOT/'scripts/inventory.py',
+                     ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
 
     out_dir = Path(args.out)
     sections_dir = out_dir/'sections'
@@ -395,7 +401,6 @@ def main(argv: list[str] | None = None) -> int:
     if any(not p.is_file() for p in artifact_paths):
         print('capture artifacts must be existing regular files', file=sys.stderr)
         return 2
-    artifact_hashes = {str(p): digest(p) for p in artifact_paths}
     inventory_path = Path(args.inventory)
     if not inventory_path.exists():
         print(f"inventory not found: {inventory_path}", file=sys.stderr)
@@ -438,6 +443,16 @@ def main(argv: list[str] | None = None) -> int:
         except (ValueError,OSError) as exc:
             print(f'invalid reference manifest: {exc}',file=sys.stderr)
             return 2
+    try:
+        artifact_hashes = {str(p):snapshot.digest(p) for p in artifact_paths}
+        preflight_provenance = None
+        if manifest is not None:
+            preflight_provenance = verify_reference_inputs(manifest,args.reference_artifacts or [],inventory,
+                                                          selected,args.libc,inventory_path,args.reference_image,
+                                                          file_digest=snapshot.digest)
+    except (ValueError,OSError,KeyError,TypeError) as exc:
+        print(f'invalid execution inputs: {exc}',file=sys.stderr)
+        return 2
     capture_command = args.capture_cmd
     command_verified = False
     qemu = None
@@ -446,41 +461,40 @@ def main(argv: list[str] | None = None) -> int:
             if manifest is None:
                 raise ValueError('strict capture requires --reference-manifest')
             capture_command = strict_qemu_command(args.capture_cmd, args.reference_artifacts or [], args.reference_image)
-            image_hash = artifact_hashes.get(str(args.reference_image))
-            if image_hash != inventory['image']['uncompressed_sha256'] or image_hash != manifest.get('inputs', {}).get('image'):
-                raise ValueError('actual reference disk does not match frozen manifest')
-            qemu = qemu_identity(capture_command[0])
-            capture_command[0] = qemu['path']
-            artifact_hashes[qemu['path']] = qemu['sha256']
-            command_verified = True
         except (ValueError, OSError, TypeError) as exc:
             print(f'invalid strict capture: {exc}', file=sys.stderr)
             return 2
 
     # 在执行外部命令前固定源码身份，长时间运行期间的编辑不能改写这次执行的来源。
-    source_hashes = {str(p.relative_to(ROOT)): digest(p) for p in
-                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py', ROOT/'scripts/reference_manifest.py']}
     # 所有会影响判分的文件在采集前登记；缺失文件也登记，防止中途补入。
     judge_paths = set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py'))
     for group in selected:
         cfg = groups_cfg[group]
         directory = Path(args.judge_dir) if cfg['kind'] == 'official' else Path(args.team_judge_dir)
         judge_paths.add(directory/Path(cfg['judge_file']).name)
-    judge_hashes = {str(p): digest(p) for p in sorted(judge_paths) if p.is_file()}
-    watched = {Path(ROOT/name): sha for name, sha in source_hashes.items()}
-    watched.update({p: judge_hashes.get(str(p)) for p in judge_paths})
-    watched.update({Path(p): sha for p, sha in artifact_hashes.items()})
-    if qemu:
-        watched[Path(qemu['invoked_path'])] = qemu['sha256']
+    judge_hashes = {str(p): snapshot.digest(p) for p in sorted(judge_paths) if p.is_file()}
+    for name,sha in source_hashes.items():
+        snapshot.watch(ROOT/name,sha)
+    for p in judge_paths:
+        snapshot.watch(p,judge_hashes.get(str(p)))
+    for p,sha in artifact_hashes.items():
+        snapshot.watch(p,sha,bulk=True)
     for p in {inventory_path, INVENTORY, REFERENCE_LOCK}:
-        watched[p] = digest(p) if p.is_file() else None
-    watched[inventory_path] = inventory_hash
-    for p in ([args.reference_manifest] if args.reference_manifest else []) + [Path(p) for p in (args.reference_artifacts or [])]:
-        watched[p] = manifest_hash if p == args.reference_manifest else (digest(p) if p.is_file() else None)
-    # 同时固定声明路径和其解析后的真实路径，防止别名重定向掩盖变化。
-    for p, initial_hash in list(watched.items()):
-        if initial_hash is not None:
-            watched[p.resolve()] = initial_hash
+        snapshot.watch(p,inventory_hash if p == inventory_path else snapshot.digest(p))
+    if args.reference_manifest:
+        snapshot.watch(args.reference_manifest,manifest_hash)
+    if isinstance(capture_command,list):
+        try:
+            qemu = qemu_identity(capture_command[0])
+            capture_command[0] = qemu['path']
+            artifact_hashes[qemu['path']] = qemu['sha256']
+            snapshot.watch(qemu['path'],qemu['sha256'],bulk=True)
+            snapshot.watch(qemu['invoked_path'],qemu['sha256'],bulk=True)
+            command_verified = True
+        except (ValueError,OSError) as exc:
+            print(f'invalid strict QEMU: {exc}',file=sys.stderr)
+            return 2
+    watched = snapshot.states
     managed_files = [out_dir/name for name in ('serial.log', 'summary.json', 'summary.md')]
     def aliases(a, b):
         if a.resolve() == b.resolve(): return True
@@ -503,16 +517,9 @@ def main(argv: list[str] | None = None) -> int:
             any(aliases(p, target) for target in managed_files) for p in watched):
         print('managed output aliases an execution input or symlink', file=sys.stderr)
         return 2
-    def changed_inputs():
-        changed = []
-        for path, original in watched.items():
-            try:
-                current = digest(path) if path.is_file() else None
-            except OSError:
-                current = None
-            if current != original:
-                changed.append(str(path))
-        return sorted(changed)
+    if snapshot.changes():
+        print('execution inputs changed before capture/replay',file=sys.stderr)
+        return 2
     truncated = False
     if args.log:
         raw_log = Path(args.log).read_bytes()
@@ -529,7 +536,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as exc:
         sections, log_error = {}, str(exc)
     environment = validate_reference(log_text, args.reference, selected, args.libc)
-    changed = changed_inputs()
+    changed = snapshot.changes()
     provenance = None
     strict = args.reference == 'strict' or (args.reference is None and environment['status'] != 'NOT_APPLICABLE')
     if strict and not truncated and not changed:
@@ -538,14 +545,14 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError('strict reference requires --reference-manifest and --reference-artifacts KERNEL INITRAMFS')
             if args.capture_cmd and not command_verified:
                 raise ValueError('strict capture command was not validated before execution')
-            provenance = verify_manifest(args.reference_manifest, args.reference_artifacts, log_text,
-                                         inventory, selected, args.libc, inventory_path, image=args.reference_image)
+            verify_reference_log(manifest,log_text)
+            provenance = {'manifest_sha256':manifest_hash,**preflight_provenance}
         except (ValueError, OSError, KeyError, TypeError) as exc:
             environment['status'] = 'ERROR'
             environment['errors'].append(str(exc))
     results = []
     for group in selected:
-        changed = sorted(set(changed + changed_inputs()))
+        changed = sorted(set(changed + snapshot.changes()))
         section = None if changed else sections.get((group, args.libc))
         result = judge_group(
             group,
@@ -558,7 +565,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         results.append(result)
 
-    changed = sorted(set(changed + changed_inputs()))
+    changed = sorted(set(changed + snapshot.changes(full=True)))
     if changed:
         environment['status'] = 'ERROR'
         environment['errors'].append('inputs changed during run: '+', '.join(changed))
@@ -661,6 +668,6 @@ def main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except OSError as exc:
+    except (ValueError,OSError) as exc:
         print(f'runner: {exc}', file=sys.stderr)
         raise SystemExit(2)

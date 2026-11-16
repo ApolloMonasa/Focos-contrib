@@ -132,3 +132,9 @@ schema 1 的归档和记录保留原样，但不能声明 schema 2 的严格身�
 显式 manifest 在读取嵌套字段前做共用结构校验：顶层及 inputs/selection/outputs/content 必须是对象，版本、SHA256、选择列表及类型须合法；非法文件退出 2，在任何 QEMU 版本探测、采集或判分前停止。解析与登记哈希使用同一字节快照。Lua 与 busybox 的未知 testcase 名称直接从原始行收集，独立于官方 judge 是否返回该项；不计入分母。
 
 2026-11-17 这轮只修复边界并回放既有数据，未新采集参考 Linux。问题分析、完整检查及两份历史诊断差异见 [本轮摘要](../../tests/results/review-2026-11-17/summary.md)。
+
+严格检查分两阶段：显式 manifest 的所有静态输入/构件校验（含内核、initramfs payload、嵌入 ID 与 BusyBox 实际内容）必须在 QEMU --version、采集或判分前完成，不匹配退出 2；采集后再核对日志的构建 ID、尝试顺序及协议。schema 2 的 builder_sha256、inventory_code_sha256、manifest_code_sha256 和 busybox_sha256 均为必填 SHA256，不能用缺少实现来源的简化对象声明严格通过。
+
+runner 以 inode 缓存初始构件哈希，同一文件的相对路径、绝对路径、符号链接与硬链接不重复读取。声明/真实路径分别保留绑定监视；大构件逐组检查 inode、大小、mtime_ns、ctime_ns、模式与重定向，最终再完整哈希一次，小型源码及判据仍逐组重哈希。稳定镜像总计只做两次完整 SHA256，不随所选组数增长；变更立即使执行失效。源码在大构件读取前冻结；构建器仍保留两次发布检查，但在每个边界内部去重相同文件。
+
+后续预检修复、真实 QEMU 及哈希读取次数记录见 [preflight 验证](../../tests/results/review-2026-11-17/preflight/summary.md)。旧 schema 2 证据只要原已含必填来源字段及正确构件，仍可严格回放；不把源码哈希强制改为当前版本来覆盖旧来源。

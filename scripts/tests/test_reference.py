@@ -140,6 +140,18 @@ class BuildTests(unittest.TestCase):
                 changed = json.loads(out.with_suffix('.manifest.json').read_text())
                 self.assertNotEqual(old, changed['build_id'])
 
+    def test_relative_build_inputs_are_not_rehashed_twice_for_the_same_boundary(self):
+        reads=[];original=build.digest
+        def digest(path):
+            if path.is_file() and path.samefile(self.busybox):reads.append(str(path))
+            return original(path)
+        out=self.root/'result/init.gz'
+        with patch.object(build,'digest',side_effect=digest),patch.object(build,'extract_busybox',return_value=b'busybox'),contextlib.redirect_stdout(io.StringIO()):
+            build.main(['--image',os.path.relpath(self.busybox),'--kernel-apk',str(self.apk),
+                        '--out',str(out),'--kernel-out',str(out.parent/'Image'),'--modules-dir',str(out.parent/'modules'),
+                        '--scripts','lua_testcode.sh','--allow-unpinned-inputs'])
+        self.assertEqual(len(reads),3,reads)  # 初始固定 + 两次发布边界，各一次。
+
     def test_output_hardlinks_are_rejected_before_any_write(self):
         from itertools import combinations
         for left, right in combinations(['Image','init.gz','init.manifest.json','modules/virtio.ko','modules/ext4.ko'],2):

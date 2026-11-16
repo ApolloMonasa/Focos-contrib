@@ -108,6 +108,7 @@ Focos/
 │   ├── test_irq_api.py                # 启动自检 unsafe 边界的调用方编译测试
 │   ├── test_smoke.py                  # 启动检查器标记、退出状态与超时测试
 │   ├── inventory.py                   # 冻结输入的共用读取、校验与哈希
+│   ├── input_snapshot.py              # 构件哈希去重、路径绑定与分层变化检查
 │   ├── sync_test_plan.py              # 从清单生成区域计划与文档表格
 │   ├── run_tests.py                   # 串口切组、判分、原始日志与结果
 │   ├── fetch_judges.py                # 拉取并核对固定官方 judge 文件
@@ -126,6 +127,7 @@ Focos/
 │   │   ├── build_initramfs.py         # 输入校验、确定性构建与 manifest
 │   │   └── replay_evidence.py         # 历史归档校验与逐项结果对比
 │   └── tests/                         # TEST-001 开发机测试
+│       ├── test_input_snapshot.py     # 大构件读取次数、别名与最终内容复核
 │       ├── test_inputs.py             # 清单投影、来源与归档边界
 │       ├── test_judges.py             # 性能格式与误报负例
 │       ├── test_reference.py          # 确定性构建及逐步故障注入
@@ -148,7 +150,11 @@ Focos/
 │   │   │   └── schema2-lua/             # 新协议原始串口、manifest 与采集/回放摘要
 │   │   └── review-2026-11-17/           # 后续审核边界修复与历史诊断差异
 │   │       ├── summary.md             # 问题分析、验证结果与限制
-│   │       └── validation.json        # 逐份历史对照、严格回放及源码哈希
+│   │       ├── validation.json        # 逐份历史对照、严格回放及源码哈希
+│   │       └── preflight/             # 后续 strict 构件预检、来源字段与有界哈希验证
+│   │           ├── summary.md         # 问题分析、检查与性能计数的边界
+│   │           ├── validation.json    # 当前源码哈希、读取次数与结果对照
+│   │           └── lua/               # 本轮 manifest、原始串口及采集/回放摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

@@ -206,8 +206,15 @@ def main(argv: list[str] | None = None) -> int:
     frozen = {path: implementation_hashes[key] for key, path in IMPLEMENTATION_FILES.items()}
     frozen.update({INVENTORY: inventory_hash, REFERENCE_LOCK: lock_hash})
     def unchanged():
+        checked = {}
         for path, initial in frozen.items():
-            if not path.is_file() or digest(path) != initial:
+            if not path.is_file():
+                raise ValueError('build source/input changed: '+str(path))
+            info = path.stat()
+            key = (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+            if key not in checked:
+                checked[key] = digest(path)
+            if checked[key] != initial:
                 raise ValueError('build source/input changed: '+str(path))
     args.release = args.release or lock['kernel']['release']
     scripts = {f'{g}_testcode.sh' for g in inventory['groups']}

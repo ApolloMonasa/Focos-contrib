@@ -28,7 +28,7 @@ def load_manifest(path, *, raw=None):
     sha_fields += [(manifest[section],key) for section,keys in [
         ('inputs',('image','kernel_apk')),('outputs',('kernel_sha256','initramfs_sha256')),
         ('content',('kernel_sha256','initramfs_payload_sha256'))] for key in keys]
-    sha_fields += [(manifest,key) for key in ('builder_sha256','inventory_code_sha256','manifest_code_sha256','busybox_sha256') if key in manifest]
+    sha_fields += [(manifest,key) for key in ('builder_sha256','inventory_code_sha256','manifest_code_sha256','busybox_sha256')]
     if any(not isinstance(obj.get(key),str) or not re.fullmatch(r'[0-9a-f]{64}',obj[key]) for obj,key in sha_fields):
         raise ValueError('invalid reference manifest SHA256 field')
     selection=manifest['selection']
@@ -51,13 +51,13 @@ def build_identity(manifest):
     return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def initramfs_payload_sha256(raw, build_id):
+def initramfs_identity(raw, build_id):
     """只归零 newc 中 /init 的嵌入 ID，其余字节（含元数据）全部绑定。
 
     仅接受构建器的单一 newc 归档；拒绝重名、路径别名、硬链接、尾随归档和截断。
     不能对整个二进制做字符串替换：模块或 busybox 中可能也包含同形文本。
     """
-    offset, names, identity_span = 0, set(), None
+    offset, names, identity_span, busybox_sha256 = 0, set(), None, None
     while True:
         header = raw[offset:offset+110]
         if not re.fullmatch(rb'070701[0-9a-fA-F]{104}', header):
@@ -84,6 +84,10 @@ def initramfs_payload_sha256(raw, build_id):
                 (mode & 0o170000 == 0o040000 and size)):
             raise ValueError('unsupported/duplicate initramfs path or entry')
         names.add(name)
+        if name == b'busybox':
+            if mode != 0o100755:
+                raise ValueError('initramfs busybox must be an executable regular file')
+            busybox_sha256 = hashlib.sha256(raw[data_start:data_end]).hexdigest()
         if name == b'init':
             if mode != 0o100755:
                 raise ValueError('initramfs init must be an executable regular file')
@@ -93,7 +97,12 @@ def initramfs_payload_sha256(raw, build_id):
             identity_span = (data_start+matches[0].start(1),data_start+matches[0].end(1))
         offset = following
     start, end = identity_span
-    return hashlib.sha256(raw[:start]+b'0'*64+raw[end:]).hexdigest()
+    return {'initramfs_payload_sha256':hashlib.sha256(raw[:start]+b'0'*64+raw[end:]).hexdigest(),
+            'busybox_sha256':busybox_sha256}
+
+
+def initramfs_payload_sha256(raw, build_id):
+    return initramfs_identity(raw,build_id)['initramfs_payload_sha256']
 
 
 def strict_qemu_command(command, artifacts, image):
@@ -148,21 +157,18 @@ def qemu_identity(executable):
             'path': str(path), 'sha256': initial, 'version': version}
 
 
-def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):
-    manifest = load_manifest(path)
-    ids = [match[1] for line in text.splitlines()
-           if (match := re.fullmatch(r'REF_BUILD_ID ([0-9a-f]{64})', line))]
-    if ids != [manifest['build_id']]:
-        raise ValueError('log does not match reference build identity')
+def verify_reference_inputs(manifest, artifacts, inventory, selected, libc, inventory_path=INVENTORY,
+                            image=None, *, file_digest=digest):
+    """与日志无关的静态校验，必须在 QEMU 版本探测、采集或判分前完成。"""
     lock = json.loads(REFERENCE_LOCK.read_text())
     if (manifest.get('inputs_pinned') is not True or
             manifest.get('inputs', {}).get('image') != inventory['image']['uncompressed_sha256'] or
             manifest.get('inputs', {}).get('kernel_apk') != lock['kernel']['sha256'] or
             manifest.get('selection', {}).get('release') != lock['kernel']['release']):
         raise ValueError('reference inputs are not the frozen inputs')
-    if manifest.get('inventory_sha256') != digest(inventory_path) or manifest.get('reference_lock_sha256') != digest(REFERENCE_LOCK):
+    if manifest.get('inventory_sha256') != file_digest(inventory_path) or manifest.get('reference_lock_sha256') != file_digest(REFERENCE_LOCK):
         raise ValueError('reference input lock changed since build')
-    if image is None or digest(Path(image)) != manifest['inputs']['image']:
+    if image is None or file_digest(Path(image)) != manifest['inputs']['image']:
         raise ValueError('actual reference disk hash does not match manifest')
     selection = manifest['selection']
     if (len(artifacts) != 2 or not isinstance(selection.get('libcs'), list) or not selection['libcs'] or
@@ -174,20 +180,36 @@ def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_
         raise ValueError('invalid reference build selection/artifacts')
     if libc not in selection['libcs'] or any(f'{group}_testcode.sh' not in selection['scripts'] for group in selected):
         raise ValueError('reference manifest does not include selected groups/libc')
-    runs = re.findall(r'^REF RUN (musl|glibc) ([a-z0-9_]+_testcode\.sh)\r?$', text, re.M)
-    if runs != [(c, s) for c in selection['libcs'] for s in selection['scripts']]:
-        raise ValueError('reference attempts do not match build selection/order')
     for artifact, key in zip(artifacts, ['kernel_sha256', 'initramfs_sha256']):
-        if digest(Path(artifact)) != manifest['outputs'][key]:
+        if file_digest(Path(artifact)) != manifest['outputs'][key]:
             raise ValueError('reference artifact hash mismatch: ' + key)
     content = manifest['content']
     if content.get('kernel_sha256') != manifest['outputs']['kernel_sha256']:
         raise ValueError('reference kernel content identity mismatch')
     try:
-        payload = initramfs_payload_sha256(gzip.decompress(Path(artifacts[1]).read_bytes()),manifest['build_id'])
+        identity = initramfs_identity(gzip.decompress(Path(artifacts[1]).read_bytes()),manifest['build_id'])
     except (OSError, EOFError, zlib.error) as exc:
         raise ValueError('invalid compressed reference initramfs') from exc
-    if payload != content.get('initramfs_payload_sha256'):
+    if identity['initramfs_payload_sha256'] != content.get('initramfs_payload_sha256'):
         raise ValueError('reference initramfs payload identity mismatch')
-    return {'manifest_sha256': digest(Path(path)),
-            'build_id': manifest['build_id'], 'inputs_pinned': True, 'image_sha256': manifest['inputs']['image']}
+    if identity['busybox_sha256'] != manifest['busybox_sha256']:
+        raise ValueError('reference busybox content identity mismatch')
+    return {'build_id':manifest['build_id'],'inputs_pinned':True,'image_sha256':manifest['inputs']['image']}
+
+
+def verify_reference_log(manifest, text):
+    ids = [match[1] for line in text.splitlines()
+           if (match := re.fullmatch(r'REF_BUILD_ID ([0-9a-f]{64})', line))]
+    if ids != [manifest['build_id']]:
+        raise ValueError('log does not match reference build identity')
+    selection = manifest['selection']
+    runs = re.findall(r'^REF RUN (musl|glibc) ([a-z0-9_]+_testcode\.sh)\r?$', text, re.M)
+    if runs != [(c, s) for c in selection['libcs'] for s in selection['scripts']]:
+        raise ValueError('reference attempts do not match build selection/order')
+
+
+def verify_manifest(path, artifacts, text, inventory, selected, libc, inventory_path=INVENTORY, image=None):
+    manifest = load_manifest(path)
+    provenance = verify_reference_inputs(manifest,artifacts,inventory,selected,libc,inventory_path,image)
+    verify_reference_log(manifest,text)
+    return {'manifest_sha256':digest(Path(path)),**provenance}
