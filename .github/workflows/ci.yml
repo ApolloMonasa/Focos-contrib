@@ -32,7 +32,9 @@ jobs:
           sudo apt "${apt_options[@]}" install -y --no-install-recommends qemu-system-misc
       - name: Install pinned Rust
         run: rustup toolchain install 1.99.0 --profile minimal --component rustfmt --component clippy --target riscv64gc-unknown-none-elf --no-self-update
-      - name: Verify build and boot
+      - name: Verify build, boot and TEST-001 contracts
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: make check
       - name: Verify MM-002 real pages
         run: make mm-smoke
@@ -45,3 +47,23 @@ jobs:
           name: boot-evidence
           path: target/evidence/
           if-no-files-found: ignore
+
+  test001-reference:
+    name: test001-reference
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify frozen reference evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make reference-replay
+      - name: Keep replay evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test001-reference-evidence
+          path: target/evidence/test001/
+          if-no-files-found: error

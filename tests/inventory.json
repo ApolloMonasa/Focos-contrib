@@ -25,7 +25,14 @@
   },
   "judge": {
     "repo": "https://github.com/oscomp/oskernel-testsuits-cooperation",
-    "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b"
+    "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b",
+    "files": {
+      "judge_basic.py": "9425db752d00a0f2c8843ea2983fb605c352576309bdec5127a6bb62cbad2664",
+      "judge_busybox.py": "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d",
+      "judge_lua.py": "b07d38ab9bb12c67d1ef5c9adfcd9012671cdcb1c44f21498c9449f8e1b1634f",
+      "judge_libctest.py": "587804e2210784f17f6a4febe744dcca1b48fdb50a4dc7fb9378d62e7c711a34",
+      "judge_iozone.py": "967cb9085fb44c08668f538e5367c70fad307d521c16d3df177ab4d124d45022"
+    }
   },
   "groups": {
     "basic": {
@@ -505,7 +512,7 @@
         "23:512k mmap read open2close (megabytes per second)",
         "24:context switch latency (micro second when there are 96 processes)"
       ],
-      "note": "官方 lmbench.sh 是运行器而非 stdin 判分器；团队解析器按关键字匹配，置信度中"
+      "note": "完整标签、单位和有限正数判完成；无标签指标要求 shell trace，缺少上下文不猜测归属"
     },
     "netperf": {
       "kind": "team",

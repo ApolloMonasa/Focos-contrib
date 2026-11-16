@@ -14,7 +14,7 @@
   "excluded_groups": [
     "ltp"
   ],
-  "case_inventory_status": "FROZEN",
+  "case_inventory_status": "FROZEN_WITH_KNOWN_DIFFERENCES",
   "case_count": 427,
   "groups": [
     {
@@ -23,7 +23,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 32,
+      "judge_source": "official"
     },
     {
       "name": "busybox",
@@ -31,7 +33,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 53,
+      "judge_source": "official"
     },
     {
       "name": "lua",
@@ -39,7 +43,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 9,
+      "judge_source": "official"
     },
     {
       "name": "libctest",
@@ -47,7 +53,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 220,
+      "judge_source": "official"
     },
     {
       "name": "iozone",
@@ -55,7 +63,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 20,
+      "judge_source": "official"
     },
     {
       "name": "unixbench",
@@ -63,7 +73,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 27,
+      "judge_source": "team"
     },
     {
       "name": "iperf",
@@ -71,7 +83,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 6,
+      "judge_source": "team"
     },
     {
       "name": "libcbench",
@@ -79,7 +93,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 27,
+      "judge_source": "team"
     },
     {
       "name": "lmbench",
@@ -87,7 +103,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 24,
+      "judge_source": "team"
     },
     {
       "name": "netperf",
@@ -95,7 +113,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 5,
+      "judge_source": "team"
     },
     {
       "name": "cyclictest",
@@ -103,7 +123,9 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
-      }
+      },
+      "case_count": 4,
+      "judge_source": "team"
     }
   ],
   "candidate_images": [
@@ -111,9 +133,9 @@
       "purpose": "preliminary",
       "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz",
       "published_compressed_sha256": "2b59aee4d26681b2d78a8faa615ac216f723a8ea157544e7867bbc8c77aac087",
-      "digest_source": "GitHub release metadata + local sha256sum（2026-11-08 校验通过）",
+      "digest_source": "tests/inventory.json; release digest and local hash verified",
       "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
-      "source_match": "11 组脚本与 pre-2025@8b58dd1 一致；镜像 basic 的 musl 实为 glibc 构建，见 docs/reference/test-inventory.md",
+      "source_match": "MATCHED_GROUP_SCRIPTS_WITH_KNOWN_DIFFERENCES",
       "local_verification": "VERIFIED"
     },
     {
@@ -127,7 +149,6 @@
   "locks_pending": [
     "container_digest",
     "judge_revision_match",
-    "image_source_script_match",
     "tool_ELF_hashes",
     "make_source_version_and_hash"
   ],
@@ -172,5 +193,6 @@
   "judge": {
     "repo": "https://github.com/oscomp/oskernel-testsuits-cooperation",
     "commit": "44fa7ac65f292580c3974a8252f533c4484ebe6b"
-  }
+  },
+  "inventory_frozen_at": "2026-11-08"
 }

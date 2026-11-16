@@ -1,45 +1,54 @@
 #!/usr/bin/env python3
-"""Fetch the published judges at the pinned commit.
-
-The official judge repository has no explicit license file; it is kept out of
-this repository and fetched into third_party/ at a pinned commit instead of
-being vendored. Record the commit in tests/inventory.json.
-"""
-
-from __future__ import annotations
-
-import subprocess
-import sys
+"""从固定提交拉取并校验官方 judge；只写 third_party，不覆盖已有不同内容。"""
+import argparse
+import io
 from pathlib import Path
+import subprocess
+import tarfile
+import tempfile
 
-PIN = "44fa7ac65f292580c3974a8252f533c4484ebe6b"
-REPO = "https://github.com/oscomp/oskernel-testsuits-cooperation.git"
-ROOT = Path(__file__).resolve().parents[1]
-DEST = ROOT / "third_party" / "oskernel-testsuits-cooperation"
-
-
-def run(cmd: list[str], cwd: Path | None = None) -> None:
-    print("+", " ".join(cmd))
-    subprocess.run(cmd, cwd=cwd, check=True)
+from inventory import ROOT, digest, load_inventory
 
 
-def main() -> int:
-    if DEST.exists():
-        head = subprocess.check_output(["git", "-C", str(DEST), "rev-parse", "HEAD"], text=True).strip()
-        if head != PIN:
-            run(["git", "-C", str(DEST), "fetch", "origin", PIN])
-            run(["git", "-C", str(DEST), "checkout", PIN])
-        else:
-            print(f"already at {PIN}")
-        return 0
+def fetch(dest: Path) -> None:
+    inventory = load_inventory()
+    pin = inventory['judge']
+    hashes = pin['files']
+    if dest.exists():
+        judge = dest / 'judge'
+        if all((judge / name).is_file() and digest(judge / name) == sha for name, sha in hashes.items()):
+            print(f'official judges verified: {pin["commit"]}')
+            return
+        raise ValueError(f'{dest} contains missing/modified judges; use a new --dest, do not overwrite evidence')
+    repo = pin['repo'].removeprefix('https://github.com/')
+    archive = subprocess.check_output(['gh', 'api', f'repos/{repo}/tarball/{pin["commit"]}'], timeout=60)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.judges-', dir=dest.parent) as temporary:
+        stage = Path(temporary) / 'payload'
+        (stage/'judge').mkdir(parents=True)
+        with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as source:
+            for name in hashes:
+                members = [m for m in source.getmembers() if m.isfile() and
+                           len(Path(m.name).parts) == 3 and Path(m.name).parts[1:] == ('judge', name)]
+                if len(members) != 1:
+                    raise ValueError(f'missing/duplicate official judge: {name}')
+                with source.extractfile(members[0]) as handle:
+                    (stage/'judge'/name).write_bytes(handle.read())
+                if digest(stage/'judge'/name) != hashes[name]:
+                    raise ValueError(f'official judge hash mismatch: {name}')
+        stage.rename(dest)
+    print(f'official judges ready: {pin["commit"]}')
 
-    DEST.parent.mkdir(parents=True, exist_ok=True)
-    run(["git", "clone", "--filter=blob:none", "--no-checkout", REPO, str(DEST)])
-    run(["git", "-C", str(DEST), "fetch", "origin", PIN])
-    run(["git", "-C", str(DEST), "checkout", PIN])
-    print(f"judges ready at {DEST} ({PIN})")
-    return 0
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--dest', type=Path, default=ROOT/'third_party/oskernel-testsuits-cooperation')
+    args = parser.parse_args()
+    fetch(args.dest)
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == '__main__':
+    try:
+        main()
+    except (ValueError, OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
+        raise SystemExit(f'fetch judges: {exc}')

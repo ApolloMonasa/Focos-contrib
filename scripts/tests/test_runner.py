@@ -199,5 +199,139 @@ iozone throughput write/read measurements
         self.assertEqual(group["subcases"][0]["status"], "PASS")
 
 
-if __name__ == "__main__":
+
+class RunnerSafetyTests(unittest.TestCase):
+    def invoke(self, data=b"", extra=(), capture=None):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        log = root / 'input.log'
+        log.write_bytes(data)
+        out = root / 'out'
+        cmd = [sys.executable, '-B', str(RUNNER), '--out', str(out),
+               '--libc', 'musl', '--group', 'iperf', '--inventory', str(INVENTORY),
+               '--team-judge-dir', str(TEAM_DIR)]
+        cmd += ['--capture-cmd', capture] if capture else ['--log', str(log)]
+        proc = subprocess.run(cmd + list(extra), capture_output=True, timeout=8)
+        payload = json.loads((out / 'summary.json').read_text()) if (out / 'summary.json').exists() else None
+        return proc, payload, out
+
+    @staticmethod
+    def complete():
+        names = ['BASIC_UDP', 'BASIC_TCP', 'PARALLEL_UDP', 'PARALLEL_TCP', 'REVERSE_UDP', 'REVERSE_TCP']
+        return ('#### OS COMP TEST GROUP START iperf-musl ####\n' +
+                ''.join(f'====== iperf {n} end: success ======\n' for n in names) +
+                '#### OS COMP TEST GROUP END iperf-musl ####\n').encode()
+
+    def test_raw_bytes_are_preserved(self):
+        raw = b'\xff\x00\r\n' + self.complete()
+        proc, data, out = self.invoke(raw)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual((out / 'serial.log').read_bytes(), raw)
+        self.assertNotIn('score', data['totals'])
+        self.assertIn('log_sha256', data['meta'])
+
+    def test_environment_failure_invalidates_success(self):
+        proc, data, _ = self.invoke(b'REF_FAIL network-dummy\n' + self.complete())
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+
+    def test_duplicate_nested_and_mismatched_sections_are_errors(self):
+        valid = self.complete()
+        malformed = [valid + valid,
+                     valid.replace(b'END iperf-musl', b'END iperf-glibc'),
+                     valid.replace(b'====== iperf BASIC_UDP', b'#### OS COMP TEST GROUP START lua-musl ####\n====== iperf BASIC_UDP')]
+        for raw in malformed:
+            with self.subTest(raw=raw):
+                proc, data, _ = self.invoke(raw)
+                self.assertEqual(proc.returncode, 1)
+                self.assertEqual(data['groups'][0]['status'], 'LOG_ERROR')
+
+    def test_nonzero_capture_exit_overrides_complete_results(self):
+        import shlex
+        source = f'import sys;sys.stdout.buffer.write({self.complete()!r});sys.exit(7)'
+        proc, data, _ = self.invoke(capture=shlex.join([sys.executable, '-c', source]))
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'CAPTURE_ERROR')
+
+    def test_malformed_judge_rows_return_judge_error(self):
+        rows = [[{'name': 'BASIC_UDP', 'all': 0, 'pass': 0}],
+                [{'name': 'BASIC_UDP', 'all': 1, 'pass': 2}],
+                [{'name': 'BASIC_UDP', 'all': True, 'pass': 1}],
+                [{'name': 'BASIC_UDP', 'all': 1, 'pass': 1, 'score': float('nan')}],
+                [{'name': 'BASIC_UDP', 'all': 'oops', 'pass': 1}],
+                [{'name': 'BASIC_UDP', 'all': 1, 'pass': 1}] * 2]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / 'judge_iperf.py'
+            for items in rows:
+                with self.subTest(items=items):
+                    fake.write_text('import json\nprint(' + repr(json.dumps(items)) + ')\n')
+                    proc, data, _ = self.invoke(self.complete(), ['--team-judge-dir', tmp])
+                    self.assertEqual(proc.returncode, 1)
+                    self.assertEqual(data['groups'][0]['status'], 'JUDGE_ERROR')
+
+    def test_strict_reference_requires_complete_protocol(self):
+        proc, data, _ = self.invoke(self.complete(), ['--reference', 'strict'])
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+
+    def reference(self, rc=0):
+        return (b'REF_PROTOCOL 1\nREF_MODULES_OK\nREF_MOUNT_OK\nREF_PREPARED musl\n'
+                b'REF RUN musl iperf_testcode.sh\n' + self.complete() +
+                f'REF RESULT musl iperf_testcode.sh {rc}\nREF_ALL_DONE\n'.encode())
+
+    def test_valid_reference_protocol_and_test_exit_are_distinct(self):
+        proc, data, _ = self.invoke(self.reference(), ['--reference', 'strict'])
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(data['meta']['environment']['status'], 'VALID')
+        proc, data, _ = self.invoke(self.reference(3), ['--reference', 'strict'])
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'FAIL')
+        self.assertEqual(data['totals']['pass'], 0)
+        self.assertEqual(data['meta']['environment']['status'], 'VALID')
+
+    def test_reference_order_missing_and_duplicate_markers_are_errors(self):
+        good = self.reference()
+        bad = [good.replace(b'REF_MODULES_OK\n', b''),
+               good.replace(b'REF_ALL_DONE', b'REF_ALL_DONE\nREF_ALL_DONE'),
+               good.replace(b'REF_PREPARED musl\n', b'REF_PREPARED musl\nREF_PREPARED musl\n'),
+               good.replace(b'REF RESULT musl', b'REF RESULT glibc'),
+               good.replace(b'REF RESULT musl iperf_testcode.sh 0\n', b''),
+               good.replace(b'REF_MOUNT_OK', b'REF_MOUNT_OK\nREF_FAIL configuration')]
+        for raw in bad:
+            with self.subTest(raw=raw):
+                proc, data, _ = self.invoke(raw, ['--reference', 'strict'])
+                self.assertEqual(proc.returncode, 1)
+                self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+
+    def test_legacy_reference_cannot_be_accepted_as_new_environment(self):
+        raw = b'REF_MODULES_OK\nREF_MOUNT_OK\n' + self.complete() + b'REF_ALL_DONE\n'
+        proc, data, _ = self.invoke(raw)
+        self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+        proc, data, _ = self.invoke(raw, ['--reference', 'legacy'])
+        self.assertEqual(proc.returncode, 1)
+        self.assertEqual(data['groups'][0]['status'], 'PASS')
+        self.assertFalse(data['meta']['execution_valid'])
+
+    def test_capture_timeout_terminates_descendants_even_after_success(self):
+        import shlex
+        import time
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            child_pid = Path(tmp)/'child.pid'
+            source = ("import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
+                      f"open({str(child_pid)!r},'w').write(str(p.pid));"
+                      f"sys.stdout.buffer.write({self.complete()!r});sys.stdout.flush();time.sleep(30)")
+            started = time.monotonic()
+            proc, data, _ = self.invoke(capture=shlex.join([sys.executable, '-c', source]), extra=['--timeout', '1'])
+            self.assertLess(time.monotonic()-started, 4)
+            self.assertEqual(proc.returncode, 1)
+            self.assertEqual(data['groups'][0]['status'], 'TIMEOUT')
+            self.assertEqual(data['totals']['pass'], 0)
+            stat = Path('/proc')/child_pid.read_text()/'stat'
+            if stat.exists():
+                self.assertEqual(stat.read_text().split()[2], 'Z')
+
+
+if __name__ == '__main__':
     unittest.main()

@@ -1,223 +1,200 @@
 #!/usr/bin/env python3
-"""Build a reference-run initramfs for the official 2025 test image.
-
-This is a reference harness, not part of FOCOS. It extracts a static busybox
-from the official image, extracts the Alpine kernel/modules from a pinned apk,
-and writes a newc cpio initramfs that mounts the test image and runs the
-selected group scripts inside a chroot.
-
-Requirements:
-    pip install ext4        # only needed when --busybox is omitted
-    QEMU 9.2.4 (xPack or distro package)
-
-Example:
-    python scripts/ref/build_initramfs.py \
-      --image sdcard-rv.img \
-      --kernel-apk linux-lts-6.18.60-r0.apk \
-      --out ref/initramfs.cpio.gz --kernel-out ref/Image \
-      --libcs glibc musl --scripts basic_testcode.sh lua_testcode.sh
-"""
-
+"""构建 TEST-001 参考 Linux 环境；输入校验、确定性归档与环境准备属于同一契约。"""
 from __future__ import annotations
 
 import argparse
 import gzip
 import io
-import os
-import re
-import tarfile
+import json
 from pathlib import Path
+import shlex
+import sys
+import tarfile
+import zlib
 
-MODULES = [
-    "failover",
-    "net_failover",
-    "virtio_ring",
-    "virtio",
-    "virtio_net",
-    "virtio_mmio",
-    "virtio_blk",
-    "crc16",
-    "mbcache",
-    "jbd2",
-    "ext4",
-]
-NAME_RE = re.compile(r"^[A-Za-z0-9_.+-]+$")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from inventory import NAME, REFERENCE_LOCK, digest, load_inventory
+
+MODULES = ['failover', 'net_failover', 'virtio_ring', 'virtio', 'virtio_net',
+           'virtio_mmio', 'virtio_blk', 'crc16', 'mbcache', 'jbd2', 'ext4']
 
 
 def extract_busybox(image: Path, explicit: Path | None) -> bytes:
     if explicit:
         return explicit.read_bytes()
     try:
-        from ext4 import Volume  # type: ignore
+        from ext4 import Volume
     except ImportError as exc:
-        raise SystemExit("install ext4 (pip install ext4) or pass --busybox") from exc
-    volume = Volume(image.open("rb"))
-    handle = volume.inode_at("/musl/busybox").open()
-    try:
-        return handle.read()
-    finally:
-        handle.close()
+        raise ValueError('install ext4 or pass --busybox') from exc
+    with image.open('rb') as source:
+        handle = Volume(source).inode_at('/musl/busybox').open()
+        try:
+            return handle.read()
+        finally:
+            handle.close()
 
 
-def extract_kernel_and_modules(
-    apk: Path, release: str, kernel_out: Path, modules_dir: Path, extra: tuple[str, ...] = ()
-) -> list[str]:
+def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path,
+                               modules_dir: Path, extra: tuple[str, ...] = ()) -> list[str]:
+    targets = MODULES + list(extra)
+    payloads = {}
+    with tarfile.open(apk, 'r:gz') as archive:
+        members = [m for m in archive.getmembers() if m.isfile()]
+        def read_one(candidates, description):
+            if len(candidates) != 1:
+                raise ValueError(f'expected one {description}, found {len(candidates)}')
+            with archive.extractfile(candidates[0]) as handle:
+                return gzip.decompress(handle.read())
+        kernel = read_one([m for m in members if m.name.lstrip('./') == 'boot/vmlinuz-lts'], 'kernel')
+        for module in targets:
+            payloads[module] = read_one([
+                m for m in members if m.name.lstrip('./').startswith(f'lib/modules/{release}/')
+                and m.name.endswith(f'/{module}.ko.gz')
+            ], f'{release}/{module}.ko.gz')
     kernel_out.parent.mkdir(parents=True, exist_ok=True)
     modules_dir.mkdir(parents=True, exist_ok=True)
-    found: list[str] = []
-    with tarfile.open(apk, "r:gz") as tar:
-        names = tar.getnames()
-        kernel_name = next((n for n in names if n.endswith("boot/vmlinuz-lts")), None)
-        if not kernel_name:
-            raise SystemExit("boot/vmlinuz-lts not found in apk")
-        kernel = gzip.decompress(tar.extractfile(kernel_name).read())
-        kernel_out.write_bytes(kernel)
-
-        targets = MODULES + [m for m in extra if m not in MODULES]
-        for module in targets:
-            candidates = [n for n in names if n.endswith(f"/{module}.ko.gz")]
-            if not candidates:
-                continue
-            data = gzip.decompress(tar.extractfile(candidates[0]).read())
-            (modules_dir / f"{module}.ko").write_bytes(data)
-            found.append(module)
-
-    if "virtio_ring" not in found or "virtio_blk" not in found or "ext4" not in found:
-        raise SystemExit(f"required modules missing, found: {found}")
-    return found
+    kernel_out.write_bytes(kernel)
+    for module, data in payloads.items():
+        (modules_dir / f'{module}.ko').write_bytes(data)
+    return targets
 
 
 def entry(name: str, mode: int, data: bytes, ino: int) -> bytes:
-    name_bytes = name.encode() + b"\0"
-    header = b"070701" + b"".join(
-        f"{value:08x}".encode()
-        for value in (ino, mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(name_bytes), 0)
-    )
-    out = header + name_bytes
-    out += b"\0" * ((4 - len(out) % 4) % 4)
-    out += data
-    out += b"\0" * ((4 - len(data) % 4) % 4)
-    return out
+    encoded = name.encode() + b'\0'
+    header = b'070701' + b''.join(f'{v:08x}'.encode() for v in
+        (ino, mode, 0, 0, 1, 0, len(data), 0, 0, 0, 0, len(encoded), 0))
+    out = header + encoded
+    return out + b'\0' * (-len(out) % 4) + data + b'\0' * (-len(data) % 4)
 
 
 def build_init(libcs: list[str], scripts: list[str], modules: list[str], release: str, network: bool) -> str:
-    module_lines = "\n".join(
-        f'  [ -f /lib/modules/{release}/{m}.ko ] || fail "module-missing:{m}"\n'
-        f'  /busybox insmod /lib/modules/{release}/{m}.ko || fail "module-load:{m}"'
-        for m in modules
-    )
-    libc_lines = []
-    for libc in libcs:
-        libc_lines.append(
-            f"""  /busybox mkdir -p /mnt/{libc}/proc /mnt/{libc}/dev /mnt/{libc}/tmp /mnt/{libc}/var/tmp /mnt/{libc}/bin || fail "mkdir:{libc}"
-  /busybox mount --bind /proc /mnt/{libc}/proc || fail "bind-proc:{libc}"
-  /busybox mount --bind /dev /mnt/{libc}/dev || fail "bind-dev:{libc}"
-  /busybox ln -sf /busybox /mnt/{libc}/bin/sh
-  /busybox ln -sf /busybox /mnt/{libc}/bin/busybox
-  /busybox ln -sf /busybox /mnt/{libc}/bin/ls
-  [ -f /mnt/{libc}/basic/run-all.sh ] && /busybox chmod +x /mnt/{libc}/basic/run-all.sh
-  /busybox mkdir -p /mnt/{libc}/etc
-  /busybox sh -c "echo '127.0.0.1 localhost' > /mnt/{libc}/etc/hosts"
-  /busybox sh -c "echo 'hosts: files dns' > /mnt/{libc}/etc/nsswitch.conf"
-"""
-        )
-        if network:
-            libc_lines[-1] += (
-                f'  /busybox ifconfig dummy0 10.0.0.1 netmask 255.255.255.0 up || fail "ifconfig:dummy0:{libc}"\n'
-            )
-        for script in scripts:
-            libc_lines[-1] += f"  /busybox echo \"REF RUN {libc} {script}\"\n"
-            libc_lines[-1] += f"  /busybox chroot /mnt/{libc} /busybox sh /{script}\n"
-    body = "\n".join(libc_lines)
-    return f"""#!/busybox sh
-fail() {{
+    # 生成命令一律经过 must；只有被测脚本退出码与环境错误分开记录。
+    lines = ['''#!/busybox sh
+fail() {
   /busybox echo "REF_FAIL $1"
   /busybox poweroff -f
   exit 1
-}}
-/busybox mkdir -p /proc /sys /dev /mnt || fail mkdir-root
-/busybox mount -t proc proc /proc || fail mount-proc
-/busybox mount -t sysfs sysfs /sys || fail mount-sys
-/busybox mount -t devtmpfs devtmpfs /dev || fail mount-dev
-{module_lines}
-/busybox echo "REF_MODULES_OK"
-/busybox mount -t ext4 /dev/vda /mnt || fail mount-ext4
-/busybox echo "REF_MOUNT_OK"
-{body}
-/busybox echo "REF_ALL_DONE"
-/busybox poweroff -f
-"""
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="build a TEST-001 reference initramfs")
-    parser.add_argument("--image", required=True, type=Path, help="official sdcard-rv.img")
-    parser.add_argument("--kernel-apk", required=True, type=Path, help="Alpine linux-lts apk")
-    parser.add_argument("--out", required=True, type=Path, help="output initramfs.cpio.gz")
-    parser.add_argument("--kernel-out", type=Path, default=Path("Image"), help="decompressed kernel Image")
-    parser.add_argument("--modules-dir", type=Path, default=Path("modules"), help="extracted .ko directory")
-    parser.add_argument("--busybox", type=Path, help="static busybox; default extract /musl/busybox from image")
-    parser.add_argument("--release", default="6.18.60-0-lts", help="kernel module directory name")
-    parser.add_argument("--libcs", nargs="+", default=["glibc"], help="glibc / musl")
-    parser.add_argument("--scripts", nargs="+", required=True, help="group scripts, e.g. basic_testcode.sh")
-    parser.add_argument("--network-dummy", action="store_true", help="load dummy0 for netperf getaddrinfo")
-    args = parser.parse_args()
-
-    for value in args.libcs + args.scripts:
-        if not NAME_RE.match(value):
-            raise SystemExit(f"unsafe value: {value!r}")
-    if not all(libc in ("glibc", "musl") for libc in args.libcs):
-        raise SystemExit("--libcs must be glibc and/or musl")
-
-    extra_modules = ("dummy",) if args.network_dummy else ()
-    modules = extract_kernel_and_modules(
-        args.kernel_apk, args.release, args.kernel_out, args.modules_dir, extra_modules
-    )
-    if args.network_dummy and "dummy" not in modules:
-        raise SystemExit("--network-dummy requires dummy.ko in the apk")
-
-    busybox = extract_busybox(args.image, args.busybox)
-    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy)
-
-    files = {"init": (0o100755, init.encode()), "busybox": (0o100755, busybox)}
+}
+must() {
+  stage="$1"
+  shift
+  "$@" || fail "$stage"
+}
+/busybox echo "REF_PROTOCOL 1"''']
+    def must(stage, *args):
+        lines.append('must ' + shlex.join([stage, '/busybox', *args]))
+    must('mkdir-root', 'mkdir', '-p', '/proc', '/sys', '/dev', '/mnt')
+    for kind, dest in [('proc', '/proc'), ('sysfs', '/sys'), ('devtmpfs', '/dev')]:
+        must(f'mount-{kind}', 'mount', '-t', kind, kind, dest)
     for module in modules:
-        path = args.modules_dir / f"{module}.ko"
-        files[f"lib/modules/{args.release}/{module}.ko"] = (0o100644, path.read_bytes())
+        path = f'/lib/modules/{release}/{module}.ko'
+        must(f'module-missing:{module}', 'test', '-f', path)
+        must(f'module-load:{module}', 'insmod', path)
+    lines.append('/busybox echo REF_MODULES_OK')
+    must('mount-ext4', 'mount', '-t', 'ext4', '/dev/vda', '/mnt')
+    lines.append('/busybox echo REF_MOUNT_OK')
+    if network:
+        must('network-dummy', 'ifconfig', 'dummy0', '10.0.0.1', 'netmask', '255.255.255.0', 'up')
+    # 先准备全部 libc；避免后一套环境失败时已有部分运行被误作完整基线。
+    for libc in libcs:
+        base = f'/mnt/{libc}'
+        must(f'busybox:{libc}', 'test', '-x', base + '/busybox')
+        must(f'mkdir:{libc}', 'mkdir', '-p', *[base + p for p in
+             ['/proc', '/dev', '/tmp', '/var/tmp', '/bin', '/etc']])
+        for path in ['/proc', '/dev']:
+            must(f'bind-{path[1:]}:{libc}', 'mount', '--bind', path, base + path)
+        for applet in ['sh', 'busybox', 'ls']:
+            must(f'link-{applet}:{libc}', 'ln', '-sf', '/busybox', base + '/bin/' + applet)
+        if 'basic_testcode.sh' in scripts:
+            must(f'basic-file:{libc}', 'test', '-f', base + '/basic/run-all.sh')
+            must(f'chmod-basic:{libc}', 'chmod', '+x', base + '/basic/run-all.sh')
+        for file, value in [('hosts', '127.0.0.1 localhost'), ('nsswitch.conf', 'hosts: files dns')]:
+            must(f'config-{file}:{libc}', 'sh', '-c', f"printf '%s\\n' '{value}' > {base}/etc/{file}")
+        for script in scripts:
+            must(f'script:{libc}:{script}', 'test', '-r', base + '/' + script)
+        must(f'chroot-ready:{libc}', 'chroot', base, '/busybox', 'sh', '-c', ':')
+        lines.append(f'/busybox echo REF_PREPARED {libc}')
+    for libc in libcs:
+        for script in scripts:
+            lines.append(f'/busybox echo REF RUN {libc} {script}')
+            # lmbench 部分结果没有标签；记录 shell trace 以绑定命令和指标，脚本内容不改。
+            trace = ' -x' if script == 'lmbench_testcode.sh' else ''
+            lines.append(f'/busybox chroot /mnt/{libc} /busybox sh{trace} /{script}')
+            lines.append('result=$?')
+            lines.append(f'/busybox echo REF RESULT {libc} {script} "$result"')
+    lines += ['/busybox echo REF_ALL_DONE', '/busybox poweroff -f', '']
+    return '\n'.join(lines)
 
-    dirs = {"lib", "lib/modules", f"lib/modules/{args.release}"}
-    for path in files:
-        parts = path.split("/")[:-1]
-        for i in range(1, len(parts) + 1):
-            dirs.add("/".join(parts[:i]))
 
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--image', required=True, type=Path)
+    parser.add_argument('--kernel-apk', required=True, type=Path)
+    parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--kernel-out', type=Path, default=Path('Image'))
+    parser.add_argument('--modules-dir', type=Path, default=Path('modules'))
+    parser.add_argument('--busybox', type=Path)
+    parser.add_argument('--release', help='默认取 reference.lock.json 的 release')
+    parser.add_argument('--libcs', nargs='+', default=['glibc'])
+    parser.add_argument('--scripts', nargs='+', required=True)
+    parser.add_argument('--network-dummy', action='store_true')
+    parser.add_argument('--allow-unpinned-inputs', action='store_true', help='显式实验输入；manifest 标为未冻结')
+    args = parser.parse_args(argv)
+    inventory = load_inventory()
+    lock = json.loads(REFERENCE_LOCK.read_text())
+    args.release = args.release or lock['kernel']['release']
+    scripts = {f'{g}_testcode.sh' for g in inventory['groups']}
+    if (not NAME.fullmatch(args.release) or
+            any(v not in scripts for v in args.scripts) or
+            any(v not in ('musl', 'glibc') for v in args.libcs) or
+            len(set(args.libcs)) != len(args.libcs) or len(set(args.scripts)) != len(args.scripts)):
+        raise ValueError('invalid release, scripts or duplicate selections')
+    inputs = {'image': digest(args.image), 'kernel_apk': digest(args.kernel_apk)}
+    pinned = (inputs['image'] == inventory['image']['uncompressed_sha256'] and
+              inputs['kernel_apk'] == lock['kernel']['sha256'] and
+              args.release == lock['kernel']['release'] and args.busybox is None)
+    if not pinned and not args.allow_unpinned_inputs:
+        raise ValueError('input hashes/release do not match frozen reference; explicit inputs are experimental')
+    busybox = extract_busybox(args.image, args.busybox)
+    if not busybox:
+        raise ValueError('empty busybox')
+    modules = extract_kernel_and_modules(args.kernel_apk, args.release, args.kernel_out,
+                                        args.modules_dir, ('dummy',) if args.network_dummy else ())
+    init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy)
+    files = {'init': (0o100755, init.encode()), 'busybox': (0o100755, busybox)}
+    for module in modules:
+        files[f'lib/modules/{args.release}/{module}.ko'] = (0o100644, (args.modules_dir/f'{module}.ko').read_bytes())
+    dirs = {str(parent) for name in files for parent in Path(name).parents if str(parent) != '.'}
     buffer = io.BytesIO()
-    ino = 1
-    for directory in sorted(dirs):
-        buffer.write(entry(directory, 0o040755, b"", ino))
-        ino += 1
-    for path, (mode, data) in files.items():
-        buffer.write(entry(path, mode, data, ino))
-        ino += 1
-    buffer.write(entry("TRAILER!!!", 0, b"", 0))
-
+    for ino, directory in enumerate(sorted(dirs), 1):
+        buffer.write(entry(directory, 0o040755, b'', ino))
+    for ino, (name, (mode, data)) in enumerate(sorted(files.items()), len(dirs)+1):
+        buffer.write(entry(name, mode, data, ino))
+    buffer.write(entry('TRAILER!!!', 0, b'', 0))
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with open(args.out, "wb") as raw, gzip.GzipFile(
-        filename="", mode="wb", fileobj=raw, mtime=0
-    ) as handle:
-        handle.write(buffer.getvalue())
-
-    print(f"kernel: {args.kernel_out} ({args.kernel_out.stat().st_size} bytes)")
-    print(f"initramfs: {args.out} ({args.out.stat().st_size} bytes)")
-    print(f"modules: {', '.join(modules)}")
-    print("QEMU:")
-    print(
-        "qemu-system-riscv64 -machine virt -m 1G -smp 1 -nographic -no-reboot -snapshot "
-        f"-bios default -kernel {args.kernel_out} -initrd {args.out} "
-        '-append "console=ttyS0 rdinit=/init" '
-        f"-drive file={args.image},if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0"
-    )
+    with args.out.open('wb') as raw:
+        with gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=9) as handle:
+            handle.write(buffer.getvalue())
+    import hashlib
+    manifest = {'schema_version': 1, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
+                'busybox_sha256': hashlib.sha256(busybox).hexdigest(),
+                'builder_sha256': digest(Path(__file__)), 'inventory_code_sha256': digest(Path(__file__).resolve().parents[1]/'inventory.py'), 'inventory_sha256': digest(Path(__file__).resolve().parents[2]/'tests/inventory.json'),
+                'zlib_version': zlib.ZLIB_RUNTIME_VERSION,
+                'selection': {'libcs': args.libcs, 'scripts': args.scripts, 'release': args.release,
+                              'network_dummy': args.network_dummy},
+                'outputs': {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}}
+    args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
+    command = ['qemu-system-riscv64', '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
+               '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', str(args.kernel_out),
+               '-initrd', str(args.out), '-append', 'console=ttyS0 rdinit=/init',
+               '-drive', f'file={args.image},if=none,format=raw,id=x0', '-device', 'virtio-blk-device,drive=x0']
+    print(shlex.join(command))
+    print(json.dumps(manifest['outputs']))
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, tarfile.TarError, EOFError) as exc:
+        raise SystemExit(f'build reference: {exc}')

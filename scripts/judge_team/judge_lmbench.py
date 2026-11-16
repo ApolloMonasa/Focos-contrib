@@ -1,85 +1,86 @@
-"""Team judge for lmbench (the published lmbench.sh is a runner, not a stdin parser).
+"""按冻结源码的完整标签/单位判 lmbench；无标签数值必须绑定 shell trace。
 
-This is a conservative keyword-based parser. It only proves that a numeric
-result for each command appeared; it does not compare against a performance
-baseline. Confidence is medium until validated against a real reference run.
+格式依据 testsuits-for-oskernel@8b58dd1 的 lmbench_src/src。
+旧日志缺少 trace 时，不猜测 lat_mmap 与四个读带宽指标的归属。
 """
-
-import json
+import math
 import re
+import shlex
 import sys
 
-EXPECTED = [
-    "1:syscall null latency (micro second)",
-    "2:syscall read latency (micro second)",
-    "3:syscall write latency (micro second)",
-    "4:syscall stat latency (micro second)",
-    "5:syscall fstat latency (micro second)",
-    "6:syscall open latency (micro second)",
-    "7:select latency (micro second)",
-    "8:sig install latency (micro second)",
-    "9:sig catch latency (micro second)",
-    "10:sig prot latency (micro second)",
-    "11:pipe latency (micro second)",
-    "12:proc fork latency (micro second)",
-    "13:proc exec latency (micro second)",
-    "14:proc shell latency (micro second)",
-    "15:fs write bandwidth (KB/sec)",
-    "16:pagefault latency (micro second)",
-    "17:mmap latency (micro second)",
-    "18:pipe bandwidth (KB/sec)",
-    "19:file system latency (creations+deletes per second)",
-    "20:512k file read ioonly (megabytes per second)",
-    "21:512k file read open2close (megabytes per second)",
-    "22:512k mmap read mmaponly (megabytes per second)",
-    "23:512k mmap read open2close (megabytes per second)",
-    "24:context switch latency (micro second when there are 96 processes)",
-]
+from common import NUMBER, emit, expected, positive
 
-RULES = [
-    r"Simple syscall",
-    r"Simple read",
-    r"Simple write",
-    r"Simple stat",
-    r"Simple fstat",
-    r"Simple open/close",
-    r"Select on",
-    r"Signal handler installation",
-    r"Signal handler overhead",
-    r"Protection fault",
-    r"Pipe latency",
-    r"\bfork\b",
-    r"\bexec\b",
-    r"\bshell\b",
-    r"write bandwidth|XXX",
-    r"[Pp]agefault",
-    r"[Mm]map",
-    r"pipe bandwidth",
-    r"creations|file system latency|^\s*\d+k\s",
-    r"io_only",
-    r"open2close",
-    r"mmap_only",
-    r"open2close",
-    r"context",
-]
-
-text = sys.stdin.read()
-pending = list(range(len(EXPECTED)))
-assigned = {}
-number_re = re.compile(r"\d+(?:\.\d+)?")
-
-for raw in text.splitlines():
+names = expected('lmbench')
+labels = [r'Simple syscall', r'Simple read', r'Simple write', r'Simple stat', r'Simple fstat',
+          r'Simple open/close', r"Select on 100 fd's", r'Signal handler installation',
+          r'Signal handler overhead', r'Protection fault', r'Pipe latency',
+          r'(?:Static )?Process fork\+exit', r'(?:Static )?Process fork\+execve',
+          r'(?:Static )?Process fork\+/bin/sh -c']
+patterns = [(index, re.compile(rf'{label}:\s*({NUMBER}) microseconds'), re.compile(rf'{label}:'))
+            for index, label in enumerate(labels)]
+patterns += [(14, re.compile(rf'File /var/tmp/XXX write bandwidth:\s*({NUMBER}) KB/sec'), re.compile(r'File /var/tmp/XXX write bandwidth:')),
+             (15, re.compile(rf'Pagefaults on /var/tmp/XXX:\s*({NUMBER}) microseconds'), re.compile(r'Pagefaults on /var/tmp/XXX:')),
+             (17, re.compile(rf'Pipe bandwidth:\s*({NUMBER}) MB/sec'), re.compile(r'Pipe bandwidth:'))]
+contexts = {
+    ('lat_mmap', '-P', '1', '512k', '/var/tmp/XXX'): 16,
+    ('bw_file_rd', '-P', '1', '512k', 'io_only', '/var/tmp/XXX'): 19,
+    ('bw_file_rd', '-P', '1', '512k', 'open2close', '/var/tmp/XXX'): 20,
+    ('bw_mmap_rd', '-P', '1', '512k', 'mmap_only', '/var/tmp/XXX'): 21,
+    ('bw_mmap_rd', '-P', '1', '512k', 'open2close', '/var/tmp/XXX'): 22,
+}
+found = {}
+context = None
+for raw in sys.stdin.read().splitlines():
     line = raw.strip()
-    if not line or not number_re.search(line):
+    if not line:
         continue
-    for idx in list(pending):
-        if re.search(RULES[idx], line, re.I):
-            assigned[idx] = line
-            pending.remove(idx)
+    if line.startswith('+ '):
+        context = None
+        try:
+            args = shlex.split(line[2:])
+        except ValueError:
+            continue
+        if args and args[0] == './lmbench_all':
+            context = contexts.get(tuple(args[1:]))
+            if args[1:] == ['lat_fs', '/var/tmp']:
+                context = 18
+            if args[1:] == ['lat_ctx', '-P', '1', '-s', '32', '2', '4', '8', '16', '24', '32', '64', '96']:
+                context = 23
+        continue
+    if line == 'file system latency':
+        context = 18
+        continue
+    if line == 'context switch overhead':
+        context = 23
+        continue
+    matched = False
+    for index, pattern, prefix in patterns:
+        match = pattern.fullmatch(line)
+        if prefix.match(line):
+            found.setdefault(names[index], []).append(bool(match and positive(match[1])))
+            matched = True
             break
-
-result = []
-for idx, name in enumerate(EXPECTED):
-    ok = idx in assigned
-    result.append({"name": name, "all": 1, "pass": 1 if ok else 0, "score": 1 if ok else 0})
-print(json.dumps(result))
+    if matched:
+        continue
+    if context in (16, 19, 20, 21, 22):
+        match = re.fullmatch(rf'({NUMBER})\s+({NUMBER})', line)
+        if match:
+            ok = math.isclose(float(match[1]), 0.524288, rel_tol=0, abs_tol=0.0000005) and positive(match[2])
+            found.setdefault(names[context], []).append(ok)
+            # 保留 context，使同一命令重复输出也能被拒绝。
+        else:
+            context = None
+    elif context == 18:
+        match = re.fullmatch(r'10k\s+(\d+)\s+(\d+)\s+(\d+)', line)
+        if match:
+            found.setdefault(names[18], []).append(all(int(n) > 0 for n in match.groups()))
+        elif not re.fullmatch(r'\d+k\s+\d+\s+\d+\s+\d+', line):
+            context = None
+    elif context == 23:
+        match = re.fullmatch(rf'96\s+({NUMBER})', line)
+        if match:
+            found.setdefault(names[23], []).append(positive(match[1]))
+        elif not (re.fullmatch(r'"size=32k ovr=\d+(?:\.\d+)?', line)
+                  or re.fullmatch(rf'(?:2|4|8|16|24|32|64)\s+{NUMBER}', line)):
+            context = None
+emit(names, found)

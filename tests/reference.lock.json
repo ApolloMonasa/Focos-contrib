@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "kernel": {
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/riscv64/linux-lts-6.18.63-r0.apk",
+    "sha256": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369",
+    "release": "6.18.63-0-lts",
+    "version": "6.18.63-r0",
+    "aports_commit": "5001b1fba5a7a200a3b76cbf3361f00925064264"
+  },
+  "evidence": {
+    "repo": "Weibo-Hd/Focos",
+    "tag": "test-001-evidence-2026-11-08",
+    "asset": "test-001-evidence-2026-11-08.tar.gz",
+    "sha256": "8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd",
+    "historical_runner_commit": "051b611fb5810b9863dcc19afc1764d42f907812"
+  },
+  "historical_kernel": {
+    "url": "https://mirrors.ustc.edu.cn/alpine/edge/main/riscv64/linux-lts-6.18.60-r0.apk",
+    "sha256": "06454180443143009db6c36e1bcd9300871c65c5b2d9f41697007db51455994c",
+    "release": "6.18.60-0-lts"
+  }
+}

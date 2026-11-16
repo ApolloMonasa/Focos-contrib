@@ -21,21 +21,23 @@
 
 ## 2. 11 组清单
 
+<!-- TEST001_TABLE_BEGIN -->
 | 组 | 子用例数 | 判据来源 | judge 文件 | 说明 |
 | --- | ---: | --- | --- | --- |
-| basic | 32 | 官方 | `judge_basic.py` | 解析 `========== START/END`，逐用例 assert；内部类名 `dup2_test`，输出名 `test_dup2` |
-| busybox | 53 | 官方 | `judge_busybox.py` | 镜像有 55 条命令；judge 去重后 53 项 |
-| lua | 9 | 官方 | `judge_lua.py` | 固定 9 个 `.lua` |
-| libctest | 220 | 官方 | `judge_libctest.py` | static 109 + dynamic 111；镜像实际 107 + 110 |
-| iozone | 20 | 官方 | `judge_iozone.py` | 20 个吞吐指标；无 `pass` 字段，按“结果为正”判完成 |
-| unixbench | 27 | 团队 | `judge_team/judge_unixbench.py` | 官方未公开 judge；按输出行是否有正数判完成 |
-| iperf | 6 | 团队 | `judge_team/judge_iperf.py` | 按 `end: success/fail` 标记 |
-| libcbench | 27 | 团队 | `judge_team/judge_libcbench.py` | 27 个内部 benchmark；标签由 `main.c` 的 RUN 行还原 |
-| lmbench | 24 | 团队 | `judge_team/judge_lmbench.py` | 官方 `lmbench.sh` 是运行器而非 stdin 判分器；团队按关键字匹配，置信度中 |
-| netperf | 5 | 团队 | `judge_team/judge_netperf.py` | 按 `end: success/fail` 标记 |
-| cyclictest | 4 | 团队 | `judge_team/judge_cyclictest.py` | 4 个 cyclictest 场景；hackbench 只是负载 |
+| basic | 32 | 官方 | `judge_basic.py` | judge_basic.py 内部类名 dup2_test，输出名 test_dup2；清单使用输出名 |
+| busybox | 53 | 官方 | `judge_busybox.py` | 镜像 55 条，judge 53 个唯一项；1 个 judge-only（kill 10），2 个镜像-only（printf、sh -c sleep & kill）；满分 53 不可达 |
+| lua | 9 | 官方 | `judge_lua.py` | 按冻结判据解释；参考结果另列 |
+| libctest | 220 | 官方 | `judge_libctest.py` | 镜像实际 107 static + 110 dynamic = 217；judge baseline 109+111=220；缺 crypt/pleval，单项按 0 计 |
+| iozone | 20 | 官方 | `judge_iozone.py` | 官方 judge 的 res 笔误只影响 latency 键；iozone baseline 全是 kb/sec，正常判分，不设 fallback |
+| unixbench | 27 | 团队 | `judge_team/judge_unixbench.py` | 按冻结判据解释；参考结果另列 |
+| iperf | 6 | 团队 | `judge_team/judge_iperf.py` | 按冻结判据解释；参考结果另列 |
+| libcbench | 27 | 团队 | `judge_team/judge_libcbench.py` | 27 个内部 benchmark，标签由 main.c RUN 行还原 |
+| lmbench | 24 | 团队 | `judge_team/judge_lmbench.py` | 完整标签、单位和有限正数判完成；无标签指标要求 shell trace，缺少上下文不猜测归属 |
+| netperf | 5 | 团队 | `judge_team/judge_netperf.py` | 按冻结判据解释；参考结果另列 |
+| cyclictest | 4 | 团队 | `judge_team/judge_cyclictest.py` | 按冻结判据解释；参考结果另列 |
 
-合计 **427** 项：32 + 53 + 9 + 220 + 20 + 27 + 6 + 27 + 24 + 5 + 4。
+合计 **427** 项；本表由 `scripts/sync_test_plan.py` 从清单生成。
+<!-- TEST001_TABLE_END -->
 
 ## 3. 镜像与源码的已核实差异
 

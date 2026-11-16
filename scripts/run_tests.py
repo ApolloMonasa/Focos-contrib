@@ -17,12 +17,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import math
+import signal
+import hashlib
 import re
-import shlex
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from inventory import load_inventory, digest, ROOT
+from reference_protocol import validate_reference
 
 GROUP_RE = re.compile(r"^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$")
 LIBC_SUFFIX_RE = re.compile(r"-(musl|glibc)$")
@@ -55,29 +60,31 @@ def normalize_group(raw: str, default_libc: str) -> tuple[str, str]:
 
 
 def split_sections(log_text: str, default_libc: str) -> dict[tuple[str, str], Section]:
-    """Split a serial log into group sections keyed by (group, libc)."""
-    sections: dict[tuple[str, str], Section] = {}
-    current: Section | None = None
-
+    """严格配对组与 libc；重复、嵌套或孤立 END 不允许被覆盖。"""
+    sections = {}
+    seen = set()
+    current = None
     for line in log_text.splitlines():
-        match = GROUP_RE.match(line)
-        if match:
-            state, raw = match.groups()
-            group, libc = normalize_group(raw, default_libc)
-            if state == "START":
-                if current is not None:
-                    current.truncated = True
-                    sections[(current.group, current.libc)] = current
-                current = Section(group=group, libc=libc)
-            else:
-                if current is not None and current.group == group:
-                    current.truncated = False
-                    sections[(current.group, current.libc)] = current
-                    current = None
+        match = GROUP_RE.fullmatch(line)
+        if not match:
+            if '#### OS COMP TEST GROUP' in line and not line.startswith('+ '):
+                raise ValueError('malformed group marker')
+            if current is not None:
+                current.lines.append(line)
             continue
-        if current is not None:
-            current.lines.append(line)
-
+        state, raw = match.groups()
+        group, libc = normalize_group(raw, default_libc)
+        key = (group, libc)
+        if state == 'START':
+            if current is not None or key in seen:
+                raise ValueError(f'nested or duplicate section: {raw}')
+            seen.add(key)
+            current = Section(group=group, libc=libc)
+        else:
+            if current is None or (current.group, current.libc) != key:
+                raise ValueError(f'unmatched END: {raw}')
+            sections[key] = current
+            current = None
     if current is not None:
         current.truncated = True
         sections[(current.group, current.libc)] = current
@@ -118,15 +125,23 @@ def run_judge(judge_path: Path, section_text: str, timeout: int) -> JudgeResult:
 
 
 def normalize_item(item: dict, mode: str) -> tuple[str, int, int, float]:
-    name = str(item.get("name", "")).strip()
-    all_count = int(item.get("all", item.get("total", 1)) or 1)
-    passed = int(item.get("pass", 0) or 0)
-    score = float(item.get("score", 0) or 0)
-    if mode == "performance":
-        result = float(item.get("result", 0) or 0)
-        passed = 1 if (result > 0 or score > 0) else 0
-        all_count = 1
-    return name, all_count, passed, score
+    name = item.get('name')
+    if not isinstance(name, str) or not name.strip() or name != name.strip():
+        raise ValueError('invalid judge name')
+    score = item.get('score', 0)
+    if type(score) not in (int, float) or not math.isfinite(score) or score < 0:
+        raise ValueError('invalid/nonfinite judge score')
+    if mode == 'performance':
+        value = item.get('result')
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+            raise ValueError('invalid/nonfinite performance result')
+        return name, 1, int(value > 0), float(score)
+    all_count = item.get('all', item.get('total'))
+    passed = item.get('pass')
+    if (type(all_count) is not int or type(passed) is not int or
+            all_count <= 0 or not 0 <= passed <= all_count):
+        raise ValueError('invalid judge assertion counts')
+    return name, all_count, passed, float(score)
 
 
 def judge_group(
@@ -136,6 +151,7 @@ def judge_group(
     judge_dir: Path,
     team_dir: Path,
     judge_timeout: int,
+    official_hashes: dict | None = None,
 ) -> dict:
     expected = list(cfg.get("subcases", []))
     mode = cfg.get("mode", "pass_fail")
@@ -181,10 +197,13 @@ def judge_group(
     else:
         judge_path = team_dir / Path(judge_file).name
 
-    judged = run_judge(judge_path, section.text, judge_timeout)
+    if cfg.get('kind') == 'official' and official_hashes is not None and judge_path.exists() and digest(judge_path) != official_hashes.get(judge_path.name):
+        judged = JudgeResult([], 'error', 'official judge hash mismatch')
+    else:
+        judged = run_judge(judge_path, section.text, judge_timeout)
     result["judge_source"] = cfg.get("kind", "unknown")
     if judged.error:
-        result["status"] = "TIMEOUT" if section.truncated else "JUDGE_ERROR"
+        result["status"] = "JUDGE_ERROR"
         result["judge_error"] = judged.error
         result["subcases"] = [
             {"name": n, "status": "JUDGE_ERROR", "all": 1, "pass": 0, "score": 0.0}
@@ -192,11 +211,20 @@ def judge_group(
         ]
         return result
 
-    by_name: dict[str, dict] = {}
-    for item in judged.items:
-        name, all_count, passed, score = normalize_item(item, mode)
-        if name:
-            by_name[name] = {"all": all_count, "pass": passed, "score": score}
+    by_name = {}
+    try:
+        for item in judged.items:
+            name, all_count, passed, score = normalize_item(item, mode)
+            if name in by_name:
+                raise ValueError('duplicate judge name: ' + name)
+            by_name[name] = {'all': all_count, 'pass': passed, 'score': score}
+    except (ValueError, TypeError, OverflowError) as exc:
+        result['status'] = 'JUDGE_ERROR'
+        result['judge_error'] = str(exc)
+        result['subcases'] = [
+            {'name': name, 'status': 'JUDGE_ERROR', 'all': 1, 'pass': 0, 'score': 0.0}
+            for name in expected]
+        return result
 
     subcases = []
     for name in expected:
@@ -204,7 +232,7 @@ def judge_group(
         if item is None:
             subcases.append({"name": name, "status": "MISSING", "all": 1, "pass": 0, "score": 0.0})
             continue
-        if item["pass"] >= item["all"] and item["all"] > 0:
+        if item["pass"] == item["all"] and item["all"] > 0:
             status = "PASS"
         elif item["pass"] > 0 or item["score"] > 0:
             status = "PARTIAL"
@@ -226,24 +254,20 @@ def judge_group(
     return result
 
 
-def capture(cmd: str, timeout: int) -> tuple[str, bool, int | None]:
-    """Run a capture command (e.g. QEMU) and return (log, truncated, exit_code)."""
-    proc = subprocess.Popen(
-        cmd,
-        shell=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+def capture(cmd: str, timeout: int) -> tuple[bytes, bool, int | None]:
+    """超时关闭整个进程组，避免 QEMU/后代继续持有串口管道。"""
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, start_new_session=True)
     truncated = False
     try:
         out, _ = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        proc.kill()
-        out, _ = proc.communicate()
         truncated = True
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        out, _ = proc.communicate()
     return out, truncated, proc.returncode
 
 
@@ -254,14 +278,12 @@ def summarize(results: list[dict]) -> dict:
         "partial": 0,
         "fail": 0,
         "not_run": 0,
-        "score": 0.0,
         "groups": {"PASS": 0, "PARTIAL": 0, "FAIL": 0, "TIMEOUT": 0, "NOT_RUN": 0, "JUDGE_ERROR": 0},
     }
     for result in results:
         totals["groups"][result["status"]] = totals["groups"].get(result["status"], 0) + 1
         for sub in result["subcases"]:
             totals["subcases"] += 1
-            totals["score"] += float(sub.get("score", 0) or 0)
             status = sub["status"]
             if status == "PASS":
                 totals["pass"] += 1
@@ -278,7 +300,7 @@ def summarize(results: list[dict]) -> dict:
 def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     payload = {"meta": meta, "totals": totals, "groups": results}
-    (out_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / "summary.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False), encoding="utf-8")
 
     lines = [
         "# TEST-001 result summary",
@@ -288,9 +310,12 @@ def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) 
         f"- inventory: {meta.get('inventory')}",
         f"- log: {meta.get('log')}",
         f"- captured_at: {meta.get('captured_at')}",
+        f"- environment: {meta['environment']['status']}",
+        f"- execution_valid: {meta['execution_valid']}",
+        f"- errors: {meta['environment']['errors'] or meta['log_error'] or '-'}",
         "",
-        "| group | libc | status | judge | subcases | pass | partial | fail | not_run | score |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| group | libc | status | judge | subcases | pass | partial | fail | not_run |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for result in results:
         counts = {"PASS": 0, "PARTIAL": 0, "FAIL": 0, "NOT_RUN": 0}
@@ -299,8 +324,7 @@ def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) 
             counts[key] += 1
         lines.append(
             f"| {result['group']} | {result['libc'] or '-'} | {result['status']} | {result['judge_source']} | "
-            f"{len(result['subcases'])} | {counts['PASS']} | {counts['PARTIAL']} | {counts['FAIL']} | {counts['NOT_RUN']} | "
-            f"{sum(float(x.get('score', 0) or 0) for x in result['subcases']):.2f} |"
+            f"{len(result['subcases'])} | {counts['PASS']} | {counts['PARTIAL']} | {counts['FAIL']} | {counts['NOT_RUN']} |"
         )
     lines += [
         "",
@@ -308,7 +332,7 @@ def write_summary(out_dir: Path, meta: dict, results: list[dict], totals: dict) 
         f"{totals['fail']} fail, {totals['not_run']} not run; pass rate {totals['pass_rate']:.2%}",
         "",
         "A group is PASS only when every inventory subcase passes. TIMEOUT/NOT_RUN/JUDGE_ERROR are not passes.",
-        "The score column is judge-specific (points, lps, KBps, seconds); do not sum or compare it across groups.",
+        "Scores remain in per-case JSON only; mixed units are never summed.",
     ]
     (out_dir / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
@@ -320,7 +344,8 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--capture-cmd", help="run a command (e.g. QEMU) and capture stdout")
     parser.add_argument("--out", required=True, help="output directory")
     parser.add_argument("--group", action="append", default=None, help="group to judge; repeatable; default all")
-    parser.add_argument("--libc", default="unknown", help="libc label when the group marker has no suffix")
+    parser.add_argument("--libc", required=True, choices=["musl", "glibc"])
+    parser.add_argument("--reference", choices=["strict", "legacy"], help="严格新协议或显式回放未验证的旧环境")
     parser.add_argument("--timeout", type=int, default=600, help="capture timeout in seconds")
     parser.add_argument("--judge-timeout", type=int, default=120, help="judge timeout in seconds")
     parser.add_argument("--judge-dir", default="third_party/oskernel-testsuits-cooperation/judge")
@@ -333,9 +358,19 @@ def main(argv: list[str] | None = None) -> int:
     if not inventory_path.exists():
         print(f"inventory not found: {inventory_path}", file=sys.stderr)
         return 2
-    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    try:
+        inventory = load_inventory(inventory_path)
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print(f'invalid inventory: {exc}', file=sys.stderr)
+        return 2
+    if args.timeout <= 0 or args.judge_timeout <= 0:
+        print('timeouts must be positive', file=sys.stderr)
+        return 2
     groups_cfg = inventory["groups"]
     selected = args.group or list(groups_cfg.keys())
+    if len(set(selected)) != len(selected):
+        print("duplicate selected groups", file=sys.stderr)
+        return 2
     unknown = [g for g in selected if g not in groups_cfg]
     if unknown:
         print(f"unknown group(s): {', '.join(unknown)}", file=sys.stderr)
@@ -343,22 +378,23 @@ def main(argv: list[str] | None = None) -> int:
 
     truncated = False
     if args.log:
-        log_text = Path(args.log).read_text(encoding="utf-8", errors="replace")
+        raw_log = Path(args.log).read_bytes()
         log_label = str(Path(args.log))
         exit_code = None
     else:
-        log_text, truncated, exit_code = capture(args.capture_cmd, args.timeout)
+        raw_log, truncated, exit_code = capture(args.capture_cmd, args.timeout)
         log_label = args.capture_cmd
 
-    sections = split_sections(log_text, args.libc)
+    log_text = raw_log.decode('utf-8', errors='replace')
+    log_error = None
+    try:
+        sections = split_sections(log_text, args.libc)
+    except ValueError as exc:
+        sections, log_error = {}, str(exc)
+    environment = validate_reference(log_text, args.reference, selected, args.libc)
     results = []
     for group in selected:
         section = sections.get((group, args.libc))
-        if section is None:
-            # If libc was not given, accept any libc for this group.
-            if args.libc == "unknown":
-                candidates = [s for (g, _), s in sections.items() if g == group]
-                section = candidates[0] if candidates else None
         result = judge_group(
             group,
             section,
@@ -366,15 +402,32 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.judge_dir),
             Path(args.team_judge_dir),
             args.judge_timeout,
+            inventory['judge']['files'],
         )
         results.append(result)
 
-    if truncated:
-        for result in results:
-            result["status"] = "TIMEOUT"
-            for sub in result["subcases"]:
-                if sub["status"] == "NOT_RUN":
-                    sub["status"] = "TIMEOUT"
+    failure = None
+    if re.search(r'^REF_FAIL(?:\s|$)', log_text, re.M):
+        failure = 'ENV_ERROR'
+    elif truncated:
+        failure = 'TIMEOUT'
+    elif environment['status'] == 'ERROR':
+        failure = 'ENV_ERROR'
+    elif exit_code not in (None, 0):
+        failure = 'CAPTURE_ERROR'
+    elif log_error:
+        failure = 'LOG_ERROR'
+    for result in results:
+        result['libc'] = args.libc
+        if failure:
+            result['status'] = failure
+            # 无效运行的子项不能留 PASS；数值仍供诊断，不能计入通过率。
+            for sub in result['subcases']:
+                sub['status'] = failure
+        elif environment['script_exits'].get(f"{result['group']}-{args.libc}", 0) != 0:
+            result['status'] = 'FAIL'
+            for sub in result['subcases']:
+                sub['status'] = 'FAIL'
 
     totals = summarize(results)
     import datetime
@@ -386,14 +439,20 @@ def main(argv: list[str] | None = None) -> int:
         "log": log_label,
         "capture_exit_code": exit_code,
         "capture_truncated": truncated,
-        "captured_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        'inventory_sha256': digest(inventory_path),
+        'log_sha256': hashlib.sha256(raw_log).hexdigest(),
+        'environment': environment,
+        'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED',
+        'log_error': log_error,
+        'source_sha256': {str(p.relative_to(ROOT)): digest(p) for p in
+                          [Path(__file__).resolve(), ROOT/'scripts/inventory.py', ROOT/'scripts/reference_protocol.py']},
+        'judge_sha256': {str(p): digest(p) for p in
+                         sorted(set(Path(args.judge_dir).glob('judge_*.py')) | set(Path(args.team_judge_dir).glob('*.py')))},
     }
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    if args.log:
-        (out_dir / "serial.log").write_text(log_text, encoding="utf-8")
-    else:
-        (out_dir / "serial.log").write_text(log_text, encoding="utf-8")
+    (out_dir / 'serial.log').write_bytes(raw_log)
 
     sections_dir = out_dir / "sections"
     sections_dir.mkdir(exist_ok=True)
@@ -408,8 +467,12 @@ def main(argv: list[str] | None = None) -> int:
     write_summary(out_dir, meta, results, totals)
 
     print(json.dumps(totals, ensure_ascii=False))
-    return 0 if all(r["status"] == "PASS" for r in results) else 1
+    return 0 if environment["status"] != "LEGACY_UNVERIFIED" and all(r["status"] == "PASS" for r in results) else 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except OSError as exc:
+        print(f'runner: {exc}', file=sys.stderr)
+        raise SystemExit(2)
