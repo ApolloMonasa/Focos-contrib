@@ -29,12 +29,12 @@ test001 analyze --run NEW_RUN --out NEW_REPORT --require-pass
 test001 analyze --log SERIAL --libc glibc --group lua --out NEW_REPLAY
 ```
 
-`--run` 与 `--log` 互斥。运行包分析默认涵盖其全部组与 libc；不允许通过只选成功部分获得整次运行的通过。外部日志必须显式指定 libc 和组。重复/未知组、空选择、非法时限和已存在输出均退出 2。首版不提供自定义 judge、清单、shell 命令、legacy/strict 自动切换和自由平台标签；新增后端需先补 SPEC。
+`--run` 与 `--log` 互斥。运行包分析默认涵盖其全部组与 libc；不允许通过只选成功部分获得整次运行的通过。外部日志必须显式指定 libc 和组；报告固定 `subject=unknown`、`platform=unknown`，不从日志标记、文件名或调用方描述推断来源。重复/未知组、空选择、非法时限和已存在输出均退出 2。首版不提供自定义 judge、清单、shell 命令、legacy/strict 自动切换和自由平台标签；新增后端需先补 SPEC。
 
 | 阶段 | 输入与输出 | 不承担的职责 |
 | --- | --- | --- |
 | 冻结 | 版本化清单：源码提交、镜像、APK、judge 文件哈希、期望项、来源和单位 | 不填写 FocOS 执行成绩 |
-| build | 私有输入 → 内核、initramfs、构建清单 | 不启动 QEMU，不发布通过率 |
+| build | 私有输入 → 内核、initramfs、基盘、构建清单 | 不启动 QEMU，不发布通过率 |
 | capture | 校验构建包 → 原始串口、采集清单 | 不加载判分器，不因文本 success 决定通过 |
 | analyze | 运行包或外部日志 + 固定判据 → JSON/Markdown 报告 | 不重跑被测程序，不修改运行包 |
 
@@ -45,16 +45,16 @@ test001 analyze --log SERIAL --libc glibc --group lua --out NEW_REPLAY
 以下为待实现的包布局，不是当前仓库文件树：
 
 ```text
-BUILD/  kernel  initramfs.gz  build.json
+BUILD/  kernel  initramfs.gz  base.img  build.json
 RUN/    serial.log  capture.json
 REPORT/ report.json  report.md
 ```
 
 所有 JSON 有独立 `schema_version: 1`，未知版本、重复键、未知必需语义、NaN/Inf、非法计数均拒绝。清单内文件路径只允许固定相对名称；拒绝绝对路径、`..`、重复成员、符号链接和特殊文件。每个消费阶段先读取同一份清单字节，再校验其所有必需文件的长度与 SHA256。清单自己的 SHA256 由下游记录，不引入自引用哈希。
 
-- `build.json`：冻结清单哈希、构建实现文件集合及哈希、工具版本、输入哈希、组/libc 顺序、内核/initramfs 哈希及长度、环境适配项。不得设置“已运行”。相同输入、选择、实现和压缩工具版本应得到相同构建输出；运行时间不写进可复现载荷。
+- `build.json`：冻结清单哈希、构建实现文件集合及哈希、工具版本、输入哈希、组/libc 顺序、内核/initramfs/base.img 哈希及长度、环境适配项。`base.img` 是冻结镜像的完整字节副本，其输出哈希必须等于冻结输入镜像哈希。不得设置“已运行”。相同输入、选择、实现和压缩工具版本应得到相同构建输出；运行时间不写进可复现载荷。
 - `capture.json`：构建清单哈希与副本内容、实际内核/initramfs/基盘哈希、固定 `subject=reference_linux` 与 `platform=qemu_riscv64`、QEMU 路径/二进制哈希/版本、实际 argv、开始/结束时间、采集状态、退出码、限额、原始串口哈希及长度、采集实现身份。主机启动生成的 argv 才是采集条件，来宾打印的 build ID 只作一致性检查。
-- `report.json`：输入种类与字节哈希、被引用采集清单哈希、冻结清单与分析实现/判据文件哈希、所选范围、逐项结果、额外名称、各独立状态、验收阻断原因和计数。报告完成标记为最后写入的 `report.json`；消费者须一并核对其中记录的 `report.md` 哈希。串口保留在运行包；外部日志报告保存来源哈希，不覆盖原文件。
+- `report.json`：输入种类与字节哈希、被引用采集清单哈希、冻结清单与分析实现/判据文件哈希、subject/platform、所选范围与分母、逐项结果、额外名称、各独立状态、验收阻断原因和计数。报告完成标记为最后写入的 `report.json`；消费者须一并核对其中记录的 `report.md` 哈希。串口保留在运行包；外部日志报告保存来源哈希，不覆盖原文件。
 
 输出路径从可信工作目录逐级以不跟随符号链接的目录句柄访问，独占创建最终目录；后续写入相对此句柄，不重新解析可能被改名的祖先。文件独占新建，不采用先 exists 再覆盖写。文件写入失败只留下未完成目录；清单在所有文件关闭、校验完成后发布。读者仅接受完整清单及其全部文件。首版不承诺掉电事务；重启后仍重新校验，损坏包不能通过。
 
@@ -62,9 +62,9 @@ REPORT/ report.json  report.md
 
 ## 输入如何真正固定
 
-构建器把 APK 与镜像复制到自己的暂存区，校验复制后字节与冻结值，再从该副本提取内核、模块和 BusyBox。内存中的提取结果直接交给归档器，不通过共享 `Image/modules` 路径回读。模块按该 APK 的依赖图排序；缺模块、环或 release 不符在启动前拒绝。
+构建器把 APK 与镜像复制到自己的暂存区，校验复制后字节与冻结值，再从该副本提取内核、模块和 BusyBox。内存中的提取结果直接交给归档器，不通过共享 `Image/modules` 路径回读。已校验镜像以 `base.img` 纳入构建包，不只保留外部路径；移动完整 BUILD 或删除原始 IMAGE/APK 后仍能采集。模块按该 APK 的依赖图排序；缺模块、环或 release 不符在启动前拒绝。
 
-采集器重新将构建包、基盘和 QEMU 可执行文件复制到私有运行区并核对哈希，argv 只指向这些文件。基盘只读，以独立写时复制层承载测试写入；禁止其他进程复用该层。动态链接器/系统库属于受信主机工具链，记录版本，不声称只凭 QEMU 哈希已冻结完整主机。磁盘空间不足即失败，不退回原路径或硬链接。原始输入在复制期间变化，只有副本哈希仍等于冻结输入时才可继续。
+采集器只从 `--build` 指定包取得内核、initramfs 与 `base.img`，复制到私有运行区并核对哈希；基盘缺失或不匹配在启动前退出 2，不回查 build 时的 `--image` 路径。QEMU 从主机工具链解析、复制并记录身份，argv 只指向这些文件。基盘只读，以独立写时复制层承载测试写入；禁止其他进程复用该层。动态链接器/系统库属于受信主机工具链，记录版本，不声称只凭 QEMU 哈希已冻结完整主机。磁盘空间不足即失败，不退回原路径或硬链接。原始输入在复制期间变化，只有副本哈希仍等于冻结输入时才可继续。
 
 分析器先冻结完整的源码与判据文件集合，再在隔离 Python 搜索路径、空 pycache 的子进程中执行该副本；主脚本、helper、包、数据均显式列入。官方判据只能使用冻结提交中列出的文件，额外同名标准库模块也拒绝。被执行的项目模块均来自副本，报告哈希也从副本生成；不依赖运行前后扫描原目录来证明实际执行身份。整轮历史回放共享一次分析源码快照。
 
@@ -81,11 +81,32 @@ REPORT/ report.json  report.md
 | judgment | `PASS / PARTIAL / FAIL / MISSING / JUDGE_ERROR / NOT_RUN` | 固定判据与规范化 |
 | acceptance | `PASS / BLOCKED`，附全部原因 | 分析器的单一纯函数 |
 
-`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、协议 VALID、每个所选脚本退出 0、所有段 COMPLETE、所有冻结项 judgment 为 PASS、没有判据错误或未知用例。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
+`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、没有判据错误或未知用例。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
 
-例如 `capture=EXITED(exit=7)`、`section=TRUNCATED` 与 `judgment=PASS` 可以同时存在，报告保留三项事实，验收为 BLOCKED，原因包含非零退出与截断；不挑一个状态覆盖其他信息。`observed_pass` 统计判据观察值，`accepted_pass` 只有整次验收通过时才等于冻结总数，否则为 0；始终并列显示 origin 和 subject。性能指标保留单位与原值，不合成总分。
+例如 `capture=EXITED(exit=7)`、`section=TRUNCATED` 与 `judgment=PASS` 可以同时存在，报告保留三项事实，验收为 BLOCKED，原因包含非零退出与截断；不挑一个状态覆盖其他信息。`observed_pass` 统计判据观察值，`accepted_pass` 只有本运行范围验收通过时才等于该范围的 `selected_total`，否则为 0；始终并列显示 origin 和 subject。性能指标保留单位与原值，不合成总分。
 
-外部历史日志仍检查组边界，并可诊断其中协议，但报告的 capture 为 NOT_RECORDED。完整运行包在另一次分析中保持 recorded_capture，表示可追溯的记录，不表示此次重新执行、硬件认证或 FocOS 成绩。
+外部历史日志仍检查组边界，并可诊断其中协议，但报告的 capture 为 NOT_RECORDED，subject/platform 均为 unknown。运行包分析的 subject/platform 从已校验的采集清单读取，首版仅允许 reference_linux/qemu_riscv64；未知或冲突值作为输入错误拒绝。完整运行包在另一次分析中保持 recorded_capture，表示可追溯的记录，不表示此次重新执行、硬件认证或 FocOS 成绩。
+
+## 范围、汇总与退出码
+
+构建清单中的组列表与 libc 列表的笛卡尔积定义运行范围 `selection`。分析器从同一冻结清单投影出 `(group, libc, case)` 集合，`selected_total` 为其大小；不得以整个清单的 427 项代替本次范围，也不得在分析时删掉失败组。范围外项不生成 MISSING/NOT_RUN；范围内缺组为 NOT_RUN、缺项为 MISSING。运行包中出现范围外组/libc 是协议错误，不能悄悄扩展范围。
+
+按候选旧清单，Lua 每套 libc 为 9 项：示例的双 libc Lua 包分母为 18，全部条件满足时 `accepted_pass=18`、`--require-pass` 退出 0；报告必须标明只覆盖 Lua。冻结全清单则是每套 libc 427 项、双 libc 共 854 项，不能将 18/18 展示成全套通过。
+
+D 阶段另行交付全套汇总：预先固定 22 个 `(group, libc)` 槽位及各自运行包/报告哈希，要求相同冻结清单、被测系统/平台、基盘/APK/工具链、构建实现与环境适配策略，以及同一分析实现和判据快照；构建选择、构建包哈希、时间及日志允许不同。必须覆盖每个槽位恰好一次，每个子报告均满足本范围验收，才可报告全套 PASS。缺槽、重复槽或条件不一致均 BLOCKED，不挑选多次尝试中的最佳结果；重测须建立新的完整汇总清单并保留旧清单。分母由各槽位冻结项相加，候选双 libc 清单为 854。此汇总不是首版三个命令隐含的能力，接口在 D 的实现 PR 中补齐。
+
+下表均以参数与包校验通过为前提；输入/参数错误优先退出 2，不执行被测程序。发布失败或工具自身无法完成阶段退出 1，无可消费的完成清单。
+
+| 命令及结果 | 退出码 | 报告/证据语义 |
+| --- | --- | --- |
+| build 完成并发布构建包 | 0 | 尚未采集 |
+| capture 正常退出 0 并发布运行包 | 0 | 尚未判分；来宾协议/脚本仍可能失败 |
+| capture 启动失败、超时、超限或非零退出 | 1 | 能完成发布时保留失败运行包供诊断；不表示验收通过 |
+| 普通 analyze 完成报告，含 BLOCKED、缺项或 JUDGE_ERROR | 0 | 分析完成，观察结果和验收结论见报告 |
+| analyze --require-pass 完成报告且本范围 acceptance=PASS | 0 | 只认可报告明确列出的范围 |
+| analyze --require-pass 完成报告且 acceptance=BLOCKED | 1 | 保留报告及全部阻断原因；外部日志必在此列 |
+
+待实现负例须覆盖：完整 BUILD 移走原始输入仍可采集；BUILD 缺失/篡改 base.img 时不启动 QEMU；Lua 单组成功无需其他组；选择范围内缺项仍失败；少一个汇总槽位不算全套；同一外部全 PASS 日志的普通分析返回 0、require-pass 返回 1，两个报告均显示 unknown 来源。
 
 ## 尝试、判分与真实环境
 
