@@ -63,7 +63,7 @@ python3 -B scripts/run_tests.py \
   --reference-artifacts target/ref/Image target/ref/lua.cpio.gz
 ```
 
-构建器第一行输出经过 shell 引号保护的完整 QEMU 命令，第二行输出构件哈希。`-snapshot` 保留原始镜像；不同组建议分别启动，避免前一组的挂载或文件操作影响后一组。内核/initramfs/manifest 必须保留，严格回放需要核对实际构件。
+构建器第一行输出经过 shell 引号保护的完整 QEMU 命令，第二行输出构件哈希。`-snapshot` 保留原始镜像；不同组建议分别启动，避免前一组的挂载或文件操作影响后一组。内核/initramfs/manifest 必须保留，严格回放需要核对实际构件。每个输入/选择/源码版本请使用独立的 out、kernel-out、modules-dir 目录；相同内容可复用，不同内容会明确拒绝覆盖。
 
 默认检查镜像、APK、release；缺失或重复模块、输出覆盖输入、非法脚本名均在构建阶段失败。只提取当前 release 的必需模块；`netperf_testcode.sh` 自动启用 dummy 网卡，iperf/netperf 预先配置 loopback。显式 `--network-dummy` 可用于其他实验。
 
@@ -138,3 +138,13 @@ schema 1 的归档和记录保留原样，但不能声明 schema 2 的严格身�
 runner 以 inode 缓存初始构件哈希，同一文件的相对路径、绝对路径、符号链接与硬链接不重复读取。声明/真实路径分别保留绑定监视；大构件逐组检查 inode、大小、mtime_ns、ctime_ns、模式与重定向，最终再完整哈希一次，小型源码及判据仍逐组重哈希。稳定镜像总计只做两次完整 SHA256，不随所选组数增长；变更立即使执行失效。源码在大构件读取前冻结；构建器仍保留两次发布检查，但在每个边界内部去重相同文件。
 
 后续预检修复、真实 QEMU 及哈希读取次数记录见 [preflight 验证](../../tests/results/review-2026-11-17/preflight/summary.md)。旧 schema 2 证据只要原已含必填来源字段及正确构件，仍可严格回放；不把源码哈希强制改为当前版本来覆盖旧来源。
+
+## 状态归并与构建来源
+
+执行状态由一处表归并：明确环境/来源/协议错误优先；捕获超时或已知 EOF 截断保留 TIMEOUT；其他协议不完整、结构错误、完整日志的非零采集退出随后处理。script 失败只影响可判分状态，退出码与 judge_error 留在元数据。strict 的合法协议前缀未完成可保留 TIMEOUT，但执行无效、有效通过为零；错误构建 ID、非法顺序或 REF_FAIL 不会被超时掩盖。
+
+APK 在同一字节快照上校验并解包；kernel/module 字节只在内存中交接给身份计算与打包，Image/modules 目录只用于发布及复核。源码、配置和输入还监视路径与文件属性；BusyBox 从打开的文件描述符核对身份，读取后复查，避免路径先验证、文件后替换。
+
+产物先写私有临时文件，再用本地文件系统硬链接原子创建目标；同内容复用，不同内容拒绝覆盖，manifest 最后发布。构建目录应位于支持硬链接的 Linux/POSIX 文件系统。此操作不是跨文件回滚事务；失败可能留下无 manifest 的组件，不能据此认定构建成功。独立目录可避免不同版本争用默认 Image/modules。
+
+本轮根因、受控进程/线程竞争、状态组合和最终实际启动证据见 [ownership 验证](../../tests/results/review-2026-11-17/ownership/summary.md)。旧测试已纠正为修改真实 APK 内容才改变输入身份，外来中间输出不能被采纳为本次 APK 的产物。

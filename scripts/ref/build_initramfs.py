@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
+import io
 from itertools import combinations
 import json
+import os
 from pathlib import Path
 import shlex
 import sys
 import tarfile
+import tempfile
 import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -27,17 +31,35 @@ IMPLEMENTATION_FILES = {
 }
 
 
-def extract_busybox(image: Path, explicit: Path | None) -> bytes:
+def file_attributes(info):
+    return (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns,info.st_mode)
+
+
+def file_signature(path):
+    return path.resolve(),file_attributes(path.stat())
+
+
+def extract_busybox(image: Path, explicit: Path | None, expected=None) -> bytes:
+    def unchanged_descriptor(source):
+        if expected is not None and file_attributes(os.fstat(source.fileno())) != expected[1]:
+            raise ValueError('busybox input changed during extraction')
     if explicit:
-        return explicit.read_bytes()
+        with explicit.open('rb') as source:
+            unchanged_descriptor(source)
+            data=source.read()
+            unchanged_descriptor(source)
+            return data
     try:
         from ext4 import Volume
     except ImportError as exc:
         raise ValueError('install ext4 or pass --busybox') from exc
     with image.open('rb') as source:
+        unchanged_descriptor(source)
         handle = Volume(source).inode_at('/musl/busybox').open()
         try:
-            return handle.read()
+            data=handle.read()
+            unchanged_descriptor(source)
+            return data
         finally:
             handle.close()
 
@@ -73,11 +95,14 @@ def module_order(targets: list[str], dependency_table: str) -> list[str]:
     return order
 
 
-def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path,
-                               modules_dir: Path, extra: tuple[str, ...] = ()) -> list[str]:
+def read_kernel_payload(apk: Path, release: str, expected_sha256: str, extra: tuple[str, ...] = ()):
+    """只从校验过的 APK 字节快照解包，返回不可变字节，不经过共享输出目录。"""
     targets = MODULES + list(extra)
     payloads = {}
-    with tarfile.open(apk, 'r:gz') as archive:
+    raw = apk.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError('APK changed before extraction')
+    with tarfile.open(fileobj=io.BytesIO(raw),mode='r:gz') as archive:
         members = [m for m in archive.getmembers() if m.isfile()]
         def read_one(candidates, description):
             if len(candidates) != 1:
@@ -95,12 +120,34 @@ def extract_kernel_and_modules(apk: Path, release: str, kernel_out: Path,
                 m for m in members if m.name.lstrip('./').startswith(f'lib/modules/{release}/')
                 and m.name.endswith(f'/{module}.ko.gz')
             ], f'{release}/{module}.ko.gz')
-    kernel_out.parent.mkdir(parents=True, exist_ok=True)
-    modules_dir.mkdir(parents=True, exist_ok=True)
-    kernel_out.write_bytes(kernel)
-    for module, data in payloads.items():
-        (modules_dir / f'{module}.ko').write_bytes(data)
-    return targets
+    return kernel, tuple((module,payloads[module]) for module in targets)
+
+
+def check_immutable_output(path, data):
+    for component in (path.absolute(),*path.absolute().parents):
+        if component.is_symlink():
+            raise ValueError('build output contains a symlink: '+str(component))
+    if not path.exists():
+        return False
+    if not path.is_file() or path.stat().st_size != len(data) or path.read_bytes() != data:
+        raise ValueError('existing build output differs; use new output paths: '+str(path))
+    return True
+
+
+def publish_immutable(path, data):
+    """私有文件写完后以 link 原子创建；并发同名文件只能复用同样的字节。"""
+    if check_immutable_output(path,data):
+        return
+    path.parent.mkdir(parents=True,exist_ok=True)
+    with tempfile.NamedTemporaryFile(prefix='.reference-',dir=path.parent) as stage:
+        stage.write(data)
+        stage.flush()
+        os.fchmod(stage.fileno(),0o644)
+        try:
+            os.link(stage.name,path)
+        except FileExistsError:
+            if not check_immutable_output(path,data):
+                raise ValueError('build output disappeared during publication: '+str(path))
 
 
 def entry(name: str, mode: int, data: bytes, ino: int) -> bytes:
@@ -195,12 +242,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--network-dummy', action='store_true')
     parser.add_argument('--allow-unpinned-inputs', action='store_true', help='显式实验输入；manifest 标为未冻结')
     args = parser.parse_args(argv)
+    fingerprints={p:file_signature(p) for p in [*IMPLEMENTATION_FILES.values(),INVENTORY,REFERENCE_LOCK]}
     implementation_hashes = {key: digest(path) for key, path in IMPLEMENTATION_FILES.items()}
     inventory_bytes = INVENTORY.read_bytes()
     lock_bytes = REFERENCE_LOCK.read_bytes()
     inventory = load_inventory(raw=inventory_bytes)
     lock = json.loads(lock_bytes)
-    import hashlib
     inventory_hash = hashlib.sha256(inventory_bytes).hexdigest()
     lock_hash = hashlib.sha256(lock_bytes).hexdigest()
     frozen = {path: implementation_hashes[key] for key, path in IMPLEMENTATION_FILES.items()}
@@ -208,12 +255,13 @@ def main(argv: list[str] | None = None) -> int:
     def unchanged():
         checked = {}
         for path, initial in frozen.items():
-            if not path.is_file():
+            if not path.is_file() or file_signature(path) != fingerprints[path]:
                 raise ValueError('build source/input changed: '+str(path))
-            info = path.stat()
-            key = (info.st_dev,info.st_ino,info.st_size,info.st_mtime_ns,info.st_ctime_ns)
+            key = fingerprints[path][1]
             if key not in checked:
                 checked[key] = digest(path)
+                if file_signature(path) != fingerprints[path]:
+                    raise ValueError('build source/input changed while hashing: '+str(path))
             if checked[key] != initial:
                 raise ValueError('build source/input changed: '+str(path))
     args.release = args.release or lock['kernel']['release']
@@ -235,23 +283,27 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError('input/output paths overlap')
     check_outputs()
     args.network_dummy = args.network_dummy or 'netperf_testcode.sh' in args.scripts
+    fingerprints.update({p:file_signature(p) for p in [args.image,args.kernel_apk,*([args.busybox] if args.busybox else [])]})
     inputs = {'image': digest(args.image), 'kernel_apk': digest(args.kernel_apk)}
     frozen.update({args.image: inputs['image'], args.kernel_apk: inputs['kernel_apk']})
     if args.busybox:
         frozen[args.busybox] = digest(args.busybox)
-    for path, initial in list(frozen.items()): frozen[path.resolve()] = initial
+    for path, initial in list(frozen.items()):
+        canonical=fingerprints[path][0]
+        frozen.setdefault(canonical,initial)
+        fingerprints.setdefault(canonical,fingerprints[path])
     pinned = (inputs['image'] == inventory['image']['uncompressed_sha256'] and
               inputs['kernel_apk'] == lock['kernel']['sha256'] and
               args.release == lock['kernel']['release'] and args.busybox is None)
     if not pinned and not args.allow_unpinned_inputs:
         raise ValueError('input hashes/release do not match frozen reference; explicit inputs are experimental')
-    busybox = extract_busybox(args.image, args.busybox)
+    busybox = bytes(extract_busybox(args.image,args.busybox,fingerprints[args.busybox or args.image]))
     if not busybox:
         raise ValueError('empty busybox')
     check_outputs()
-    modules = extract_kernel_and_modules(args.kernel_apk, args.release, args.kernel_out,
-                                        args.modules_dir, ('dummy',) if args.network_dummy else ())
-    import hashlib
+    kernel, module_payloads = read_kernel_payload(args.kernel_apk,args.release,inputs['kernel_apk'],
+                                                 ('dummy',) if args.network_dummy else ())
+    modules = [module for module,data in module_payloads]
     manifest = {'schema_version': 2, 'protocol': 1, 'inputs_pinned': pinned, 'inputs': inputs,
                 'busybox_sha256': hashlib.sha256(busybox).hexdigest(), 'module_order': modules,
                 **implementation_hashes,
@@ -263,9 +315,9 @@ def main(argv: list[str] | None = None) -> int:
     placeholder = '0'*64
     init = build_init(args.libcs, args.scripts, modules, args.release, args.network_dummy, placeholder)
     files = {'init': (0o100755, init.encode()), 'busybox': (0o100755, busybox)}
-    for module in modules:
-        files[f'lib/modules/{args.release}/{module}.ko'] = (0o100644, (args.modules_dir/f'{module}.ko').read_bytes())
-    manifest['content'] = {'kernel_sha256': digest(args.kernel_out),
+    for module,data in module_payloads:
+        files[f'lib/modules/{args.release}/{module}.ko'] = (0o100644,data)
+    manifest['content'] = {'kernel_sha256': hashlib.sha256(kernel).hexdigest(),
                            'initramfs_payload_sha256': initramfs_payload_sha256(archive_bytes(files),placeholder)}
     manifest['build_id'] = build_identity(manifest)
     files['init'] = (0o100755,build_init(args.libcs,args.scripts,modules,args.release,args.network_dummy,manifest['build_id']).encode())
@@ -274,16 +326,26 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError('initramfs payload changed while embedding identity')
     unchanged()
     check_outputs()
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open('wb') as raw:
-        with gzip.GzipFile(fileobj=raw, filename='', mode='wb', mtime=0, compresslevel=9) as handle:
-            handle.write(payload)
-    manifest['outputs'] = {'kernel_sha256': digest(args.kernel_out), 'initramfs_sha256': digest(args.out)}
-    if manifest['outputs']['kernel_sha256'] != manifest['content']['kernel_sha256']:
-        raise ValueError('kernel output changed while writing initramfs')
+    compressed = io.BytesIO()
+    with gzip.GzipFile(fileobj=compressed,filename='',mode='wb',mtime=0,compresslevel=9) as handle:
+        handle.write(payload)
+    initramfs = compressed.getvalue()
+    manifest['outputs'] = {'kernel_sha256': manifest['content']['kernel_sha256'],
+                           'initramfs_sha256': hashlib.sha256(initramfs).hexdigest()}
+    publications = [(args.kernel_out,kernel),*[(args.modules_dir/f'{module}.ko',data) for module,data in module_payloads],
+                    (args.out,initramfs)]
+    manifest_path = args.out.with_suffix('.manifest.json')
+    manifest_bytes = (json.dumps(manifest,indent=2,sort_keys=True)+'\n').encode()
+    for path,data in [*publications,(manifest_path,manifest_bytes)]:
+        check_immutable_output(path,data)
+    for path,data in publications:
+        publish_immutable(path,data)
     unchanged()
     check_outputs()
-    args.out.with_suffix('.manifest.json').write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
+    for path,data in publications:
+        if not check_immutable_output(path,data):
+            raise ValueError('published build output disappeared: '+str(path))
+    publish_immutable(manifest_path,manifest_bytes)
     command = ['qemu-system-riscv64', '-machine', 'virt', '-m', '1G', '-smp', '1', '-nographic',
                '-no-reboot', '-snapshot', '-bios', 'default', '-kernel', str(args.kernel_out),
                '-initrd', str(args.out), '-append', 'console=ttyS0 rdinit=/init',

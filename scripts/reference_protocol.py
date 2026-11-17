@@ -4,7 +4,7 @@ import re
 
 def validate_reference(text, mode, selected, libc):
     failures = re.findall(r'^[ \t]*REF_FAIL(?:[ \t]+([^\r\n]*))?\r?$', text, re.M)
-    result = {'status': 'NOT_APPLICABLE', 'errors': [], 'script_exits': {}}
+    result = {'status': 'NOT_APPLICABLE', 'errors': [], 'script_exits': {}, 'incomplete': False}
     if failures:
         result.update(status='ERROR', errors=['REF_FAIL ' + stage for stage in failures])
         return result
@@ -65,12 +65,13 @@ def validate_reference(text, mode, selected, libc):
             phase = 'done'
         else:
             errors.append('unexpected reference marker: ' + line)
+    incomplete = phase != 'done' and not errors
     if phase != 'done':
         errors.append('incomplete reference protocol')
     for group in selected:
         key = (group, libc)
         if key not in exits:
             errors.append(f'missing reference attempt/result: {group}-{libc}')
-    result.update(status='ERROR' if errors else 'VALID', errors=errors,
+    result.update(status='ERROR' if errors else 'VALID', errors=errors, incomplete=incomplete,
                   script_exits={f'{g}-{c}': code for (g, c), code in exits.items()})
     return result

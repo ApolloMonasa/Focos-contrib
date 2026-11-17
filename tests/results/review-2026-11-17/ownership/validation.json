@@ -1,0 +1,125 @@
+{
+  "kind": "stage_priority_and_immutable_build_ownership",
+  "date": "2026-11-17",
+  "base_commit": "91032a602f87d90981198d48c512478eefe81fd0",
+  "checks": {
+    "test001": 110,
+    "rust": 52,
+    "existing_python": 15,
+    "qemu_kernel": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "observed_regressions": {
+    "initial_failed_assertions": 11,
+    "strict_prefix_failed_assertions": 4,
+    "input_restore_or_descriptor_failed_assertions": 2,
+    "empty_source_failed_assertions": 3
+  },
+  "controlled_concurrency": {
+    "process_builds": [
+      "pinned paused, experimental publishes",
+      "experimental paused, pinned publishes"
+    ],
+    "apk_differences": [
+      "kernel and modules",
+      "modules only, identical kernel"
+    ],
+    "publication_race": [
+      "identical data both reuse",
+      "same-length different data one wins, other refuses overwrite"
+    ]
+  },
+  "runtime": {
+    "identical_build_reused_without_byte_inode_or_mtime_changes": true,
+    "reused_files": 14,
+    "runs": [
+      {
+        "libc": "glibc",
+        "mode": "capture",
+        "image_hash_reads": 2,
+        "execution_valid": true,
+        "totals": {
+          "subcases": 9,
+          "pass": 9,
+          "partial": 0,
+          "fail": 0,
+          "not_run": 0,
+          "groups": {
+            "PASS": 1,
+            "PARTIAL": 0,
+            "FAIL": 0,
+            "TIMEOUT": 0,
+            "NOT_RUN": 0,
+            "JUDGE_ERROR": 0
+          },
+          "pass_rate": 1.0
+        }
+      },
+      {
+        "libc": "musl",
+        "mode": "replay",
+        "image_hash_reads": 2,
+        "execution_valid": true,
+        "totals": {
+          "subcases": 9,
+          "pass": 9,
+          "partial": 0,
+          "fail": 0,
+          "not_run": 0,
+          "groups": {
+            "PASS": 1,
+            "PARTIAL": 0,
+            "FAIL": 0,
+            "TIMEOUT": 0,
+            "NOT_RUN": 0,
+            "JUDGE_ERROR": 0
+          },
+          "pass_rate": 1.0
+        }
+      }
+    ]
+  },
+  "reference_linux_boots_this_round": 2,
+  "published_reference_linux_boots": 1,
+  "historical_replay": {
+    "samples": 15,
+    "all_expected_match": true,
+    "totals_unchanged": true,
+    "exact_groups": 13,
+    "reviewed_diagnostic_additions": 2
+  },
+  "source_sha256": {
+    "scripts/ref/build_initramfs.py": "6b5509abe35c2c16656ee45d551b63a8c0613d6533c9b7ff703b05c6022df410",
+    "scripts/run_tests.py": "5a33c65590708fb5053f8ea6f512fa34e68e52279480ee0a93d23ca0d631f3a5",
+    "scripts/reference_protocol.py": "51913f98ff64e65334c8706805dbb8101d920880ed2e0ab77bffba1e70c7cddf",
+    "scripts/reference_manifest.py": "33923a772698ee3fbe04b97ebea74ee922d5de1f7c9ccbecdae93db29d1ebe69",
+    "scripts/input_snapshot.py": "eec83f8c8fe091313a59b3d32f1f94b25b7d446aafc97e3e65fca63278d2ca6c"
+  },
+  "test_sha256": {
+    "scripts/tests/test_reference.py": "9d6f7863e52f553bbd8007c6b79d2447eaebd4c5448d48af33b9cc54ac385f6a",
+    "scripts/tests/test_runner.py": "0cb1cc73d93f075e36433c6d6e733d38f6d26b54787d6e88dce279afa3656aa9"
+  },
+  "build_id": "e3c8905bf2a28db2cfc97342910df7d782460eedc485273ab86c8f597e492b1f",
+  "content": {
+    "initramfs_payload_sha256": "63d227d77d00883244ef3202004312ce54c282a6977e264a8fbb9c0d397befd1",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "outputs": {
+    "initramfs_sha256": "a34276a6cffcba3d7ce4a821594435e128fc9a6f9f6f2e8ddf481521ecd16e48",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "evidence_sha256": {
+    "lua/build.manifest.json": "28dea0f0457180203ad4cbb3417f9b7de3e1a182a193a1ea68733d82bf2b2272",
+    "lua/capture.summary.json": "9f8f318fd608aedf132650192ec3122a00d38130b459a195ea39a44bd7800045",
+    "lua/replay.summary.json": "7b63caacb24a5c98222a3eaa7dadb3fae2598fb262a6057d3fea3f5390dc9d7b",
+    "lua/serial.log": "06a9db6ff3d84e41db152d5cab28bf360e7391b1b21f7321507fe1f27ba4995d"
+  },
+  "limits": [
+    "Final evidence retains one reference Linux boot; musl is replayed from that same dual-libc log. An earlier intermediate-code smoke boot is not published as final evidence.",
+    "No complete 22-run benchmark rerun; historical evidence remains unchanged.",
+    "Publication is per-file atomic creation with the manifest last, not a multi-file rollback transaction. Different existing output content is refused."
+  ]
+}

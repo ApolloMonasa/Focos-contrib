@@ -1,0 +1,49 @@
+{
+  "build_id": "e3c8905bf2a28db2cfc97342910df7d782460eedc485273ab86c8f597e492b1f",
+  "builder_sha256": "6b5509abe35c2c16656ee45d551b63a8c0613d6533c9b7ff703b05c6022df410",
+  "busybox_sha256": "bc09c5ae5eabf091d0ded0208a17a1173725f10d8b79264d896d09c9553c68de",
+  "content": {
+    "initramfs_payload_sha256": "63d227d77d00883244ef3202004312ce54c282a6977e264a8fbb9c0d397befd1",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "inputs": {
+    "image": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+    "kernel_apk": "47034305e6ddde9717652ce1da25d29b51ae88b997ab7c69b0beeee00ccc9369"
+  },
+  "inputs_pinned": true,
+  "inventory_code_sha256": "8d35642499cdf19a08768da81427793f17100469b26a4ce667272c291e1619a3",
+  "inventory_sha256": "cfb0a44193e1a6a2ad9ce71baa300f774f25038b943458d3417f2d46f435b8e3",
+  "manifest_code_sha256": "33923a772698ee3fbe04b97ebea74ee922d5de1f7c9ccbecdae93db29d1ebe69",
+  "module_order": [
+    "failover",
+    "net_failover",
+    "virtio_ring",
+    "virtio",
+    "virtio_net",
+    "virtio_mmio",
+    "virtio_blk",
+    "crc16",
+    "mbcache",
+    "jbd2",
+    "ext4"
+  ],
+  "outputs": {
+    "initramfs_sha256": "a34276a6cffcba3d7ce4a821594435e128fc9a6f9f6f2e8ddf481521ecd16e48",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "protocol": 1,
+  "reference_lock_sha256": "74fa1ddefa38676ab63fbd729ca3991a8a24d6382ee6e6c25f6739c6c171d42f",
+  "schema_version": 2,
+  "selection": {
+    "libcs": [
+      "glibc",
+      "musl"
+    ],
+    "network_dummy": false,
+    "release": "6.18.63-0-lts",
+    "scripts": [
+      "lua_testcode.sh"
+    ]
+  },
+  "zlib_version": "1.3.1.zlib-ng"
+}

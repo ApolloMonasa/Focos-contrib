@@ -130,8 +130,8 @@ Focos/
 │       ├── test_input_snapshot.py     # 大构件读取次数、别名与最终内容复核
 │       ├── test_inputs.py             # 清单投影、来源与归档边界
 │       ├── test_judges.py             # 性能格式与误报负例
-│       ├── test_reference.py          # 确定性构建及逐步故障注入
-│       └── test_runner.py             # 切组、捕获、判分与协议边界
+│       ├── test_reference.py          # 确定性构建、来源与并发发布
+│       └── test_runner.py             # 切组、捕获与跨阶段状态组合
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── inventory.json                 # TEST-001 冻结的 427 项清单与官方 judge 哈希
@@ -151,10 +151,14 @@ Focos/
 │   │   └── review-2026-11-17/           # 后续审核边界修复与历史诊断差异
 │   │       ├── summary.md             # 问题分析、验证结果与限制
 │   │       ├── validation.json        # 逐份历史对照、严格回放及源码哈希
-│   │       └── preflight/             # 后续 strict 构件预检、来源字段与有界哈希验证
-│   │           ├── summary.md         # 问题分析、检查与性能计数的边界
-│   │           ├── validation.json    # 当前源码哈希、读取次数与结果对照
-│   │           └── lua/               # 本轮 manifest、原始串口及采集/回放摘要
+│   │       ├── preflight/             # 后续 strict 构件预检、来源字段与有界哈希验证
+│   │       │   ├── summary.md         # 问题分析、检查与性能计数的边界
+│   │       │   ├── validation.json    # 当前源码哈希、读取次数与结果对照
+│   │       │   └── lua/               # 本轮 manifest、原始串口及采集/回放摘要
+│   │       └── ownership/             # 状态归并、输入来源与不可覆盖发布
+│   │           ├── summary.md         # 多轮遗漏根因、约束与并发验证
+│   │           ├── validation.json    # 组合/竞争测试及最终运行证据哈希
+│   │           └── lua/               # 最终 manifest、串口及采集/回放摘要
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交
 ├── docs/                              # 上手、设计与验证指南

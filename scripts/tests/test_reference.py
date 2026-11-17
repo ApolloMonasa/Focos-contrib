@@ -32,13 +32,13 @@ class BuildTests(unittest.TestCase):
         self.apk = self.root / 'kernel.apk'
         self.write_apk(build.MODULES + ['dummy'])
 
-    def write_apk(self, modules, release=RELEASE):
+    def write_apk(self, modules, release=RELEASE, *, kernel=b'kernel', module_suffix=b''):
         with tarfile.open(self.apk, 'w:gz') as archive:
             data = ''.join(f'kernel/{m}.ko.gz:\n' for m in modules).encode()
             item = tarfile.TarInfo(f'lib/modules/{release}/modules.dep');item.size=len(data)
             archive.addfile(item, io.BytesIO(data))
-            for name, raw in [('boot/vmlinuz-lts', b'kernel')] + [
-                (f'lib/modules/{release}/kernel/{m}.ko.gz', b'module:' + m.encode()) for m in modules
+            for name, raw in [('boot/vmlinuz-lts', kernel)] + [
+                (f'lib/modules/{release}/kernel/{m}.ko.gz', b'module:' + m.encode()+module_suffix) for m in modules
             ]:
                 data = gzip.compress(raw, mtime=0)
                 entry = tarfile.TarInfo(name)
@@ -123,22 +123,157 @@ class BuildTests(unittest.TestCase):
                 self.invoke(out)
         self.assertEqual(source.read_bytes(),b'implementation')
 
-    def test_build_identity_changes_with_extracted_kernel_or_module_content(self):
+    def test_build_identity_changes_with_actual_apk_kernel_or_module_content(self):
         baseline = self.root/'base/init.gz'
         self.invoke(baseline)
         old = json.loads(baseline.with_suffix('.manifest.json').read_text())['build_id']
-        original = build.extract_kernel_and_modules
         for target in ['kernel', 'module']:
-            def extract(apk, release, kernel, modules, extra):
-                order = original(apk, release, kernel, modules, extra)
-                path = kernel if target == 'kernel' else modules/(order[0]+'.ko')
-                path.write_bytes(path.read_bytes()+b'changed payload')
-                return order
+            self.write_apk(build.MODULES+['dummy'],kernel=b'changed kernel' if target=='kernel' else b'kernel',
+                           module_suffix=b':changed' if target=='module' else b'')
             out = self.root/target/'init.gz'
-            with self.subTest(target=target), patch.object(build, 'extract_kernel_and_modules', side_effect=extract):
+            with self.subTest(target=target):
                 self.invoke(out)
                 changed = json.loads(out.with_suffix('.manifest.json').read_text())
                 self.assertNotEqual(old, changed['build_id'])
+
+    def test_foreign_shared_outputs_cannot_be_adopted_as_this_apk_payload(self):
+        original=build.build_init
+        for target in ['kernel','module']:
+            with self.subTest(target=target):
+                out=self.root/target/'init.gz';polluted=False
+                def generate(*args,**kwargs):
+                    nonlocal polluted
+                    if not polluted:
+                        path=out.parent/'Image' if target=='kernel' else out.parent/'modules/virtio.ko'
+                        path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'from another build')
+                        polluted=True
+                    return original(*args,**kwargs)
+                with patch.object(build,'build_init',side_effect=generate),self.assertRaises(ValueError):self.invoke(out)
+                self.assertFalse(out.with_suffix('.manifest.json').exists())
+
+    def test_rewrite_and_restore_input_during_extraction_is_not_accepted(self):
+        original=build.extract_busybox;before=self.busybox.read_bytes();metadata=self.busybox.stat()
+        def extract(*args):
+            data=original(*args)
+            self.busybox.write_bytes(b'changed');self.busybox.write_bytes(before)
+            os.utime(self.busybox,ns=(metadata.st_atime_ns,metadata.st_mtime_ns))
+            return data
+        with patch.object(build,'extract_busybox',side_effect=extract),self.assertRaisesRegex(ValueError,'changed'):
+            self.invoke(self.root/'restored/init.gz')
+
+    def test_busybox_descriptor_must_match_the_frozen_input_even_if_alias_is_restored(self):
+        alias=self.root/'busybox-alias';alias.symlink_to(self.busybox)
+        other=self.root/'foreign';other.write_bytes(b'foreign busybox')
+        real_open=Path.open;original=build.extract_busybox;reading=False
+        def extract(*args):
+            nonlocal reading
+            reading=True
+            try:return original(*args)
+            finally:reading=False
+        def open_path(path,*args,**kwargs):
+            mode=args[0] if args else kwargs.get('mode','r')
+            if reading and path==alias and mode=='rb':
+                alias.unlink();alias.symlink_to(other)
+                handle=real_open(path,*args,**kwargs)
+                alias.unlink();alias.symlink_to(self.busybox)
+                return handle
+            return real_open(path,*args,**kwargs)
+        with patch.object(build,'extract_busybox',side_effect=extract),patch.object(Path,'open',new=open_path),self.assertRaisesRegex(ValueError,'changed'):
+            self.invoke(self.root/'descriptor/init.gz',('--busybox',str(alias)))
+
+    def test_existing_different_build_is_preserved_and_identical_build_is_reused(self):
+        out=self.root/'immutable/init.gz';self.invoke(out)
+        files=[p for p in out.parent.rglob('*') if p.is_file()]
+        before={p:(p.read_bytes(),p.stat().st_ino,p.stat().st_mtime_ns) for p in files}
+        self.invoke(out)
+        self.assertEqual({p:(p.read_bytes(),p.stat().st_ino,p.stat().st_mtime_ns) for p in files},before)
+        self.write_apk(build.MODULES+['dummy'],kernel=b'other kernel',module_suffix=b':other')
+        with self.assertRaises(ValueError):self.invoke(out)
+        self.assertEqual({p:(p.read_bytes(),p.stat().st_ino,p.stat().st_mtime_ns) for p in files},before)
+
+    def test_publication_create_race_never_overwrites_a_winner(self):
+        import concurrent.futures,threading
+        real_link=os.link
+        for identical in [True,False]:
+            with self.subTest(identical=identical),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);target=root/'artifact';barrier=threading.Barrier(2)
+                def link(source,destination):
+                    barrier.wait(timeout=5)
+                    return real_link(source,destination)
+                data=[b'first',b'first' if identical else b'other']
+                def publish(payload):
+                    try:build.publish_immutable(target,payload);return True
+                    except ValueError:return False
+                with patch.object(build.os,'link',side_effect=link),concurrent.futures.ThreadPoolExecutor(2) as pool:
+                    futures=[pool.submit(publish,payload) for payload in data]
+                    results=[future.result(timeout=10) for future in futures]
+                self.assertEqual(sum(results),2 if identical else 1)
+                for succeeded,payload in zip(results,data):
+                    if succeeded:self.assertEqual(target.read_bytes(),payload)
+                self.assertEqual(list(root.glob('.reference-*')),[])
+
+    def test_output_parent_symlink_is_rejected_without_outside_writes(self):
+        external=self.root/'external';external.mkdir();sentinel=external/'keep';sentinel.write_bytes(b'keep')
+        alias=self.root/'alias';alias.symlink_to(external,target_is_directory=True)
+        with self.assertRaisesRegex(ValueError,'symlink'):self.invoke(alias/'init.gz')
+        self.assertEqual(list(external.iterdir()),[sentinel])
+
+    def test_parallel_pinned_and_experimental_builds_cannot_mix_shared_outputs(self):
+        import itertools,select,shutil
+        source_code='''
+import os,sys
+from pathlib import Path
+sys.path.insert(0,sys.argv[1])
+from ref import build_initramfs as b
+apk,out,shared,image,inventory,lock=map(Path,sys.argv[2:8])
+b.INVENTORY=inventory;b.REFERENCE_LOCK=lock
+b.extract_busybox=lambda *args:b'synthetic busybox'
+original=b.build_init
+paused=False
+def generate(*args,**kwargs):
+    global paused
+    if len(sys.argv)>8 and not paused:
+        paused=True;os.write(int(sys.argv[8]),b'R');os.read(int(sys.argv[9]),1)
+    return original(*args,**kwargs)
+b.build_init=generate
+b.main(['--image',str(image),'--kernel-apk',str(apk),'--out',str(out),'--kernel-out',str(shared/'Image'),
+        '--modules-dir',str(shared/'modules'),'--scripts','lua_testcode.sh','--allow-unpinned-inputs'])
+'''
+        for paused_role,differing in itertools.product(['pinned','experiment'],['kernel','module']):
+            with self.subTest(paused=paused_role,differing=differing),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);shared=root/'shared';image=root/'disk';image.write_bytes(b'image')
+                apks={}
+                for role in ['pinned','experiment']:
+                    kernel=b'shared kernel' if differing=='module' else ('kernel:'+role).encode()
+                    self.write_apk(build.MODULES+['dummy'],kernel=kernel,module_suffix=(':'+role).encode())
+                    apks[role]=root/(role+'.apk');shutil.copyfile(self.apk,apks[role])
+                inv=json.loads((ROOT/'tests/inventory.json').read_text());inv['image']['uncompressed_sha256']=hashlib.sha256(b'image').hexdigest()
+                inventory=root/'inventory.json';inventory.write_text(json.dumps(inv))
+                lock_data=json.loads((ROOT/'tests/reference.lock.json').read_text());lock_data['kernel']['sha256']=hashlib.sha256(apks['pinned'].read_bytes()).hexdigest()
+                lock=root/'lock.json';lock.write_text(json.dumps(lock_data))
+                outs={role:root/role/'init.gz' for role in apks}
+                def command(role):return [sys.executable,'-B','-c',source_code,str(ROOT/'scripts'),str(apks[role]),str(outs[role]),str(shared),str(image),str(inventory),str(lock)]
+                ready_read,ready_write=os.pipe();resume_read,resume_write=os.pipe()
+                process=subprocess.Popen(command(paused_role)+[str(ready_write),str(resume_read)],pass_fds=(ready_write,resume_read),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+                os.close(ready_write);os.close(resume_read)
+                try:
+                    self.assertTrue(select.select([ready_read],[],[],10)[0],'build did not reach controlled interleave')
+                    self.assertEqual(os.read(ready_read,1),b'R')
+                    winner='experiment' if paused_role=='pinned' else 'pinned'
+                    result=subprocess.run(command(winner),capture_output=True,timeout=20)
+                    os.write(resume_write,b'R')
+                    stdout,stderr=process.communicate(timeout=20)
+                    self.assertEqual(result.returncode,0,result.stderr.decode())
+                    self.assertNotEqual(process.returncode,0,stdout.decode()+stderr.decode())
+                    self.assertFalse(outs[paused_role].with_suffix('.manifest.json').exists())
+                    manifest=json.loads(outs[winner].with_suffix('.manifest.json').read_text())
+                    self.assertIs(manifest['inputs_pinned'],winner=='pinned')
+                    self.assertEqual((shared/'Image').read_bytes(),b'shared kernel' if differing=='module' else ('kernel:'+winner).encode())
+                    archive=gzip.decompress(outs[winner].read_bytes())
+                    for module in build.MODULES:self.assertIn(('module:'+module+':'+winner).encode(),archive)
+                finally:
+                    os.close(ready_read);os.close(resume_write)
+                    if process.poll() is None:process.kill();process.communicate()
 
     def test_relative_build_inputs_are_not_rehashed_twice_for_the_same_boundary(self):
         reads=[];original=build.digest

@@ -275,6 +275,20 @@ def judge_group(
     return result
 
 
+def execution_status(result, *, environment_error, capture_timeout, log_error, capture_exit, script_exit,
+                     reference_incomplete=False):
+    """所有执行原因在一处归并；段级截断不能被较低优先级的退出码覆盖。"""
+    priorities = (
+        (environment_error, 'ENV_ERROR'),
+        (capture_timeout or result['section_truncated'], 'TIMEOUT'),
+        (reference_incomplete, 'ENV_ERROR'),
+        (bool(log_error), 'LOG_ERROR'),
+        (capture_exit not in (None,0), 'CAPTURE_ERROR'),
+        (script_exit != 0 and result['status'] in ('PASS','PARTIAL','FAIL'), 'FAIL'),
+    )
+    return next((status for applies,status in priorities if applies),result['status'])
+
+
 def capture(cmd: str | list[str], timeout: int) -> tuple[bytes, bool, int | None]:
     """超时关闭整个进程组，避免 QEMU/后代继续持有串口管道。"""
     proc = subprocess.Popen(cmd, shell=isinstance(cmd, str), stdout=subprocess.PIPE,
@@ -379,6 +393,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--inventory", default="tests/inventory.json")
     parser.add_argument("--platform", default="qemu")
     args = parser.parse_args(argv)
+    if (args.capture_cmd is not None and not args.capture_cmd.strip()) or args.log == '':
+        print('capture command or log source must not be empty',file=sys.stderr)
+        return 2
     snapshot = InputSnapshot(digest)
     # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
     source_hashes = {str(p.relative_to(ROOT)): snapshot.digest(p) for p in
@@ -539,17 +556,20 @@ def main(argv: list[str] | None = None) -> int:
     changed = snapshot.changes()
     provenance = None
     strict = args.reference == 'strict' or (args.reference is None and environment['status'] != 'NOT_APPLICABLE')
-    if strict and not truncated and not changed:
+    if strict and not changed:
         try:
             if args.reference_manifest is None or args.reference_artifacts is None:
                 raise ValueError('strict reference requires --reference-manifest and --reference-artifacts KERNEL INITRAMFS')
             if args.capture_cmd and not command_verified:
                 raise ValueError('strict capture command was not validated before execution')
-            verify_reference_log(manifest,log_text)
+            allow_incomplete = environment.get('incomplete',False) and (truncated or any(
+                section.truncated for (group,libc),section in sections.items() if group in selected and libc==args.libc))
+            verify_reference_log(manifest,log_text,allow_incomplete=allow_incomplete)
             provenance = {'manifest_sha256':manifest_hash,**preflight_provenance}
         except (ValueError, OSError, KeyError, TypeError) as exc:
             environment['status'] = 'ERROR'
             environment['errors'].append(str(exc))
+            environment['incomplete'] = False
     results = []
     for group in selected:
         changed = sorted(set(changed + snapshot.changes()))
@@ -569,36 +589,21 @@ def main(argv: list[str] | None = None) -> int:
     if changed:
         environment['status'] = 'ERROR'
         environment['errors'].append('inputs changed during run: '+', '.join(changed))
-    failure = None
-    if changed:
-        failure = 'ENV_ERROR'
-    elif re.search(r'^[ \t]*REF_FAIL(?:\s|$)', log_text, re.M):
-        failure = 'ENV_ERROR'
-    elif truncated:
-        failure = 'TIMEOUT'
-    elif environment['status'] == 'ERROR':
-        failure = 'ENV_ERROR'
-    elif exit_code not in (None, 0):
-        failure = 'CAPTURE_ERROR'
-    elif log_error:
-        failure = 'LOG_ERROR'
+    reference_incomplete = environment['status']=='ERROR' and environment.get('incomplete',False)
+    environment_error = bool(changed or re.search(r'^[ \t]*REF_FAIL(?:\s|$)',log_text,re.M) or
+                             (environment['status']=='ERROR' and not reference_incomplete))
+    invalid_execution = environment_error or reference_incomplete or truncated or bool(log_error) or exit_code not in (None,0)
     for result in results:
         result['libc'] = args.libc
-        if failure:
-            result['status'] = failure
-            # 无效运行的子项不能留 PASS；数值仍供诊断，不能计入通过率。
+        script_exit = environment['script_exits'].get(f"{result['group']}-{args.libc}",0)
+        script_failure = script_exit != 0 and result['status'] in ('PASS','PARTIAL','FAIL')
+        result['status'] = execution_status(result,environment_error=environment_error,capture_timeout=truncated,
+                                            log_error=log_error,capture_exit=exit_code,script_exit=script_exit,
+                                            reference_incomplete=reference_incomplete)
+        if invalid_execution or script_failure or (result['status']=='TIMEOUT' and args.reference!='legacy'):
             for sub in result['subcases']:
                 sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
-                sub.update(status=failure, **{'pass': 0, 'score': 0.0})
-        elif environment['script_exits'].get(f"{result['group']}-{args.libc}", 0) != 0 and result['status'] in ('PASS', 'PARTIAL', 'FAIL'):
-            result['status'] = 'FAIL'
-            for sub in result['subcases']:
-                sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
-                sub.update(status='FAIL', **{'pass': 0, 'score': 0.0})
-        elif result['status'] == 'TIMEOUT' and args.reference != 'legacy':
-            for sub in result['subcases']:
-                sub['observed'] = {key: sub[key] for key in ('status', 'pass', 'score')}
-                sub.update(status='TIMEOUT', **{'pass': 0, 'score': 0.0})
+                sub.update(status=result['status'], **{'pass': 0, 'score': 0.0})
 
     totals = summarize(results)
     import datetime
@@ -619,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
         'reference_provenance': provenance,
         'reference_command_verified': command_verified,
         'qemu': qemu,
-        'execution_valid': failure is None and environment['status'] != 'LEGACY_UNVERIFIED' and not any(
+        'execution_valid': not invalid_execution and environment['status'] != 'LEGACY_UNVERIFIED' and not any(
             section.truncated for (group,libc),section in sections.items() if group in selected and libc == args.libc),
         'log_error': log_error,
         'source_sha256': source_hashes,

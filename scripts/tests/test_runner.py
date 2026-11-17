@@ -295,6 +295,116 @@ class RunnerSafetyTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 1)
         self.assertEqual(data['groups'][0]['status'], 'CAPTURE_ERROR')
 
+    def test_nonzero_capture_with_unfinished_section_remains_timeout(self):
+        import shlex
+        raw=self.complete().replace(b'#### OS COMP TEST GROUP END iperf-musl ####\n',b'')
+        source=f'import sys;sys.stdout.buffer.write({raw!r});sys.exit(7)'
+        proc,data,_=self.invoke(capture=shlex.join([sys.executable,'-c',source]))
+        self.assertEqual(proc.returncode,1)
+        self.assertEqual(data['meta']['capture_exit_code'],7)
+        self.assertEqual(data['groups'][0]['status'],'TIMEOUT')
+        self.assertEqual(data['totals']['pass'],0)
+        self.assertFalse(data['meta']['execution_valid'])
+
+    def test_empty_source_arguments_are_rejected_before_execution(self):
+        import contextlib,io,run_tests
+        from unittest.mock import patch
+        for source in [['--capture-cmd',''],['--capture-cmd',' \n'],['--log','']]:
+            with self.subTest(source=source),tempfile.TemporaryDirectory() as tmp,patch.object(run_tests,'capture',side_effect=AssertionError('empty source was executed')),contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(run_tests.main(source+['--capture-artifact',str(RUNNER),'--out',tmp,'--libc','musl','--group','iperf']),2)
+
+    def test_execution_status_combinations_follow_one_precedence_table(self):
+        import contextlib,io,run_tests
+        from inventory import load_inventory
+        from unittest.mock import patch
+        complete=self.complete();partial=complete.replace(b'#### OS COMP TEST GROUP END iperf-musl ####\n',b'')
+        malformed=complete.replace(b'END iperf-musl',b'END iperf-glibc')
+        cases=[
+            ('valid',complete,False,0,False,'PASS'),
+            ('complete-nonzero',complete,False,7,False,'CAPTURE_ERROR'),
+            ('partial-nonzero',partial,False,7,False,'TIMEOUT'),
+            ('partial-zero',partial,False,0,False,'TIMEOUT'),
+            ('missing-nonzero',b'',False,7,False,'CAPTURE_ERROR'),
+            ('log-and-exit',malformed,False,7,False,'LOG_ERROR'),
+            ('environment-and-partial',b'REF_FAIL mount-ext4\n'+partial,False,7,False,'ENV_ERROR'),
+            ('timeout-after-complete',complete,True,-9,False,'TIMEOUT'),
+            ('environment-and-timeout',b'REF_PROTOCOL 999\n'+partial,True,-9,False,'ENV_ERROR'),
+            ('partial-and-judge-and-exit',partial,False,7,True,'TIMEOUT'),
+            ('complete-and-judge-and-exit',complete,False,7,True,'CAPTURE_ERROR'),
+            ('complete-and-judge',complete,False,0,True,'JUDGE_ERROR'),
+            ('partial-and-judge',partial,False,0,True,'TIMEOUT'),
+        ]
+        names=load_inventory()['groups']['iperf']['subcases']
+        for name,raw,timed_out,rc,broken,expected in cases:
+            with self.subTest(case=name),tempfile.TemporaryDirectory() as tmp:
+                judged=run_tests.JudgeResult([], 'error','judge unavailable') if broken else run_tests.JudgeResult(
+                    [{'name':n,'all':1,'pass':1,'score':1} for n in names],'ok')
+                with patch.object(run_tests,'capture',return_value=(raw,timed_out,rc)),patch.object(run_tests,'run_judge',return_value=judged),contextlib.redirect_stdout(io.StringIO()):
+                    code=run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',tmp,'--libc','musl','--group','iperf'])
+                data=json.loads((Path(tmp)/'summary.json').read_text())
+                self.assertEqual(data['groups'][0]['status'],expected)
+                self.assertEqual(data['meta']['capture_exit_code'],rc)
+                self.assertEqual(code,0 if expected=='PASS' else 1)
+                self.assertEqual(data['totals']['pass'],len(names) if expected=='PASS' else 0)
+                if broken:self.assertEqual(data['groups'][0]['judge_error'],'judge unavailable')
+
+    def test_complete_and_incomplete_groups_keep_distinct_capture_failure_statuses(self):
+        import contextlib,io,run_tests
+        from unittest.mock import patch
+        raw=self.complete()+b'#### OS COMP TEST GROUP START netperf-musl ####\n'
+        with tempfile.TemporaryDirectory() as tmp,patch.object(run_tests,'capture',return_value=(raw,False,7)),contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(run_tests.main(['--capture-cmd','fake','--capture-artifact',str(RUNNER),'--out',tmp,'--libc','musl',
+                                            '--group','iperf','--group','netperf']),1)
+            data=json.loads((Path(tmp)/'summary.json').read_text())
+            self.assertEqual([g['status'] for g in data['groups']],['CAPTURE_ERROR','TIMEOUT'])
+            self.assertEqual(data['totals']['pass'],0)
+
+    def test_higher_priority_evidence_dominates_lower_priority_combinations(self):
+        import itertools,run_tests
+        for status,log_error,exit_code,script_exit in itertools.product(
+                ['PASS','PARTIAL','FAIL','NOT_RUN','JUDGE_ERROR','TIMEOUT'],[None,'malformed'],[None,0,7],[0,3]):
+            result={'status':status,'section_truncated':False}
+            kwargs={'log_error':log_error,'capture_exit':exit_code,'script_exit':script_exit}
+            with self.subTest(status=status,log=log_error,exit=exit_code,script=script_exit):
+                self.assertEqual(run_tests.execution_status(result,environment_error=True,capture_timeout=True,**kwargs),'ENV_ERROR')
+                self.assertEqual(run_tests.execution_status(result,environment_error=True,capture_timeout=False,**kwargs),'ENV_ERROR')
+                self.assertEqual(run_tests.execution_status(result,environment_error=False,capture_timeout=True,**kwargs),'TIMEOUT')
+                result['section_truncated']=True
+                self.assertEqual(run_tests.execution_status(result,environment_error=False,capture_timeout=False,**kwargs),'TIMEOUT')
+
+    def test_strict_incomplete_prefix_preserves_timeout_without_hiding_protocol_faults(self):
+        import contextlib,io,run_tests,shlex
+        from inventory import digest
+        from unittest.mock import patch
+        _,_,prior=self.invoke(self.reference(),['--reference','strict']);root=prior.parent
+        full=(prior/'serial.log').read_bytes();partial=full.split(b'#### OS COMP TEST GROUP END')[0]
+        image=root/'disk.img';kernel=root/'Image';init=root/'initramfs.gz'
+        qemu=root/'qemu-system-riscv64';qemu.write_bytes(b'fake executable')
+        info={'path':str(qemu),'invoked_path':str(qemu),'sha256':digest(qemu),'version':'QEMU emulator version test'}
+        command=shlex.join(['qemu-system-riscv64','-machine','virt','-m','1G','-smp','1','-nographic','-no-reboot','-snapshot',
+                           '-bios','default','-kernel',str(kernel),'-initrd',str(init),'-append','console=ttyS0 rdinit=/init',
+                           '-drive',f'file={image},if=none,format=raw,id=x0','-device','virtio-blk-device,drive=x0'])
+        import re
+        bad_id=re.sub(rb'REF_BUILD_ID [0-9a-f]{64}',b'REF_BUILD_ID '+b'0'*64,partial)
+        prefix=full.split(b'REF RUN')[0]
+        cases=[('partial-exit',partial,False,7,'TIMEOUT'),('partial-zero',partial,False,0,'TIMEOUT'),
+               ('bad-id',bad_id,False,7,'ENV_ERROR'),('bad-protocol',partial.replace(b'REF_PROTOCOL 1',b'REF_PROTOCOL 999'),True,-9,'ENV_ERROR'),
+               ('explicit-fail',partial+b'REF_FAIL mount-ext4\n',False,7,'ENV_ERROR'),
+               ('complete-prefix',full.split(b'REF_ALL_DONE')[0],False,7,'ENV_ERROR'),
+               ('timeout-before-run',prefix,True,-9,'TIMEOUT'),('timeout-before-init',b'',True,-9,'TIMEOUT')]
+        for index,(name,raw,timed_out,rc,status) in enumerate(cases):
+            with self.subTest(case=name),patch.object(run_tests,'qemu_identity',return_value=info),patch.object(run_tests,'capture',return_value=(raw,timed_out,rc)),contextlib.redirect_stdout(io.StringIO()):
+                out=root/str(index)
+                code=run_tests.main(['--capture-cmd',command,'--out',str(out),'--libc','musl','--group','iperf','--reference','strict',
+                                     '--inventory',str(root/'inventory.json'),'--reference-manifest',str(root/'build.manifest.json'),
+                                     '--reference-image',str(image),'--reference-artifacts',str(kernel),str(init)])
+                data=json.loads((out/'summary.json').read_text())
+                self.assertEqual(code,1)
+                self.assertEqual(data['groups'][0]['status'],status)
+                self.assertFalse(data['meta']['execution_valid'])
+                self.assertEqual(data['totals']['pass'],0)
+                self.assertEqual(data['meta']['capture_exit_code'],rc)
+
     def test_malformed_judge_rows_return_judge_error(self):
         rows = [[{'name': 'BASIC_UDP', 'all': 0, 'pass': 0}],
                 [{'name': 'BASIC_UDP', 'all': 1, 'pass': 2}],

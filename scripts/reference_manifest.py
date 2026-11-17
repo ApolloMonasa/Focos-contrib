@@ -197,14 +197,16 @@ def verify_reference_inputs(manifest, artifacts, inventory, selected, libc, inve
     return {'build_id':manifest['build_id'],'inputs_pinned':True,'image_sha256':manifest['inputs']['image']}
 
 
-def verify_reference_log(manifest, text):
+def verify_reference_log(manifest, text, *, allow_incomplete=False):
     ids = [match[1] for line in text.splitlines()
            if (match := re.fullmatch(r'REF_BUILD_ID ([0-9a-f]{64})', line))]
-    if ids != [manifest['build_id']]:
+    runs = re.findall(r'^REF RUN (musl|glibc) ([a-z0-9_]+_testcode\.sh)\r?$', text, re.M)
+    before_attempt = not runs and not re.search(r'^####\s*OS COMP TEST GROUP',text,re.M)
+    if ids != [manifest['build_id']] and not (allow_incomplete and not ids and before_attempt):
         raise ValueError('log does not match reference build identity')
     selection = manifest['selection']
-    runs = re.findall(r'^REF RUN (musl|glibc) ([a-z0-9_]+_testcode\.sh)\r?$', text, re.M)
-    if runs != [(c, s) for c in selection['libcs'] for s in selection['scripts']]:
+    expected = [(c, s) for c in selection['libcs'] for s in selection['scripts']]
+    if runs != (expected[:len(runs)] if allow_incomplete else expected):
         raise ValueError('reference attempts do not match build selection/order')
 
 
