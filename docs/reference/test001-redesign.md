@@ -17,7 +17,7 @@
 
 不能把每条评审建议当作事实直接实现。例如[模块顺序评论](https://github.com/MindScrath/Focos/pull/29#discussion_r4584591073)与旧分支记录的锁定 APK 依赖方向有冲突：应读取该 APK 的 `modules.dep` 并真实启动验证，不能靠手写顺序或只返回成功的 shim 裁决。
 
-## 四个阶段与三个命令
+## 四个阶段与四个命令
 
 冻结清单是提交到仓库、人工审查的数据，不增加通用插件或配置语言。下面是拟定接口，**尚不能运行**：
 
@@ -27,7 +27,10 @@ test001 build --image IMAGE --kernel-apk APK --libc glibc --libc musl \
 test001 capture --build NEW_BUILD --firmware OPENSBI --timeout 180 --out NEW_RUN
 test001 analyze --run NEW_RUN --out NEW_REPORT --require-pass
 test001 analyze --log SERIAL --libc glibc --group lua --out NEW_REPLAY
+test001 campaign --plan PLAN --out NEW_CAMPAIGN
 ```
+
+以上四个公开子命令按 A（analyze）、B（build）、C（capture 与运行包分析）、D（campaign）交付；campaign 编排既有构建/采集/分析能力，不另设第五个基础阶段。PLAN 是批次输入计划，不是已有成功报告清单；其输入与验证要求见下文批次契约。
 
 `--run` 与 `--log` 互斥。运行包分析默认涵盖其全部组与 libc；不允许通过只选成功部分获得整次运行的通过。capture 必须显式提供 `--firmware`，具体固件来源、版本与 SHA256 随 C 阶段冻结输入提交审阅；缺失或与冻结哈希不符时在启动前退出 2。外部日志必须显式指定 libc 和组；报告固定 `subject=unknown`、`platform=unknown`，不从日志标记、文件名或调用方描述推断来源。重复/未知组、空选择、非法时限和已存在输出均退出 2。首版不提供自定义 judge、清单、shell 命令、legacy/strict 自动切换和自由平台标签；新增后端需先补 SPEC。
 
@@ -53,7 +56,7 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 所有 JSON 有独立 `schema_version: 1`，未知版本、重复键、未知必需语义、NaN/Inf、非法计数均拒绝。清单内文件路径只允许固定相对名称；拒绝绝对路径、`..`、重复成员、符号链接和特殊文件。每个消费阶段先读取同一份清单字节，再校验其所有必需文件的长度与 SHA256。清单自己的 SHA256 由下游记录，不引入自引用哈希。
 
 - `build.json`：冻结清单哈希、构建实现文件集合及哈希、工具版本、输入哈希、组/libc 顺序、内核/initramfs/base.img 哈希及长度、环境适配项。`base.img` 是冻结镜像的完整字节副本，其输出哈希必须等于冻结输入镜像哈希。不得设置“已运行”。相同输入、选择、实现和压缩工具版本应得到相同构建输出；运行时间不写进可复现载荷。
-- `capture.json`：每次 capture 调用新生成的 run_id（UUID）、构建清单哈希与副本内容、实际内核/initramfs/基盘哈希、固定 `subject=reference_linux` 与 `platform=qemu_riscv64`、QEMU 路径/二进制哈希/版本、实际 OpenSBI 固件的来源/版本/原路径及 firmware.bin 的 SHA256/长度、实际 argv、开始/结束时间、采集状态、退出码、限额、原始串口哈希及长度、采集实现身份、campaign 绑定（独立 capture 时为 null，批次运行时包含 campaign.json SHA256 和 slot_id）。主机启动生成的 argv 才是采集条件，来宾打印的 build ID 只作一致性检查。
+- `capture.json`：每次 capture 调用新生成的 run_id（UUID）、构建清单哈希与副本内容、实际内核/initramfs/基盘哈希、固定 `subject=reference_linux` 与 `platform=qemu_riscv64`、QEMU 路径/二进制哈希/版本、实际 OpenSBI 固件的来源/版本/原路径及 firmware.bin 的 SHA256/长度、实际 argv、开始/结束时间、采集状态、退出码、限额、原始串口哈希及长度、写时复制层的初始 SHA256/长度/格式、创建结果及基盘绑定、只读依赖启动前/进程回收后的校验哈希与 input_integrity、采集实现身份、campaign 绑定（独立 capture 时为 null，批次运行时包含 campaign.json SHA256 和 slot_id）。主机启动生成的 argv 才是采集条件，来宾打印的 build ID 只作一致性检查。
 - `report.json`：输入种类与字节哈希、被引用采集清单哈希、run_id 与 campaign 绑定、冻结清单与分析实现/判据文件哈希、subject/platform、所选范围与分母、逐项结果、额外名称、各独立状态、验收阻断原因和计数。报告完成标记为最后写入的 `report.json`；消费者须一并核对其中记录的 `report.md` 哈希。串口保留在运行包；外部日志报告保存实际消费的来源副本及哈希，不覆盖原文件。
 
 输出路径从可信工作目录逐级以不跟随符号链接的目录句柄访问，独占创建最终目录；后续写入相对此句柄，不重新解析可能被改名的祖先。文件独占新建，不采用先 exists 再覆盖写。文件写入失败只留下未完成目录；清单在所有文件关闭、校验完成后发布。读者仅接受完整清单及其全部文件。首版不承诺掉电事务；重启后仍重新校验，损坏包不能通过。
@@ -64,7 +67,7 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 
 构建器把 APK 与镜像复制到自己的暂存区，校验复制后字节与冻结值，再从该副本提取内核、模块和 BusyBox。内存中的提取结果直接交给归档器，不通过共享 `Image/modules` 路径回读。已校验镜像以 `base.img` 纳入构建包，不只保留外部路径；移动完整 BUILD 或删除原始 IMAGE/APK 后仍能采集。模块按该 APK 的依赖图排序；缺模块、环或 release 不符在启动前拒绝。
 
-采集器只从 `--build` 指定包取得内核、initramfs 与 `base.img`，复制到私有运行区并核对哈希；基盘缺失或不匹配在启动前退出 2，不回查 build 时的 `--image` 路径。QEMU 从主机工具链解析、复制并记录身份。显式 `--firmware` 的 OpenSBI 文件先复制到私有运行区的 `firmware.bin`，对副本计算 SHA256 并匹配冻结值，实际 argv 必须使用 `-bios <该副本的绝对路径>`；禁止 `-bios default`、`none` 或隐式搜索主机固件。固件副本随运行包保留，分析时校验其长度、哈希及与采集 argv 的绑定；原始固件路径变化不影响已固定的副本。argv 的被测文件只指向这些私有副本。基盘只读，以独立写时复制层承载测试写入；禁止其他进程复用该层。动态链接器/系统库属于受信主机工具链，记录版本，不声称只凭 QEMU 哈希已冻结完整主机。磁盘空间不足即失败，不退回原路径或硬链接。原始输入在复制期间变化，只有副本哈希仍等于冻结输入时才可继续。
+采集器只从 `--build` 指定包取得内核、initramfs 与 `base.img`，复制到私有运行区并核对哈希；基盘缺失或不匹配在启动前退出 2，不回查 build 时的 `--image` 路径。QEMU 从主机工具链解析、复制并记录身份。显式 `--firmware` 的 OpenSBI 文件先复制到私有运行区的 `firmware.bin`，对副本计算 SHA256 并匹配冻结值，实际 argv 必须使用 `-bios <该副本的绝对路径>`；禁止 `-bios default`、`none` 或隐式搜索主机固件。固件副本随运行包保留，分析时校验其长度、哈希及与采集 argv 的绑定；原始固件路径变化不影响已固定的副本。argv 的被测文件只指向这些私有副本。基盘只读，以本次独占新建且尚无来宾写入的写时复制层承载测试写入；不接受已有层或其他运行遗留层，创建失败不启动。启动前记录该层初始哈希、长度、格式和所绑定基盘的哈希；禁止其他进程复用该层。该层是运行期间唯一允许来宾写入的磁盘文件，内容变化属于预期行为；内核、initramfs、基盘、固件、QEMU 等只读依赖仍须在整个采集进程组回收后复核未变，校验结果记入 input_integrity；无法完成后检为 UNVERIFIED，变化为 CHANGED，两者均阻断验收。动态链接器/系统库属于受信主机工具链，记录版本，不声称只凭 QEMU 哈希已冻结完整主机。磁盘空间不足即失败，不退回原路径或硬链接。原始输入在复制期间变化，只有副本哈希仍等于冻结输入时才可继续。
 
 分析器先把运行包全部必需文件或外部日志复制到私有快照，校验后从同一快照计算报告哈希并解析，不在判分后重新读取来源路径。外部日志报告保留该字节副本 `source.log`，report.json 记录其长度与哈希；原路径只作来源提示。运行包的 capture.json/serial.log/firmware.bin 在复制后按清单校验，缺失或不匹配退出 2。分析器再冻结完整的源码与判据文件集合，并在隔离 Python 搜索路径、空 pycache 的子进程中执行该副本；主脚本、helper、包、数据均显式列入。官方判据只能使用冻结提交中列出的文件，额外同名标准库模块也拒绝。被执行的项目模块均来自副本，报告哈希也从副本生成；不依赖运行前后扫描原目录来证明实际执行身份。整轮历史回放共享一次分析源码快照。
 
@@ -76,12 +79,13 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 | --- | --- | --- |
 | origin | `recorded_capture / external_log` | 完整运行包校验或显式日志输入 |
 | capture | `EXITED / TIMEOUT / OUTPUT_LIMIT / START_ERROR / NOT_RECORDED`，另存退出码 | 主机采集器 |
+| input_integrity | `VERIFIED / CHANGED / UNVERIFIED` | 采集器对只读依赖的前后校验；外部日志为 UNVERIFIED |
 | protocol | `VALID / INCOMPLETE / ERROR / NOT_RECORDED`，附阶段错误和脚本退出码 | 协议解析器 |
 | section | `COMPLETE / TRUNCATED / ABSENT / INVALID` | 组与 libc 的标记配对 |
 | judgment | `PASS / PARTIAL / FAIL / MISSING / JUDGE_ERROR / NOT_RUN` | 固定判据与规范化 |
 | acceptance | `PASS / BLOCKED`，附全部原因 | 分析器的单一纯函数 |
 
-`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、没有判据错误或未知用例。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
+`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、input_integrity 为 VERIFIED、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、没有判据错误或未知用例。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
 
 例如 `capture=EXITED(exit=7)`、`section=TRUNCATED` 与 `judgment=PASS` 可以同时存在，报告保留三项事实，验收为 BLOCKED，原因包含非零退出与截断；不挑一个状态覆盖其他信息。`observed_pass` 统计判据观察值，`accepted_pass` 只有本运行范围验收通过时才等于该范围的 `selected_total`，否则为 0；始终并列显示 origin 和 subject。性能指标保留单位与原值，不合成总分。
 
@@ -105,7 +109,7 @@ D 阶段由单一批次执行器负责登记、运行和汇总，拟定入口 `t
 - 对槽位 `(g, c)`，构建包、批次计划、采集清单内的构建选择、报告范围必须一致，且组列表恰好为 `[g]`、libc 列表恰好为 `[c]`。不能从多组/多 libc 运行中截取子集。双 libc Lua 示例可用于 C 阶段接口验证，不能作为 D 的单槽证据。
 - 每槽来自独立一次采集和一次全新 QEMU 启动。22 个 run_id、采集清单哈希和报告哈希分别不得重复；复制、改名或对同一运行包重新分析不能成为另一槽。报告必须绑定对应采集清单哈希和 run_id，并完整校验运行包；文件路径不同不构成独立运行证据。串口哈希不要求互异，独立运行可能产生相同文本。
 - 要求相同冻结清单、被测系统/平台、基盘/APK/工具链、实际固件 SHA256、实际 QEMU 二进制 SHA256、构建实现、采集实现与环境适配策略，以及同一分析实现和判据快照。采集实现一致性以各 capture.json 中实际执行的完整实现文件集合及逐文件 SHA256 相等为准，不只比较工具名称或版本文本；首版不接受兼容版本集合。固件来源/版本用于追溯，版本文本相同不能替代字节哈希；身份缺失、文件集合不同或任一哈希不同均阻断全套验收。
-- 实际 QEMU argv、采集时限/输出限额须与批次预登记策略匹配。比较 argv 时，只将已校验并绑定的内核/initramfs/基盘/写时复制层/固件及 QEMU 私有路径替换为固定角色名；其他机器型号、CPU、内存、核数、设备、内核启动参数及启动选项逐项相等，不忽略未知参数。构建选择、构建包哈希、run_id、时间及串口允许不同。每槽有效参数及对应角色文件哈希须同时匹配计划，不能仅以“同一采集器”代替实际条件核对。
+- 实际 QEMU argv、采集时限/输出限额须与批次预登记策略匹配。比较 argv 时，只将已校验并绑定的内核/initramfs/基盘/写时复制层/固件及 QEMU 私有路径替换为固定角色名；其他机器型号、CPU、内存、核数、设备、内核启动参数及启动选项逐项相等，不忽略未知参数。构建选择、构建包哈希、run_id、时间及串口允许不同。每槽有效参数及只读依赖角色文件哈希须同时匹配计划；写时复制层匹配预登记的创建策略、格式和基盘绑定，各槽必须新建，初始哈希只记录到各自 capture.json，不要求跨槽相等，也不把来宾写入后的哈希与初始哈希作不变性比较。不能仅以“同一采集器”代替实际条件核对。
 - 每个槽位覆盖恰好一次，每个子报告均满足本范围验收，才可报告全套 PASS。缺槽、重复槽或条件不一致均 BLOCKED。重测必须从新的 campaign_id、完整的 22 槽位及独立目录重新开始，保留并引用前一批次身份；不支持在旧批次补跑后换掉失败包。分母由各槽位冻结项相加，候选双 libc 清单为 854。
 
 run_id 由受信采集器在启动前生成，不能由调用方指定；campaign/claim/结果记录用于检查本工具正常使用下的遗漏与重复。登记、claim 与汇总记录只独占新建，各槽 run/report 仍遵循原有包发布规则；缺最后 summary.json 的批次不能当作已完成，通过只读审计可报告其未完成原因。所有记录沿用本地主机信任边界，不承诺阻止同账户恶意改写记录或隐瞒整个批次；全套报告结论仅针对明确展示 campaign_id 的这一批次。
@@ -127,6 +131,7 @@ run_id 由受信采集器在启动前生成，不能由调用方指定；campaig
 | 边界 | 负例与预期 |
 | --- | --- |
 | 实际输入 | 缺固件/复制后哈希错误时不启动；替换主机默认固件不改变私有副本与 -bios；篡改运行包 firmware.bin 时分析退出 2；移走构建原始输入后仍可采集；构建包缺失/篡改 base.img 时不启动 |
+| 磁盘写入所有权 | 来宾写入只改变本槽写时复制层时正常保留结果；复用旧层/错基盘时不启动；只读基盘变化阻断；初始层字节不同但创建策略和基盘一致不误判条件冲突 |
 | 分析快照 | 冻结外部日志后替换原路径，报告的 source.log、哈希和解析结果仍对应同一快照；截断或篡改已记录运行包则退出 2 |
 | 单槽与范围 | Lua 单组成功无需其他组，范围内缺项仍失败；把双 libc 或全套报告拆填多槽、改名复制或重新分析同次采集均 BLOCKED |
 | 批次所有权 | 某槽失败后独立重跑成功，替换进批次必须因绑定不符/claim 冲突而 BLOCKED；省略失败槽、孤立 claim、缺失结果、额外尝试均 BLOCKED；并发争用同槽仅一个 claim 成功且最多启动一次；claim 发布失败不启动；claim 后崩溃不能重启该槽 |
