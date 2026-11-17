@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import gzip
 import hashlib
 import io
@@ -15,6 +16,11 @@ import sys
 import tarfile
 import tempfile
 import zlib
+
+_source_cache = tempfile.TemporaryDirectory(prefix='focos-source-cache-')
+atexit.register(_source_cache.cleanup)
+sys.pycache_prefix = _source_cache.name
+sys.dont_write_bytecode = True
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inventory import NAME, REFERENCE_LOCK, INVENTORY, digest, load_inventory

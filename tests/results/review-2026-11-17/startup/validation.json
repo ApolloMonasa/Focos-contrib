@@ -1,0 +1,122 @@
+{
+  "kind": "source_cache_isolation_and_strict_parameter_preflight",
+  "base_commit": "335f5d1564a243b8fbca99c7ed4a1bd8e2868713",
+  "date": "2026-11-17",
+  "checks": {
+    "test001": 114,
+    "rust": 52,
+    "existing_python": 15,
+    "qemu_kernel": [
+      "BOOT-001",
+      "MM-002",
+      "ARCH-001"
+    ]
+  },
+  "regressions": {
+    "failed_assertions_before_fix": 18,
+    "poisoned_cache_modes": [
+      "TIMESTAMP same source length and mtime",
+      "UNCHECKED_HASH"
+    ],
+    "entrypoints_tested": [
+      "run_tests.py",
+      "ref/build_initramfs.py",
+      "ref/replay_evidence.py",
+      "fetch_judges.py",
+      "sync_test_plan.py"
+    ],
+    "runner_imports_tested": [
+      "inventory.py",
+      "input_snapshot.py",
+      "reference_protocol.py",
+      "reference_manifest.py"
+    ],
+    "judge_child_helper_checked": true,
+    "strict_missing_required_subsets": 7,
+    "strict_source_modes": [
+      "capture",
+      "replay"
+    ]
+  },
+  "runtime": [
+    {
+      "libc": "glibc",
+      "mode": "capture",
+      "image_hash_reads": 2,
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    },
+    {
+      "libc": "musl",
+      "mode": "replay",
+      "image_hash_reads": 2,
+      "execution_valid": true,
+      "totals": {
+        "subcases": 9,
+        "pass": 9,
+        "partial": 0,
+        "fail": 0,
+        "not_run": 0,
+        "groups": {
+          "PASS": 1,
+          "PARTIAL": 0,
+          "FAIL": 0,
+          "TIMEOUT": 0,
+          "NOT_RUN": 0,
+          "JUDGE_ERROR": 0
+        },
+        "pass_rate": 1.0
+      }
+    }
+  ],
+  "historical_replay": {
+    "samples": 15,
+    "totals_unchanged": true,
+    "exact_groups": 13,
+    "all_expected_match": true
+  },
+  "source_sha256": {
+    "scripts/run_tests.py": "baf667426277ae32ce62677d14e9f008703fa5983238106c38d9dd4b4bccf24a",
+    "scripts/ref/build_initramfs.py": "ff046a8394fe789799c414a143a0ccef6f3d2fdcf442eae7927933e6587f1fb6",
+    "scripts/ref/replay_evidence.py": "7d78e71df94e01021f730dcfd7f4486e7cd8765d5622eaea0817cdded9d3da5b",
+    "scripts/fetch_judges.py": "88bfd6d786a229210e99ccbe54dee15f9a6ea6c9d90cc2c949d279797945a985",
+    "scripts/sync_test_plan.py": "a9510e9a65930e9113b1354d4be58e24c4653d1b86a8194e99afa8958b02c6e1"
+  },
+  "test_sha256": {
+    "Makefile": "0c307c818ed955ca23f79d8ba21a88668d032b72b040b08acb1b36e9c3fb9010",
+    "scripts/tests/test_python_sources.py": "561a3c12f081645c5dddb81672b6e7af37e77d8ea42fb301652d9667c31f71ef",
+    "scripts/tests/test_judges.py": "97521ee5a0353c06cd46f091243b25fe6b0544a4d3d64adde6dc7567b2324d29",
+    "scripts/tests/test_reference.py": "6c5f2b3c2c19cfcf5f68d7a30c4ff79c92c4c524b0ec3b152cd6200c8d7015cc",
+    "scripts/tests/test_runner.py": "3329fda2127a9515819642975b46ca015c0b9e12159824925e0b499352cb8578"
+  },
+  "build_id": "a74f8090861ee5c69a9f85bb70d6e0a69c0e8ffc21c4872e542b3e8d1c4ec7d3",
+  "outputs": {
+    "initramfs_sha256": "18e00e17e5958037e751efb024bea61b63a597de193433c5a5e972bae32bc4da",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638"
+  },
+  "evidence_sha256": {
+    "lua/build.manifest.json": "f81947e5b9f1f721cf87ba2def66f6b9dcdad1cbec6abbcdcb5529ad8f2855d0",
+    "lua/capture.summary.json": "e413f4e69f28d6d06ec0549a23547c8dea363cb516211da442efb4e05706dd13",
+    "lua/replay.summary.json": "abe05e2f4bf3d6adac6a48041de216a8f796b8c6ddb8bf679f0ad773833ef41a",
+    "lua/serial.log": "bd02d2e17a26db863908da4ae44eb58a256e58b7a20450a4bb25cb8c07c79141"
+  },
+  "limits": [
+    "CLI entrypoints isolate project imports before loading them; embedded Python callers must establish a fresh cache before their first project imports.",
+    "One additional reference Linux boot is published for this follow-up; musl replays the same serial log. No full 22-run measurement rerun."
+  ]
+}

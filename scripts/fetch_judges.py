@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """从固定提交拉取并校验官方 judge；只写 third_party，不覆盖已有不同内容。"""
 import argparse
+import atexit
 import io
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
+
+_source_cache = tempfile.TemporaryDirectory(prefix='focos-source-cache-')
+atexit.register(_source_cache.cleanup)
+sys.pycache_prefix = _source_cache.name
+sys.dont_write_bytecode = True
 
 from inventory import ROOT, digest, load_inventory
 

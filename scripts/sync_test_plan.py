@@ -1,9 +1,17 @@
 #!/usr/bin/env python3
 """由冻结清单更新区域计划和文档表格；--check 用于 CI，保留实际执行状态。"""
 import argparse
+import atexit
 import copy
 import json
 from pathlib import Path
+import sys
+import tempfile
+
+_source_cache = tempfile.TemporaryDirectory(prefix='focos-source-cache-')
+atexit.register(_source_cache.cleanup)
+sys.pycache_prefix = _source_cache.name
+sys.dont_write_bytecode = True
 
 from inventory import ROOT, load_inventory
 

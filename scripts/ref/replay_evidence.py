@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """校验不可变历史证据并用当前判据回放；不覆写原摘要，不把旧环境标为新协议通过。"""
 import argparse
+import atexit
 import copy
 import hashlib
 import io
@@ -10,6 +11,11 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+
+_source_cache = tempfile.TemporaryDirectory(prefix='focos-source-cache-')
+atexit.register(_source_cache.cleanup)
+sys.pycache_prefix = _source_cache.name
+sys.dont_write_bytecode = True
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from inventory import NAME, ROOT, REFERENCE_LOCK, INVENTORY, digest

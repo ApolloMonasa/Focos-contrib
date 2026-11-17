@@ -422,9 +422,29 @@ class RunnerSafetyTests(unittest.TestCase):
                     self.assertEqual(data['groups'][0]['status'], 'JUDGE_ERROR')
 
     def test_strict_reference_requires_complete_protocol(self):
-        proc, data, _ = self.invoke(self.complete(), ['--reference', 'strict'])
+        proc, data, _ = self.invoke(self.reference().replace(b'REF_MODULES_OK\n',b''), ['--reference', 'strict'])
         self.assertEqual(proc.returncode, 1)
         self.assertEqual(data['groups'][0]['status'], 'ENV_ERROR')
+
+    def test_strict_required_parameters_are_checked_before_replay_or_capture(self):
+        import contextlib,io,itertools,run_tests
+        from unittest.mock import patch
+        _,_,prior=self.invoke(self.reference(),['--reference','strict']);root=prior.parent
+        options={'manifest':['--reference-manifest',str(root/'build.manifest.json')],
+                 'artifacts':['--reference-artifacts',str(root/'Image'),str(root/'initramfs.gz')],
+                 'image':['--reference-image',str(root/'disk.img')]}
+        for count in [1,2,3]:
+            for missing in itertools.combinations(options,count):
+                for mode in ['capture','replay']:
+                    with self.subTest(missing=missing,mode=mode):
+                        source=['--capture-cmd','fake'] if mode=='capture' else ['--log',str(prior/'serial.log')]
+                        args=source+['--capture-artifact',str(RUNNER),'--out',str(root/(mode+'-'.join(missing))),
+                                     '--reference','strict','--libc','musl','--group','iperf']
+                        for key,values in options.items():
+                            if key not in missing:args+=values
+                        with patch.object(run_tests,'capture',side_effect=AssertionError('capture executed')),patch.object(run_tests,'qemu_identity',side_effect=AssertionError('version probe executed')),patch.object(run_tests,'run_judge',side_effect=AssertionError('judge executed')),contextlib.redirect_stderr(io.StringIO()):
+                            self.assertEqual(run_tests.main(args),2)
+                        self.assertFalse((Path(args[args.index('--out')+1])/'summary.json').exists())
 
     def reference(self, rc=0):
         return (b'REF_PROTOCOL 1\nREF_MODULES_OK\nREF_MOUNT_OK\nREF_PREPARED musl\n'

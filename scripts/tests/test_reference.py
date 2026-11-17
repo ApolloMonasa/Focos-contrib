@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
 spec = importlib.util.spec_from_file_location('refbuild', ROOT / 'scripts/ref/build_initramfs.py')
 build = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(build)
+exec(compile((ROOT/'scripts/ref/build_initramfs.py').read_bytes(),str(ROOT/'scripts/ref/build_initramfs.py'),'exec'),build.__dict__)
 RELEASE = json.loads((ROOT/'tests/reference.lock.json').read_text())['kernel']['release']
 
 
@@ -252,7 +252,7 @@ b.main(['--image',str(image),'--kernel-apk',str(apk),'--out',str(out),'--kernel-
                 lock_data=json.loads((ROOT/'tests/reference.lock.json').read_text());lock_data['kernel']['sha256']=hashlib.sha256(apks['pinned'].read_bytes()).hexdigest()
                 lock=root/'lock.json';lock.write_text(json.dumps(lock_data))
                 outs={role:root/role/'init.gz' for role in apks}
-                def command(role):return [sys.executable,'-B','-c',source_code,str(ROOT/'scripts'),str(apks[role]),str(outs[role]),str(shared),str(image),str(inventory),str(lock)]
+                def command(role):return [sys.executable,'-B','-X','pycache_prefix='+str(root/'cache'/role),'-c',source_code,str(ROOT/'scripts'),str(apks[role]),str(outs[role]),str(shared),str(image),str(inventory),str(lock)]
                 ready_read,ready_write=os.pipe();resume_read,resume_write=os.pipe()
                 process=subprocess.Popen(command(paused_role)+[str(ready_write),str(resume_read)],pass_fds=(ready_write,resume_read),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
                 os.close(ready_write);os.close(resume_read)

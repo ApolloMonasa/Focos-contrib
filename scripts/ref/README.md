@@ -4,7 +4,7 @@
 
 ## 先验证管线
 
-需要 Linux/POSIX、Python 3.11+、已配置的 `gh`。缓存完整时无需联网；缓存缺失时通过 `gh` 从固定提交/Release 拉取。
+需要 Linux/POSIX、CPython 3.11+、已配置的 `gh`。缓存完整时无需联网；缓存缺失时通过 `gh` 从固定提交/Release 拉取。
 
 ```bash
 make test-test001
@@ -148,3 +148,11 @@ APK 在同一字节快照上校验并解包；kernel/module 字节只在内存�
 产物先写私有临时文件，再用本地文件系统硬链接原子创建目标；同内容复用，不同内容拒绝覆盖，manifest 最后发布。构建目录应位于支持硬链接的 Linux/POSIX 文件系统。此操作不是跨文件回滚事务；失败可能留下无 manifest 的组件，不能据此认定构建成功。独立目录可避免不同版本争用默认 Image/modules。
 
 本轮根因、受控进程/线程竞争、状态组合和最终实际启动证据见 [ownership 验证](../../tests/results/review-2026-11-17/ownership/summary.md)。旧测试已纠正为修改真实 APK 内容才改变输入身份，外来中间输出不能被采纳为本次 APK 的产物。
+
+## Python 启动条件
+
+-B 只禁止写 pyc，不禁止读取旧缓存。五个文件 CLI 入口在第一次项目导入前使用每次运行的私有空 pycache，并禁止写缓存；judge 子进程与 Makefile 测试命令也采用独立前缀。不会清理其他任务的共享缓存。若以 Python API 嵌入调用，调用方必须在首次项目导入前建立相同隔离条件；常规支持入口为本文的文件 CLI。
+
+显式 --reference strict 在采集/回放入口统一要求 --reference-manifest、--reference-artifacts KERNEL INITRAMFS、--reference-image；任一缺失即退出 2，在读取日志、探测 QEMU 和判分前停止。自动检测到未经验证的参考日志仍不会成为有效通过。
+
+后续缓存/参数复现和实际启动见 [startup 验证](../../tests/results/review-2026-11-17/startup/summary.md)。

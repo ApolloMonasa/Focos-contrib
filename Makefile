@@ -17,7 +17,8 @@ lint:
 
 test:
 	cargo test --locked -p focos-kernel --lib --target $(HOST_TARGET)
-	python3 -B -m unittest discover -s scripts -p 'test_*.py'
+	@kernel_test_cache=$$(mktemp -d) || exit 1; trap 'rm -rf "$$kernel_test_cache"' EXIT; \
+		python3 -B -X "pycache_prefix=$$kernel_test_cache" -m unittest discover -s scripts -p 'test_*.py'
 	$(MAKE) test-test001
 
 smoke: build
@@ -40,7 +41,8 @@ judges:
 
 test-test001: judges
 	python3 -B scripts/sync_test_plan.py --check
-	python3 -B -m unittest discover -s scripts/tests -p 'test_*.py' -v
+	@test001_cache=$$(mktemp -d) || exit 1; trap 'rm -rf "$$test001_cache"' EXIT; \
+		python3 -B -X "pycache_prefix=$$test001_cache" -m unittest discover -s scripts/tests -p 'test_*.py' -v
 
 reference-replay: judges
 	python3 -B scripts/sync_test_plan.py --check

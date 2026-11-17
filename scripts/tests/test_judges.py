@@ -3,14 +3,16 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 TEAM = Path(__file__).resolve().parents[1] / "judge_team"
 
 
 def judge(name, text):
-    proc = subprocess.run([sys.executable, str(TEAM / f"judge_{name}.py")],
-                          input=text, text=True, capture_output=True, check=True)
+    with tempfile.TemporaryDirectory(prefix='judge-test-cache-') as cache:
+        proc = subprocess.run([sys.executable, '-B', '-X', 'pycache_prefix='+cache, str(TEAM / f"judge_{name}.py")],
+                              input=text, text=True, capture_output=True, check=True)
     return json.loads(proc.stdout)
 
 

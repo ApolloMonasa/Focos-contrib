@@ -15,6 +15,7 @@ Design notes:
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import math
@@ -24,8 +25,15 @@ import shutil
 import re
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+# -B 只禁写 pyc；项目导入前切换到本次运行的私有空缓存，避免读取旧代码。
+_source_cache = tempfile.TemporaryDirectory(prefix='focos-source-cache-')
+atexit.register(_source_cache.cleanup)
+sys.pycache_prefix = _source_cache.name
+sys.dont_write_bytecode = True
 
 from inventory import load_inventory, digest, ROOT, INVENTORY, REFERENCE_LOCK
 from reference_protocol import validate_reference
@@ -100,15 +108,16 @@ def run_judge(judge_path: Path, section_text: str, timeout: int) -> JudgeResult:
     if judge_path.suffix == ".sh":
         return JudgeResult([], "unsupported", f"shell judge is not a stdin parser: {judge_path}")
     try:
-        proc = subprocess.run(
-            [sys.executable, str(judge_path)],
-            input=section_text,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            timeout=timeout,
-        )
+        with tempfile.TemporaryDirectory(prefix='focos-judge-cache-') as cache:
+            proc = subprocess.run(
+                [sys.executable, '-B', '-X', 'pycache_prefix='+cache, str(judge_path)],
+                input=section_text,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                timeout=timeout,
+            )
     except subprocess.TimeoutExpired:
         return JudgeResult([], "timeout", f"judge timed out after {timeout}s")
     except OSError as exc:
@@ -395,6 +404,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if (args.capture_cmd is not None and not args.capture_cmd.strip()) or args.log == '':
         print('capture command or log source must not be empty',file=sys.stderr)
+        return 2
+    if args.reference == 'strict' and (args.reference_manifest is None or args.reference_artifacts is None or args.reference_image is None):
+        print('strict requires --reference-manifest, --reference-artifacts KERNEL INITRAMFS and --reference-image',file=sys.stderr)
         return 2
     snapshot = InputSnapshot(digest)
     # Python 已加载的实现必须先固定身份，不能等耗时的大构件哈希后才读源码版本。
