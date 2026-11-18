@@ -37,6 +37,9 @@
       "judge_sha256": "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d",
       "judge_source": "official",
       "kind": "non_ltp",
+      "planned_occurrences": {
+        "busybox echo \"bbbbbbb\" >> test.txt": 2
+      },
       "script_file": "busybox_testcode.sh",
       "script_sha256": {
         "glibc": "2b533111800370f23e5c5f6228f5153d7024e2b8b984bbff42f9cd34d63fc820",
@@ -314,7 +317,7 @@
     "cyclictest",
     "ltp"
   ],
-  "profile_hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d",
+  "profile_hash": "7bda0e4e1424c59f3162150ba82c7c23662a76c0b354262e32cf446e218c6869",
   "profile_id": "regional-2025-with-ltp-v1",
   "protocol": {
     "group_end": "#### OS COMP TEST GROUP END {group}-{libc} ####",

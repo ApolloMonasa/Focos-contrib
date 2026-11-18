@@ -44,6 +44,7 @@ class PositiveTests(unittest.TestCase):
         entry = item(result, 'alpha')
         self.assertEqual(entry['judgment'], 'PASS')
         self.assertEqual(entry['summaries'][0]['passed'], 1)
+        self.assertFalse(entry['summary_incomplete'])
         self.assertEqual(result.native['summaries']['passed'], 1)
 
 
@@ -160,6 +161,16 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(entry['judgment'], 'PASS')
         self.assertTrue(entry['summary_mismatch'])
         self.assertEqual(result.native['summary_mismatch'], 1)
+
+    def test_incomplete_summary_is_recorded(self):
+        result = parse(
+            'RUN LTP CASE alpha\nTPASS: ok\nSummary:\npassed   1\n'
+            'FAIL LTP CASE alpha : 0'
+        )
+        entry = item(result, 'alpha')
+        self.assertEqual(entry['judgment'], 'PASS')
+        self.assertTrue(entry['summary_incomplete'])
+        self.assertEqual(result.native['summary_incomplete'], 1)
 
     def test_multiple_summaries_are_preserved(self):
         result = parse(

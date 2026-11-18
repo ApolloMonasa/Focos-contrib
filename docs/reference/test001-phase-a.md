@@ -27,7 +27,7 @@ python3 scripts/test001.py analyze \
 - `--group/--libc` 与 `--shard` 二选一；未知组、未知 shard、缺参数都在开始前退出 2。
 - `--run` 消费固定布局的 `capture.json`、`serial.log`、`firmware.bin`；不能再用 `--profile/--group/--libc/--shard` 覆盖运行包选择。
 - 普通分析完成报告即退出 0，即使结论是 BLOCKED；`--require-pass` 只在结论不是 PASS 时退出 1。
-- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。`report.json` 最后写入，`report.md` 的哈希记录在其中。
+- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。适配器输出按流式读取，超过显式字节限额即终止整个进程组；目录 fsync 失败会撤销已可见的 `report.json`。`report.json` 最后原子发布，`report.md` 的哈希记录在其中。
 
 ## 冻结了什么
 
@@ -41,14 +41,14 @@ python3 scripts/test001.py analyze \
 | PROFILE | `regional-2025-with-ltp-v1`，`profile_hash` 见 [profile](../../tests/test001/profiles/regional-2025-with-ltp-v1.json) |
 | 判据 | `regional-2025-log-v1`（J1）、`regional-2025-log-v2`（J2，额外要求 LTP 原生汇总） |
 
-LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `datafiles`、`ftrace_stress` 不执行；每个文件无参数、按文件名排序，工作目录为 `/musl` 或 `/glibc`。逐文件的路径、长度、权限和 SHA256 在调用清单里。包装脚本无条件打印 `FAIL LTP CASE`，所以不能按该字样判失败。
+LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `datafiles`、`ftrace_stress` 不执行；每个文件无参数、按文件名排序，工作目录为 `/musl` 或 `/glibc`。逐文件的路径、长度、权限和 SHA256 在调用清单里。包装脚本无条件打印 `FAIL LTP CASE`，所以不能按该字样判失败。busybox 镜像脚本中的 `echo "bbbbbbb" >> test.txt` 计划执行两次，PROFILE 的 `planned_occurrences` 记为 2；这是计划重复，不是意外重试。
 
 ## 分析边界
 
 - 来源分 `external_log` 与 `recorded_capture`。外部日志的 subject/platform 固定 `unknown`、capture 为 `NOT_RECORDED`、input_integrity 为 `UNVERIFIED`，即使逐项全 PASS 也不能验收通过。
 - 采集状态、完整性、协议、段和判分分字段保存。截断段保留已观察值，但 acceptance 仍 BLOCKED，`accepted_pass=0`。
-- 非 LTP 使用冻结的官方/团队结果适配器；适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
-- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。未知名称单列且阻断验收，不进入分母。
+- 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
+- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。J2 还要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。未知名称单列且阻断验收，不进入分母。
 - 同一运行包用 J1/J2 重判时，`run_id`、采集清单哈希、PROFILE 哈希、selection 和分母不变；CRITERIA 身份与结论可以不同。J2 的额外 LTP 汇总要求只影响分析，不重跑 QEMU。
 
 ## 15 份历史结果对照
@@ -59,7 +59,7 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 | --- | --- | --- |
 | basic glibc/musl | 32 项一致 | musl 仍按旧镜像的已知构建问题记失败 |
 | lua glibc/musl | 9 项一致 | 参考历史全 PASS，但来源仍是 external_log |
-| busybox glibc/musl | 53 项一致 | judge 输出多出 2 个镜像实际执行项，作为 extras 单列并阻断验收 |
+| busybox glibc/musl | 53 项一致 | 计划重复 `bbbbbbb` 允许两次成功；judge 输出多出 2 个镜像实际执行项，作为 extras 单列并阻断验收 |
 | libctest glibc/musl | 220 项一致 | 镜像缺少的项按失败保留 |
 | iozone/libcbench | 20/27 项一致 | 性能结果只作参考，不合成总分 |
 | lmbench | 24 项一致 | 历史日志在 END 前挂住，段为 TRUNCATED、协议 INCOMPLETE |

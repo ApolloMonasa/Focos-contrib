@@ -75,8 +75,10 @@ def create_output_dir(path: Path, *, label: str = 'output') -> Path:
         os.mkdir(path, 0o700)
     except FileExistsError as exc:
         raise InputError(f'{label}: output already exists: {path}') from exc
-    except OSError as exc:
+    except (FileNotFoundError, NotADirectoryError) as exc:
         raise InputError(f'{label}: cannot create output: {exc}') from exc
+    except OSError as exc:
+        raise PublishError(f'{label}: cannot create output: {exc}') from exc
     return path
 
 
@@ -126,9 +128,20 @@ class OutputDir:
         self.write(temporary, raw, mode=mode)
         try:
             os.rename(temporary, name, src_dir_fd=self._fd, dst_dir_fd=self._fd)
-            self.sync()
         except OSError as exc:
             raise PublishError(f'cannot publish output member {name}: {exc}') from exc
+        try:
+            self.sync()
+        except PublishError as exc:
+            # 目录同步失败时不能把已可见的 report.json 留成完成标记。
+            try:
+                os.unlink(name, dir_fd=self._fd)
+                self.sync()
+            except OSError as cleanup:
+                raise PublishError(
+                    f'cannot publish output member {name}: {exc}; cleanup failed: {cleanup}'
+                ) from exc
+            raise
 
     def close(self):
         if getattr(self, '_fd', None) is not None:

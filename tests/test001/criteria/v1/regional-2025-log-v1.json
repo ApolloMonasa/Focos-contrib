@@ -96,7 +96,7 @@
       "timeout_seconds": 30
     }
   },
-  "criteria_hash": "9675b8d8a451045bb9bf36c487127ebb1759332f92cb92e462f003c795ae3a70",
+  "criteria_hash": "dbfa38a1ec794da59c6423e812577ecfe9c8a3bab230fed67ab2b2219bac7228",
   "criteria_id": "regional-2025-log-v1",
   "frozen_at": "2026-11-18",
   "implementation": {
@@ -106,19 +106,19 @@
       "scripts/test001",
       "tests/test001/criteria/v1/adapters"
     ],
-    "sha256": "f1f615c53473f10a1f54ed0e49bfcaebe8b66d33dcca6e936b1ad58f716ebe96"
+    "sha256": "7247dfc8582d8edf0e0fe4f3497546aa98034504da51bddea0263f53db65800a"
   },
   "kind": "test001_criteria",
   "mapping": {
     "mode": "identity",
     "notes": "适配器输出名与 PROFILE 的 invocation.name 逐项相同；不从运行后输出增删分母。",
-    "profile_hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d"
+    "profile_hash": "7bda0e4e1424c59f3162150ba82c7c23662a76c0b354262e32cf446e218c6869"
   },
   "revision": 1,
   "schema_version": 2,
   "supported_profiles": [
     {
-      "profile_hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d",
+      "profile_hash": "7bda0e4e1424c59f3162150ba82c7c23662a76c0b354262e32cf446e218c6869",
       "profile_id": "regional-2025-with-ltp-v1",
       "revision": 1
     }

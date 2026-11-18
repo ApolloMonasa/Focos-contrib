@@ -59,8 +59,8 @@ def _markdown(report: dict) -> str:
         lines += [
             '## LTP 原生计数',
             '',
-            '| 组 | TPASS | TFAIL | TBROK | TCONF | TWARN | TINFO | TDEBUG | 缺汇总 | 汇总不一致 |',
-            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
+            '| 组 | TPASS | TFAIL | TBROK | TCONF | TWARN | TINFO | TDEBUG | 缺汇总 | 不完整汇总 | 汇总不一致 |',
+            '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
         ]
         for group in native_groups:
             native = group['native']
@@ -69,7 +69,8 @@ def _markdown(report: dict) -> str:
                 f"| {group['group']} | {events.get('TPASS', 0)} | {events.get('TFAIL', 0)} | "
                 f"{events.get('TBROK', 0)} | {events.get('TCONF', 0)} | {events.get('TWARN', 0)} | "
                 f"{events.get('TINFO', 0)} | {events.get('TDEBUG', 0)} | "
-                f"{native.get('summary_missing', 0)} | {native.get('summary_mismatch', 0)} |"
+                f"{native.get('summary_missing', 0)} | {native.get('summary_incomplete', 0)} | "
+                f"{native.get('summary_mismatch', 0)} |"
             )
         lines.append('')
 

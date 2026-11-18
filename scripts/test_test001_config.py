@@ -64,6 +64,11 @@ class ProfileTests(unittest.TestCase):
         ltp = next(group for group in plan['groups'] if group['name'] == 'ltp')
         self.assertEqual(ltp['case_count'], 5660)
 
+    def test_planned_duplicate_is_frozen(self):
+        """busybox 镜像脚本计划重复的命令不能当成意外重试。"""
+        planned = self.profile.data['groups']['busybox']['planned_occurrences']
+        self.assertEqual(planned, {'busybox echo "bbbbbbb" >> test.txt': 2})
+
     def test_ltp_rows_freeze_binary_hash_and_path(self):
         """LTP 每一行都有镜像路径、长度、模式和 SHA256。"""
         for row in self.profile.invocations:

@@ -12,6 +12,7 @@ from .config import Criteria, Profile, Shard
 from .errors import InputError
 from .logs import Section, SplitResult, split_sections
 from .ltp import parse_ltp_section
+from .observations import check_observations
 
 
 @dataclass
@@ -93,6 +94,47 @@ def _map_judge_items(expected: list[dict], items: dict[str, dict]) -> tuple[list
     return mapped, extras
 
 
+def _merge_extras(extras: list[dict], observed: list[str],
+                  statuses: dict[str, list[str]]) -> list[dict]:
+    merged = list(extras)
+    known = {item['name'] for item in merged}
+    for name in observed:
+        if name not in known:
+            item = {'name': name, 'source': 'observation_guard'}
+            if name in statuses:
+                item['observations'] = list(statuses[name])
+            merged.append(item)
+            known.add(name)
+    return sorted(merged, key=lambda item: item['name'])
+
+
+def _apply_observation_guard(items: list[dict], extras: list[dict],
+                             guard, planned: dict) -> tuple[list[dict], list[dict], list[str]]:
+    """独立校验原始观测：重复尝试不能被最后一次成功覆盖，未知名称单列。"""
+    errors = []
+    for item in items:
+        name = item['name']
+        count = guard.counts.get(name, 0)
+        planned_count = planned.get(name, 1)
+        reasons = item.setdefault('reasons', [])
+        if name in guard.statuses:
+            item['observations'] = list(guard.statuses[name])
+        if count > planned_count:
+            item['judgment'] = 'JUDGE_ERROR'
+            reason = f'DUPLICATE_OBSERVATION:{count}/{planned_count}'
+            reasons.append(reason)
+            errors.append(f'{name}:{reason}')
+        elif count and count < planned_count:
+            item['judgment'] = 'JUDGE_ERROR'
+            reason = f'MISSING_PLANNED_OCCURRENCE:{count}/{planned_count}'
+            reasons.append(reason)
+            errors.append(f'{name}:{reason}')
+        elif name in guard.failures and item['judgment'] != 'JUDGE_ERROR':
+            item['judgment'] = 'FAIL'
+            reasons.append('OBSERVED_FAILURE')
+    return items, _merge_extras(extras, guard.extras, guard.statuses), errors
+
+
 def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
                    split: SplitResult, *, adapter_root: Path | None) -> GroupAnalysis:
     group_meta = profile.data['groups'][shard.group]
@@ -121,6 +163,10 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
         return GroupAnalysis(shard, section, status, group_meta['adapter'], items, [], [],
                              None, _count_items(items))
 
+    guard = check_observations(
+        shard.group, section.text, [item['name'] for item in expected]
+    )
+    planned = group_meta.get('planned_occurrences', {})
     if adapter_root is None:
         raise InputError('adapter snapshot is missing for a non-LTP group')
     output = run_adapter(criteria, shard.group, section.text, adapter_root)
@@ -129,11 +175,13 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
             'name': item['name'], 'invocation_id': item['invocation_id'],
             'judgment': 'JUDGE_ERROR', 'reasons': [output.error],
         } for item in expected]
-        return GroupAnalysis(shard, section, status, group_meta['adapter'], items, [],
-                             [output.error], None, _count_items(items))
+        items, extras, guard_errors = _apply_observation_guard(items, [], guard, planned)
+        return GroupAnalysis(shard, section, status, group_meta['adapter'], items, extras,
+                             [output.error, *guard_errors], None, _count_items(items))
     items, extras = _map_judge_items(expected, output.items)
+    items, extras, guard_errors = _apply_observation_guard(items, extras, guard, planned)
     return GroupAnalysis(shard, section, status, group_meta['adapter'], items, extras,
-                         [], None, _count_items(items))
+                         guard_errors, None, _count_items(items))
 
 
 def validate_selection(profile: Profile, shards: list[Shard]):
@@ -184,6 +232,11 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
                 reasons.append(
                     f'LTP_SUMMARY_MISSING:{analysis.shard.shard_id}:'
                     f'{native["summary_missing"]}'
+                )
+            if native.get('summary_incomplete'):
+                reasons.append(
+                    f'LTP_SUMMARY_INCOMPLETE:{analysis.shard.shard_id}:'
+                    f'{native["summary_incomplete"]}'
                 )
             if native.get('summary_mismatch'):
                 reasons.append(

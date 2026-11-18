@@ -23,6 +23,7 @@ class Attempt:
     lines: list[str] = field(default_factory=list)
     events: dict[str, int] = field(default_factory=dict)
     summaries: list[dict[str, int]] = field(default_factory=list)
+    summary_incomplete: bool = False
     summary_mismatch: bool = False
     unknown_flags: list[str] = field(default_factory=list)
     parse_errors: list[str] = field(default_factory=list)
@@ -69,6 +70,7 @@ class Attempt:
             'end_line': self.end_line,
             'events': dict(sorted(self.events.items())),
             'summaries': list(self.summaries),
+            'summary_incomplete': self.summary_incomplete,
             'summary_mismatch': self.summary_mismatch,
             'unknown_flags': sorted(self.unknown_flags),
         }
@@ -82,6 +84,7 @@ class LtpParse:
     native: dict
     order_matches: bool
     summary_missing: int
+    summary_incomplete: int
     summary_mismatch: int
 
 
@@ -107,6 +110,8 @@ def _summaries_from_lines(lines: list[str], *, attempt: Attempt) -> list[dict[st
             cursor += 1
         if not values:
             attempt.parse_errors.append('EMPTY_SUMMARY')
+        elif set(values) != {'passed', 'failed', 'broken', 'skipped', 'warnings'}:
+            attempt.summary_incomplete = True
         summaries.append(values)
     if summaries:
         return summaries
@@ -119,7 +124,10 @@ def _summaries_from_lines(lines: list[str], *, attempt: Attempt) -> list[dict[st
         if key == 'Total Tests':
             continue
         legacy[{'Passed': 'passed', 'Failed': 'failed', 'Not Supported': 'skipped'}[key]] = int(value)
-    return [legacy] if legacy else []
+    if legacy:
+        attempt.summary_incomplete = True
+        return [legacy]
+    return []
 
 
 def strip_ansi(text: str) -> str:
@@ -224,6 +232,7 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
 
     items = []
     summary_missing = 0
+    summary_incomplete = 0
     summary_mismatch = 0
     for name in expected_names:
         cases = attempts.get(name, [])
@@ -234,6 +243,8 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
             })
             continue
         if len(cases) > 1:
+            if any(case.summary_incomplete for case in cases):
+                summary_incomplete += 1
             items.append({
                 'name': name, 'judgment': 'JUDGE_ERROR',
                 'reasons': ['DUPLICATE_ATTEMPT'],
@@ -244,6 +255,8 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
         result = case.result()
         if not case.summaries:
             summary_missing += 1
+        if case.summary_incomplete:
+            summary_incomplete += 1
         if case.summary_mismatch:
             summary_mismatch += 1
         items.append(result)
@@ -270,7 +283,9 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
         items=items, extras=extras, errors=errors,
         native={'events': {flag: count for flag, count in native.items() if count},
                 'summaries': {key: value for key, value in summaries.items() if value},
-                'summary_missing': summary_missing, 'summary_mismatch': summary_mismatch},
+                'summary_missing': summary_missing, 'summary_incomplete': summary_incomplete,
+                'summary_mismatch': summary_mismatch},
         order_matches=observed_order == expected_names,
-        summary_missing=summary_missing, summary_mismatch=summary_mismatch,
+        summary_missing=summary_missing, summary_incomplete=summary_incomplete,
+        summary_mismatch=summary_mismatch,
     )

@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -176,36 +177,103 @@ def run_adapter(criteria: Criteria, group: str, section_text: str,
         return AdapterOutput({}, error=f'adapter entry hash mismatch: {spec["entry"]}')
 
     command = [sys.executable, '-E', '-s', '-S', '-B', str(entry)]
-    process = None
     try:
-        process = subprocess.Popen(
-            command, cwd=snapshot_root, stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            env=_adapter_environment(), start_new_session=True,
+        stdout, stderr, returncode, error = _run_bounded(
+            command, section_text.encode('utf-8'), timeout=spec['timeout_seconds'],
+            limit=spec['max_output_bytes'], cwd=snapshot_root,
+            environment=_adapter_environment(),
         )
-        stdout, stderr = process.communicate(
-            section_text.encode('utf-8'), timeout=spec['timeout_seconds'],
-        )
-    except subprocess.TimeoutExpired:
-        if process is not None:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            stdout, stderr = process.communicate()
-        return AdapterOutput({}, error=f'adapter timed out after {spec["timeout_seconds"]}s')
     except OSError as exc:
         return AdapterOutput({}, error=f'adapter failed to start: {exc}')
-
     stderr_text = stderr.decode('utf-8', 'replace')[:2000]
-    if len(stdout) > spec['max_output_bytes']:
-        return AdapterOutput({}, error='adapter output exceeds limit', stderr=stderr_text)
-    if process.returncode != 0:
+    if error:
+        return AdapterOutput({}, error=error, stderr=stderr_text)
+    if returncode != 0:
         detail = stderr_text.strip() or stdout.decode('utf-8', 'replace')[:500]
-        return AdapterOutput({}, error=f'adapter exited {process.returncode}: {detail}',
+        return AdapterOutput({}, error=f'adapter exited {returncode}: {detail}',
                              stderr=stderr_text)
     try:
         items = normalize_adapter_items(stdout, max_output=spec['max_output_bytes'])
     except (ValueError, TypeError, OverflowError) as exc:
         return AdapterOutput({}, error=f'invalid adapter output: {exc}', stderr=stderr_text)
     return AdapterOutput(items, stderr=stderr_text)
+
+
+def _run_bounded(command: list[str], input_bytes: bytes, *, timeout: int, limit: int,
+                 cwd: Path, environment: dict[str, str]):
+    """流式读取两个输出管道；超过总字节限额就终止整个进程组。"""
+    process = subprocess.Popen(
+        command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE, env=environment, start_new_session=True,
+    )
+    stdout_parts: list[bytes] = []
+    stderr_parts: list[bytes] = []
+    lock = threading.Lock()
+    state = {'total': 0, 'overflow': False, 'timeout': False}
+
+    def terminate():
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+    def reader(pipe, parts):
+        try:
+            while True:
+                try:
+                    chunk = pipe.read(65536)
+                except (OSError, ValueError):
+                    break
+                if not chunk:
+                    break
+                with lock:
+                    if state['total'] + len(chunk) > limit:
+                        state['overflow'] = True
+                        terminate()
+                        break
+                    state['total'] += len(chunk)
+                    parts.append(chunk)
+        finally:
+            try:
+                pipe.close()
+            except OSError:
+                pass
+
+    def writer():
+        try:
+            process.stdin.write(input_bytes)
+            process.stdin.flush()
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        finally:
+            try:
+                process.stdin.close()
+            except OSError:
+                pass
+
+    threads = [
+        threading.Thread(target=reader, args=(process.stdout, stdout_parts), daemon=True),
+        threading.Thread(target=reader, args=(process.stderr, stderr_parts), daemon=True),
+        threading.Thread(target=writer, daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        state['timeout'] = True
+        terminate()
+        process.wait()
+    for thread in threads:
+        thread.join(timeout=5)
+    for pipe in (process.stdout, process.stderr, process.stdin):
+        try:
+            pipe.close()
+        except OSError:
+            pass
+    error = None
+    if state['overflow']:
+        error = 'adapter output exceeds limit'
+    elif state['timeout']:
+        error = f'adapter timed out after {timeout}s'
+    return b''.join(stdout_parts), b''.join(stderr_parts), process.returncode, error

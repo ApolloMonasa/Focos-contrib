@@ -20,7 +20,7 @@ INVOCATION_KEYS = {
 GROUP_KEYS = {
     'kind', 'adapter', 'cases_per_libc', 'script_file', 'script_sha256',
     'judge_file', 'judge_sha256', 'judge_source', 'version', 'wrapper_file',
-    'wrapper_sha256', 'data_trees',
+    'wrapper_sha256', 'data_trees', 'planned_occurrences',
 }
 PROFILE_KEYS = {
     'schema_version', 'kind', 'profile_id', 'revision', 'frozen_at',
@@ -340,6 +340,12 @@ def load_profile(root: Path, profile_id: str, catalog: dict | None = None) -> Pr
                 raise InputError(f'profile group judge hash is invalid: {group}')
             if meta['script_file'] != f'{group}_testcode.sh':
                 raise InputError(f'profile group script file is invalid: {group}')
+            planned = meta.get('planned_occurrences', {})
+            if (not isinstance(planned, dict)
+                    or any(not isinstance(name, str) or not name
+                           or not _is_int(count) or count < 1
+                           for name, count in planned.items())):
+                raise InputError(f'profile group planned occurrences are invalid: {group}')
             hashes = meta['script_sha256']
             if not isinstance(hashes, dict) or set(hashes) != set(libcs):
                 raise InputError(f'profile group script hashes are invalid: {group}')
@@ -470,6 +476,15 @@ def load_profile(root: Path, profile_id: str, catalog: dict | None = None) -> Pr
                 raise InputError(f'invocation line {ordinal + 1}: judge/kind does not match group')
         counts[row['group']][row['libc']] += 1
         invocations.append(row)
+
+    for group in groups:
+        meta = group_meta[group]
+        if meta['kind'] != 'non_ltp':
+            continue
+        group_names = {row['name'] for row in invocations if row['group'] == group}
+        for name in meta.get('planned_occurrences', {}):
+            if name not in group_names:
+                raise InputError(f'profile planned occurrence names an unknown case: {group}/{name}')
 
     declared = inv_spec['by_group_libc']
     if not isinstance(declared, dict) or set(declared) != set(groups):

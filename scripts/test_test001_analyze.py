@@ -79,6 +79,20 @@ def ltp_log(cases: list[tuple[str, list[str], int]]) -> bytes:
     return ('\n'.join(parts) + '\n').encode()
 
 
+def ltp_log_with_summaries(names: list[str], *, incomplete_name: str | None = None) -> bytes:
+    parts = ['#### OS COMP TEST GROUP START ltp-musl ####']
+    for name in names:
+        parts.append(f'RUN LTP CASE {name}')
+        parts.append('TPASS: ok')
+        parts.append('Summary:')
+        parts.append('passed   1')
+        if name != incomplete_name:
+            parts.extend(['failed   0', 'broken   0', 'skipped  0', 'warnings 0'])
+        parts.append(f'FAIL LTP CASE {name} : 0')
+    parts.append('#### OS COMP TEST GROUP END ltp-musl ####')
+    return ('\n'.join(parts) + '\n').encode()
+
+
 class TemporaryOutput(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -385,6 +399,122 @@ class RunPackageTests(TemporaryOutput):
                          ['report.json', 'report.md'])
         self.assertEqual(sorted(path.name for path in second_out.iterdir()),
                          ['report.json', 'report.md'])
+
+    def test_lua_fail_then_success_cannot_pass(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        serial = serial.replace(
+            b'testcase lua date.lua success\n',
+            b'testcase lua date.lua fail\ntestcase lua date.lua success\n',
+            1,
+        )
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        item = next(item for item in report['groups'][0]['items']
+                    if item['name'] == 'lua date.lua')
+        self.assertEqual(item['judgment'], 'JUDGE_ERROR')
+        self.assertEqual(item['observations'], ['fail', 'success'])
+        self.assertTrue(any('DUPLICATE_OBSERVATION' in reason for reason in item['reasons']))
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+
+    def test_unknown_marker_is_reported_as_extra(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_net4.log', 'iperf', 'glibc')
+        serial = serial.replace(
+            b'#### OS COMP TEST GROUP END iperf-glibc ####',
+            b'===== iperf surprise end: success =====\n'
+            b'#### OS COMP TEST GROUP END iperf-glibc ####',
+        )
+        run = make_run(self.base / 'run', ['iperf-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        group = report['groups'][0]
+        self.assertIn('surprise', [extra['name'] for extra in group['extras']])
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertTrue(any('EXTRA_ITEMS' in reason for reason in report['acceptance']['reasons']))
+
+    def test_unknown_iozone_metric_is_reported_as_extra(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_perf.log', 'iozone', 'glibc')
+        serial = serial.replace(
+            b'#### OS COMP TEST GROUP END iozone-glibc ####',
+            b'iozone throughput write/read measurements\n'
+            b'Children see throughput for surprise writers\n'
+            b'Max throughput per process = 123.4\n'
+            b'#### OS COMP TEST GROUP END iozone-glibc ####',
+        )
+        run = make_run(self.base / 'run', ['iozone-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        group = report['groups'][0]
+        self.assertIn('iozone write/read surprise writers (kb/sec)',
+                      [extra['name'] for extra in group['extras']])
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+
+    def test_busybox_planned_duplicate_is_not_a_retry(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'busybox', 'glibc')
+        run = make_run(self.base / 'run', ['busybox-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        group = report['groups'][0]
+        item = next(item for item in group['items']
+                    if item['name'] == 'busybox echo "bbbbbbb" >> test.txt')
+        self.assertEqual(item['judgment'], 'PASS')
+        self.assertEqual(item['observations'], ['success', 'success'])
+        self.assertFalse(any('DUPLICATE_OBSERVATION' in error for error in group['judge_errors']))
+
+    def test_busybox_planned_duplicate_with_failure_blocks(self):
+        serial = (
+            b'#### OS COMP TEST GROUP START busybox-glibc ####\n'
+            b'testcase busybox echo "bbbbbbb" >> test.txt fail\n'
+            b'testcase busybox echo "bbbbbbb" >> test.txt success\n'
+            b'#### OS COMP TEST GROUP END busybox-glibc ####\n'
+        )
+        run = make_run(self.base / 'run', ['busybox-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        item = next(item for item in report['groups'][0]['items']
+                    if item['name'] == 'busybox echo "bbbbbbb" >> test.txt')
+        self.assertEqual(item['judgment'], 'FAIL')
+        self.assertEqual(item['observations'], ['fail', 'success'])
+        self.assertIn('OBSERVED_FAILURE', item['reasons'])
+
+    def test_busybox_unexpected_duplicate_blocks(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'busybox', 'glibc')
+        serial = serial.replace(
+            b'#### OS COMP TEST GROUP END busybox-glibc ####',
+            b'testcase busybox date fail\n#### OS COMP TEST GROUP END busybox-glibc ####',
+        )
+        run = make_run(self.base / 'run', ['busybox-glibc'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        item = next(item for item in report['groups'][0]['items']
+                    if item['name'] == 'busybox date')
+        self.assertEqual(item['judgment'], 'JUDGE_ERROR')
+        self.assertTrue(any('DUPLICATE_OBSERVATION' in reason for reason in item['reasons']))
+
+    def test_incomplete_ltp_summary_blocks_j2(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log_with_summaries(names, incomplete_name=names[0])
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        first, first_out = self.run_analyze(run, J1)
+        second, second_out = self.run_analyze(run, J2)
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(second.returncode, 0, second.stderr)
+        a = load_report(first_out)
+        b = load_report(second_out)
+        self.assertEqual(a['acceptance']['status'], 'PASS')
+        self.assertEqual(b['acceptance']['status'], 'BLOCKED')
+        self.assertIn('LTP_SUMMARY_INCOMPLETE:ltp-musl:1', b['acceptance']['reasons'])
+        self.assertEqual(b['groups'][0]['native']['summary_missing'], 0)
+        self.assertEqual(b['groups'][0]['native']['summary_incomplete'], 1)
 
     def test_ltp_full_run_v1_passes_v2_requires_summary(self):
         rows = [json.loads(line) for line in
