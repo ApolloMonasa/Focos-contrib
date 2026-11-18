@@ -134,6 +134,12 @@ def _apply_observation_guard(items: list[dict], extras: list[dict],
         elif name in guard.failures and item['judgment'] != 'JUDGE_ERROR':
             item['judgment'] = 'FAIL'
             reasons.append('OBSERVED_FAILURE')
+        elif (guard.group == 'libctest' and item['judgment'] == 'PASS'
+              and name not in guard.successes):
+            item['judgment'] = 'JUDGE_ERROR'
+            reason = 'NO_IN_ATTEMPT_PASS'
+            reasons.append(reason)
+            errors.append(f'{name}:{reason}')
     return items, _merge_extras(extras, guard.extras, guard.statuses), errors
 
 

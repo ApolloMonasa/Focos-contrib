@@ -600,6 +600,63 @@ class RunPackageTests(TemporaryOutput):
         result = cli(*args)
         return result, output
 
+    def libctest_section(self, *, pass_after_end=False, noncanonical_first=False):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows
+                 if row['group'] == 'libctest' and row['libc'] == 'glibc']
+        parts = ['#### OS COMP TEST GROUP START libctest-glibc ####']
+        for index, name in enumerate(names):
+            _, kind, case = name.split(' ', 2)
+            raw = f'entry-{kind}.exe {case}'
+            if noncanonical_first and index == 0:
+                parts += [
+                    f'========== START {raw} ========== trailing',
+                    'Fail!',
+                    f'========== END {raw} ========== trailing',
+                ]
+            if pass_after_end:
+                parts += [
+                    f'========== START {raw} ==========',
+                    f'========== END {raw} ==========',
+                    'Pass!',
+                ]
+            else:
+                parts += [
+                    f'========== START {raw} ==========',
+                    'Pass!',
+                    f'========== END {raw} ==========',
+                ]
+        parts.append('#### OS COMP TEST GROUP END libctest-glibc ####')
+        return ('\n'.join(parts) + '\n').encode(), len(names)
+
+    def test_libctest_pass_after_end_blocks(self):
+        serial, count = self.libctest_section(pass_after_end=True)
+        run = make_run(self.base / 'run', ['libctest-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertEqual(report['groups'][0]['counts']['pass'], 0)
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        first = report['groups'][0]['items'][0]
+        self.assertIn('NO_IN_ATTEMPT_PASS', first['reasons'])
+        self.assertTrue(any('MALFORMED_OBSERVATION' in error
+                            for error in report['groups'][0]['judge_errors']))
+
+    def test_libctest_noncanonical_marker_blocks(self):
+        serial, count = self.libctest_section(noncanonical_first=True)
+        run = make_run(self.base / 'run', ['libctest-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertEqual(report['groups'][0]['counts']['pass'], count - 1)
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertTrue(any('MALFORMED_OBSERVATION' in error
+                            for error in report['groups'][0]['judge_errors']))
+
     def test_libctest_missing_case_ends_blocks(self):
         rows = [json.loads(line) for line in
                 (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
