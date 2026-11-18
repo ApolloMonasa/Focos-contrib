@@ -63,6 +63,34 @@ class DuplicateObservationTests(unittest.TestCase):
             ['libctest static argv', 'libctest dynamic tls'],
         )
 
+    def test_libctest_missing_end_is_preserved_and_malformed(self):
+        text = (
+            '========== START entry-static.exe argv ==========\n'
+            'Pass!\n'
+        )
+        guard = check_observations('libctest', text, ['libctest static argv'])
+        self.assertEqual(guard.counts['libctest static argv'], 1)
+        self.assertTrue(any('unclosed START' in line for line in guard.malformed))
+
+    def test_basic_missing_end_is_preserved_and_malformed(self):
+        text = (
+            '========== START test_brk ==========\n'
+            'Pass!\n'
+        )
+        guard = check_observations('basic', text, ['test_brk'])
+        self.assertEqual(guard.counts['test_brk'], 1)
+        self.assertTrue(any('unclosed START' in line for line in guard.malformed))
+
+    def test_libctest_end_mismatch_is_malformed(self):
+        text = (
+            '========== START entry-static.exe argv ==========\n'
+            'Pass!\n'
+            '========== END entry-static.exe basename ==========\n'
+        )
+        guard = check_observations('libctest', text, ['libctest static argv'])
+        self.assertEqual(guard.counts['libctest static argv'], 1)
+        self.assertTrue(any('does not match' in line for line in guard.malformed))
+
     def test_basic_duplicate_start_is_visible(self):
         text = (
             '========== START test_brk ==========\n'

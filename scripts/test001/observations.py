@@ -6,10 +6,7 @@ from dataclasses import dataclass
 import re
 import shlex
 
-BASIC_START = re.compile(r'^=+\s*START\s+(.+?)\s*=+\s*$', re.M)
-LIBCTEST_START = re.compile(
-    r'^=+\s*START entry-(static|dynamic)\.exe\s+(\S+)\s*=+\s*$', re.M
-)
+MARKER = re.compile(r'^=+\s*(START|END)\s+(.+?)\s*=+\s*$')
 TESTCASE = re.compile(r'testcase (.+) (\bsuccess\b|\bfail\b)')
 UNIXBENCH = re.compile(r'^Unixbench (.+?):\s*(.*?)\s*$', re.M)
 LIBCBENCH = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', re.M)
@@ -103,6 +100,51 @@ def _testcase_malformed(text: str) -> list[str]:
     return malformed
 
 
+def _paired_markers(group: str, text: str) -> tuple[list[str], list[str]]:
+    """校验 basic/libctest 的 START/END 配对；保留所有 START 观测。"""
+    names = []
+    malformed = []
+    open_name = None
+    for line_number, raw in enumerate(text.splitlines(), 1):
+        match = MARKER.fullmatch(raw.strip())
+        if not match:
+            continue
+        state, name = match.groups()
+        if state == 'START':
+            if open_name is not None:
+                malformed.append(
+                    f'line {line_number}: nested START {name} before END {open_name}'
+                )
+            if group == 'basic':
+                names.append(name)
+            else:
+                normalized = re.fullmatch(
+                    r'entry-(static|dynamic)\.exe (.+)', name
+                )
+                if normalized is None:
+                    names.append('libctest ' + name)
+                    malformed.append(
+                        f'line {line_number}: unknown libctest START name: {name}'
+                    )
+                else:
+                    names.append(
+                        f'libctest {normalized.group(1)} {normalized.group(2)}'
+                    )
+            open_name = name
+        elif open_name is None:
+            malformed.append(f'line {line_number}: END without START: {name}')
+        elif name != open_name:
+            malformed.append(
+                f'line {line_number}: END {name} does not match START {open_name}'
+            )
+            open_name = None
+        else:
+            open_name = None
+    if open_name is not None:
+        malformed.append(f'unclosed START: {open_name}')
+    return names, malformed
+
+
 def _lmbench(text: str, expected: list[str]) -> list[str]:
     names = []
     for raw in text.splitlines():
@@ -130,13 +172,9 @@ def _lmbench(text: str, expected: list[str]) -> list[str]:
 
 def observed_names(group: str, text: str, expected: list[str] | None = None) -> list[str]:
     """按固定组格式提取原始观测名称；未知格式不猜测。"""
-    if group == 'basic':
-        return [match.group(1).strip() for match in BASIC_START.finditer(text)]
-    if group == 'libctest':
-        return [
-            f'libctest {match.group(1)} {match.group(2)}'
-            for match in LIBCTEST_START.finditer(text)
-        ]
+    if group in ('basic', 'libctest'):
+        names, _ = _paired_markers(group, text)
+        return names
     if group in ('lua', 'busybox'):
         return [name for name, _ in _testcase_pairs(text)]
     if group == 'iozone':
@@ -163,6 +201,11 @@ def check_observations(group: str, text: str, expected: list[str]) -> Observatio
         for name, status in _testcase_pairs(text):
             statuses.setdefault(name, []).append(status)
     failures = {name for name, values in statuses.items() if 'fail' in values}
-    malformed = _testcase_malformed(text) if group in ('lua', 'busybox') else []
+    if group in ('basic', 'libctest'):
+        _, malformed = _paired_markers(group, text)
+    elif group in ('lua', 'busybox'):
+        malformed = _testcase_malformed(text)
+    else:
+        malformed = []
     return ObservationGuard(counts=counts, extras=extras, duplicates=duplicates,
                             failures=failures, statuses=statuses, malformed=malformed)

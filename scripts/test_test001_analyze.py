@@ -600,6 +600,29 @@ class RunPackageTests(TemporaryOutput):
         result = cli(*args)
         return result, output
 
+    def test_libctest_missing_case_ends_blocks(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows
+                 if row['group'] == 'libctest' and row['libc'] == 'glibc']
+        parts = ['#### OS COMP TEST GROUP START libctest-glibc ####']
+        for name in names:
+            _, kind, case = name.split(' ', 2)
+            parts.append(f'========== START entry-{kind}.exe {case} ==========')
+            parts.append('Pass!')
+        parts.append('#### OS COMP TEST GROUP END libctest-glibc ####')
+        serial = ('\n'.join(parts) + '\n').encode()
+        run = make_run(self.base / 'run', ['libctest-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertEqual(report['groups'][0]['counts']['pass'], len(names))
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertTrue(any('MALFORMED_OBSERVATION' in error
+                            for error in report['groups'][0]['judge_errors']))
+
     def test_lua_trailing_failure_is_not_overwritten(self):
         serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
         serial = serial.replace(
