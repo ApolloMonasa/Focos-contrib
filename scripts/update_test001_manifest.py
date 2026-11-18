@@ -8,6 +8,9 @@ import json
 import sys
 from pathlib import Path
 
+from test001.config import actual_implementation_files
+from test001.errors import InputError
+
 ROOT = Path(__file__).resolve().parents[1]
 ROOTS = ('scripts/test001.py', 'scripts/test001', 'tests/test001/criteria/v1/adapters')
 CRITERIA = ('regional-2025-log-v1', 'regional-2025-log-v2')
@@ -26,16 +29,7 @@ def criteria_hash(data: dict) -> str:
 
 
 def files():
-    found = {}
-    for relative in ROOTS:
-        path = ROOT / relative
-        if path.is_file():
-            found[relative] = path
-            continue
-        for item in sorted(path.rglob('*')):
-            if item.is_file() and '__pycache__' not in item.parts and item.suffix not in ('.pyc', '.pyo'):
-                found[item.relative_to(ROOT).as_posix()] = item
-    return found
+    return actual_implementation_files(ROOT, list(ROOTS))
 
 
 def build_manifest() -> bytes:
@@ -80,7 +74,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check', action='store_true', help='只核对，不写文件')
     args = parser.parse_args(argv)
-    return update(check=args.check)
+    try:
+        return update(check=args.check)
+    except InputError as exc:
+        print(f'update_test001_manifest: {exc}', file=sys.stderr)
+        return 1
 
 
 if __name__ == '__main__':

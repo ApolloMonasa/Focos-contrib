@@ -10,7 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
-from test001.config import load_catalog, load_criteria, load_profile
+from test001.config import (actual_implementation_files, load_catalog,
+                            load_criteria, load_profile)
 from test001.errors import InputError
 from test001.strictjson import StrictJSONError, loads
 
@@ -126,6 +127,40 @@ class CriteriaTests(unittest.TestCase):
             cwd=ROOT, capture_output=True, text=True, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+
+class ManifestEnumerationTests(unittest.TestCase):
+    """更新器和分析器共用枚举：缺失根、符号链接不能静默消失。"""
+
+    def test_missing_root_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'scripts/test001').mkdir(parents=True)
+            with self.assertRaisesRegex(InputError, 'implementation root is missing'):
+                actual_implementation_files(
+                    root, ['scripts/test001', 'scripts/missing-tree']
+                )
+
+    def test_symlink_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'scripts/test001'
+            directory.mkdir(parents=True)
+            target = root / 'real.py'
+            target.write_text('x')
+            (directory / 'link.py').symlink_to(target)
+            with self.assertRaisesRegex(InputError, 'symlink'):
+                actual_implementation_files(root, ['scripts/test001'])
+
+    def test_pycache_is_skipped(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / 'scripts/test001'
+            (directory / '__pycache__').mkdir(parents=True)
+            (directory / 'a.py').write_text('x')
+            (directory / '__pycache__' / 'a.pyc').write_bytes(b'x')
+            found = actual_implementation_files(root, ['scripts/test001'])
+            self.assertEqual(set(found), {'scripts/test001/a.py'})
 
 
 class StrictJSONTests(unittest.TestCase):

@@ -538,7 +538,8 @@ def load_profile(root: Path, profile_id: str, catalog: dict | None = None) -> Pr
                    data=data, invocations=invocations, shards=shards)
 
 
-def _manifest_actual_files(root: Path, roots: list[str]) -> dict[str, Path]:
+def actual_implementation_files(root: Path, roots: list[str]) -> dict[str, Path]:
+    """实现清单与分析器共享的枚举：缺失根、符号链接和特殊文件都拒绝。"""
     actual = {}
     for relative in roots:
         _safe_member(relative, label='implementation root')
@@ -593,7 +594,7 @@ def _verify_implementation(root: Path, criteria_path: Path, data: dict) -> list[
         if relative in expected:
             raise InputError(f'duplicate implementation manifest entry: {relative}')
         expected[relative] = parts[0]
-    actual = _manifest_actual_files(root, spec['roots'])
+    actual = actual_implementation_files(root, spec['roots'])
     if set(expected) != set(actual):
         missing = sorted(set(actual) - set(expected))
         extra = sorted(set(expected) - set(actual))

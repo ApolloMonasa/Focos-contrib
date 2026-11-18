@@ -52,6 +52,17 @@ class AdapterLimitTests(unittest.TestCase):
         self.assertIn('exceeds limit', result.error)
         self.assertLess(time.monotonic() - started, 5)
 
+    def test_hash_seed_is_effective(self):
+        script = (
+            "import json, os, sys\n"
+            "sys.stderr.write('seed=' + os.environ.get('PYTHONHASHSEED', '') + "
+            "' random=' + str(sys.flags.hash_randomization) + '\\n')\n"
+            "print(json.dumps([{'name': 'x', 'all': 1, 'pass': 1, 'score': 1}]))\n"
+        )
+        result = self.adapter(script)
+        self.assertIsNone(result.error)
+        self.assertIn('seed=0 random=0', result.stderr)
+
     def test_timeout_kills_process_group(self):
         result = self.adapter('import time\ntime.sleep(10)\n', timeout=1)
         self.assertIn('timed out', result.error)

@@ -176,7 +176,8 @@ def run_adapter(criteria: Criteria, group: str, section_text: str,
     if sha256_file(entry) != spec['sha256']:
         return AdapterOutput({}, error=f'adapter entry hash mismatch: {spec["entry"]}')
 
-    command = [sys.executable, '-E', '-s', '-S', '-B', str(entry)]
+    # 环境已白名单；不能再加 -E，否则 PYTHONHASHSEED/PYTHONIOENCODING 会被忽略。
+    command = [sys.executable, '-s', '-S', '-B', str(entry)]
     try:
         stdout, stderr, returncode, error = _run_bounded(
             command, section_text.encode('utf-8'), timeout=spec['timeout_seconds'],
