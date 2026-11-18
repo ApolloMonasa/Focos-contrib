@@ -129,6 +129,16 @@ class FinalEvidenceTests(unittest.TestCase):
                     self.assertEqual(code, 1)
                     self.assertEqual(report['totals']['accepted_pass'], 0)
 
+    def test_nonfinite_or_oversized_table_dimensions_produce_blocked_reports(self):
+        valid = '\n'.join(lmbench_lines())
+        for body in (
+            valid.replace('96 1', '1e999 1'),
+            valid.replace('10k 100 200 300', '10k ' + '9' * 5000 + ' 200 300'),
+        ):
+            code, report = self.analyze('lmbench', body)
+            self.assertEqual(code, 1)
+            self.assertEqual(report['totals']['accepted_pass'], 0)
+
     def test_valid_performance_passes_have_owned_evidence(self):
         bodies = {
             g: '\n'.join(f'====== {g} {n} end: success ======' for n in names(g))

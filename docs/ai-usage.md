@@ -83,4 +83,6 @@
 
 2026-11-18，按负责人要求重构 PR #46 的三项结构性缺口：先扩充日志协议及最终报告负例，再引入单次语义证据计划；官方 judge 保留为观察源，最终 PASS 须有绑定冻结调用的正向 proof。结构事件逐行记 consumed/information/error，孤立计时、错配、重复和未归属事件阻断；最终汇总独立核对 proof 身份、事件所有权及账本完整性。basic 另以独占尝试运行冻结 judge；LTP 绑定原生调用范围。同步修复团队跨行/非法空白、Unixbench 跨 LF、lmbench NBSP 和 libcbench orphan time 四条复审意见。两套 CRITERIA revision=4，PROFILE 不变。
 
-本轮验证：make check 通过（52 Rust、194 Python、BOOT-001），15 份历史对照逐项保持一致，已有真实 LTP 短样本回归通过。新增完整 shard 正例、四类评论复现、重复/孤立结果、伪造 adapter 全 PASS，以及缺失/错绑 proof、未归属/丢失账本等最终验收负例；历史 basic 样例本身含失败和损坏边界，其 11 项 PASS 均另获 scoped judge 证明，不宣称该样例全通过。实现清单、源码 F 类检查、JSON、本地链接和差异检查通过，日志保留本地 target/pr46-evidence/。未新增真实采集成绩；BusyBox 清单审计及 B–D 仍待完成，AI 不替代非作者人工批准。
+本轮验证：make check 通过（52 Rust、195 Python、BOOT-001），15 份历史对照逐项保持一致，已有真实 LTP 短样本的 2840 项判分及原生事件计数与 17bebe4 精确一致。新增完整 shard 正例、四类评论复现、重复/孤立结果、伪造 adapter 全 PASS，以及缺失/错绑 proof、未归属/丢失账本等最终验收负例；历史 basic 样例本身含失败和损坏边界，其 11 项 PASS 均另获 scoped judge 证明，不宣称该样例全通过。实现清单、源码 F 类检查、JSON、本地链接和差异检查通过，日志保留本地 target/pr46-evidence/。未新增真实采集成绩；BusyBox 清单审计及 B–D 仍待完成，AI 不替代非作者人工批准。
+
+同轮自审补充：lmbench 表格的非有限进程数和超长整数先暴露为无法产出报告的负例，再增加有限值校验并保留错误记录；完整 make check 再次通过（Python 共 195 项）。

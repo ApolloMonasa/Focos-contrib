@@ -387,7 +387,10 @@ def _lmbench(plan):
                 plan.error(e, 'ORPHAN_FS_ROW')
                 continue
             plan.consume(e, current)
-            size, files, creates, deletes = map(int, e.fields)
+            if any(number(text) is None for text in e.fields):
+                plan.error(e, 'INVALID_TABLE_DIMENSION', current)
+                continue
+            size, files, creates, deletes = (int(text.lstrip('0') or '0') for text in e.fields)
             if size in rows:
                 current.reasons.append('DUPLICATE_TABLE_ROW')
             rows.add(size)
@@ -408,6 +411,9 @@ def _lmbench(plan):
         elif e.kind == 'numbers' and current is not None and index == 23:
             plan.consume(e, current)
             processes, value = map(float, e.fields)
+            if not math.isfinite(processes):
+                plan.error(e, 'INVALID_PROCESS_COUNT', current)
+                continue
             if processes not in (2, 4, 8, 16, 24, 32, 64, 96):
                 plan.error(e, 'UNKNOWN_PROCESS_COUNT', current)
             if processes in rows:
