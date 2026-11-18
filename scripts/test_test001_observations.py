@@ -126,6 +126,29 @@ class PerformanceMetricTests(unittest.TestCase):
         self.assertEqual(metrics[0]['unit'], 'microseconds')
         self.assertEqual(metrics[0]['label'], 'Simple syscall')
 
+    def test_lmbench_anonymous_metrics_keep_trace_identity(self):
+        text = ('+ ./lmbench_all bw_file_rd -P 1 512k io_only /var/tmp/XXX\n'
+                '0.524288 123.45\n'
+                '+ ./lmbench_all lat_mmap -P 1 512k /var/tmp/XXX\n'
+                '0.524288 6.75\n')
+        names = [f'item-{i}' for i in range(24)]
+        metrics = extract_metrics('lmbench', text, names)
+        self.assertEqual([m['name'] for m in metrics], ['item-19', 'item-16'])
+        self.assertEqual([m['value'] for m in metrics], [123.45, 6.75])
+        self.assertEqual([m['unit'] for m in metrics], ['MB/sec', 'microseconds'])
+        self.assertEqual(metrics[0]['raw'], '0.524288 123.45')
+
+    def test_lmbench_tables_keep_all_measurements(self):
+        text = ('file system latency\n10k 100 200 300\n'
+                'context switch overhead\n2 1.25\n96 2.5\n')
+        metrics = extract_metrics('lmbench', text, [f'item-{i}' for i in range(24)])
+        self.assertEqual([m['value'] for m in metrics], [200, 300, 1.25, 2.5])
+        self.assertEqual(metrics[0]['files'], 100)
+        self.assertEqual(metrics[-1]['processes'], 96)
+
+    def test_lmbench_unbound_numbers_are_not_assigned(self):
+        self.assertEqual(extract_metrics('lmbench', '0.524288 123.45\n', []), [])
+
 
 class FrozenTableTests(unittest.TestCase):
     """lmbench 守卫命令表必须与 CRITERIA 适配器的表完全一致。"""

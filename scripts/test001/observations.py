@@ -261,14 +261,58 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                     current = None
         return metrics
     if group == 'lmbench':
+        context = None
         for line_number, raw in enumerate(text.splitlines(), 1):
-            match = LMBENCH_METRIC.fullmatch(ANSI.sub('', raw).strip())
+            line = ANSI.sub('', raw).strip()
+            if line.startswith('+ '):
+                context = None
+                try:
+                    args = shlex.split(line[2:])
+                except ValueError:
+                    continue
+                if args and args[0] == './lmbench_all':
+                    context = LMBENCH_INDEX.get(tuple(args[1:]))
+                continue
+            if line in ('file system latency', 'context switch overhead'):
+                context = 18 if line == 'file system latency' else 23
+                continue
+            match = LMBENCH_METRIC.fullmatch(line)
             if match:
                 value = float(match.group(2))
                 if math.isfinite(value):
                     metrics.append({'label': match.group(1).strip(),
                                     'value': value, 'unit': match.group(3),
-                                    'line': line_number})
+                                    'line': line_number, 'raw': raw})
+                context = None
+                continue
+            name = expected[context] if context is not None and context < len(expected) else None
+            if context in (16, 19, 20, 21, 22):
+                pair = re.fullmatch(rf'({NUMBER})\s+({NUMBER})', line)
+                if pair and all(math.isfinite(float(v)) for v in pair.groups()):
+                    metrics.append({'name': name, 'value': float(pair[2]),
+                                    'unit': 'microseconds' if context == 16 else 'MB/sec',
+                                    'input_size': float(pair[1]), 'input_size_unit': 'MB',
+                                    'line': line_number, 'raw': raw})
+                elif line:
+                    context = None
+            elif context == 18:
+                row = re.fullmatch(r'(\d+)k\s+(\d+)\s+(\d+)\s+(\d+)', line)
+                if row:
+                    for column, operation in ((3, 'create'), (4, 'delete')):
+                        metrics.append({'name': name, 'operation': operation,
+                                        'value': int(row[column]), 'unit': 'operations/sec',
+                                        'file_size': int(row[1]), 'file_size_unit': 'kB',
+                                        'files': int(row[2]), 'line': line_number, 'raw': raw})
+                elif line:
+                    context = None
+            elif context == 23:
+                row = re.fullmatch(rf'(\d+)\s+({NUMBER})', line)
+                if row and math.isfinite(float(row[2])):
+                    metrics.append({'name': name, 'value': float(row[2]),
+                                    'unit': 'microseconds', 'processes': int(row[1]),
+                                    'line': line_number, 'raw': raw})
+                elif line and not line.startswith('"size='):
+                    context = None
     return metrics
 
 

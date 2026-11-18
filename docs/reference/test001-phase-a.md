@@ -106,3 +106,5 @@ python3 scripts/update_test001_manifest.py
 ```
 
 它会重写 `tests/test001/criteria/v1/implementation.sha256`，并更新两份 CRITERIA 的 `implementation.sha256` 与 `criteria_hash`。`--check` 只核对不写；测试会检查清单是否过期。
+
+性能报告保留 libcbench 计时和 lmbench 标签指标；无标签 mmap/读带宽须绑定冻结命令 trace，文件系统及上下文切换表格分别记录操作/进程数、原值、单位和原始行。缺命令上下文的双数字不猜测归属。
