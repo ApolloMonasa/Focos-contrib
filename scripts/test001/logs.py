@@ -35,6 +35,7 @@ class SplitResult:
     protocol: str
     section_errors: dict[tuple[str, str], list[str]]
     unattributed: list[dict] = field(default_factory=list)
+    events: tuple[Event, ...] = ()
 
 
 def _key(raw: str, *, errors: list[str], section_errors: dict, line_number: int):
@@ -68,7 +69,8 @@ def split_sections(text: str) -> SplitResult:
             sections[current.key] = current
         current = None
 
-    for event in lex(text):
+    source_events = lex(text)
+    for event in source_events:
         line_number, raw = event.line, event.raw
         if event.kind != 'group':
             if not event.canonical:
@@ -171,4 +173,5 @@ def split_sections(text: str) -> SplitResult:
         protocol=protocol,
         section_errors=section_errors,
         unattributed=unattributed,
+        events=source_events,
     )

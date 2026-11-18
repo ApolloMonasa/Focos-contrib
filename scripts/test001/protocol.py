@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 import shlex
+from .formats import LMBENCH_LABELS
 
 RESULT_FLAGS = ('TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN', 'TINFO', 'TDEBUG')
 UNATTRIBUTED_FLAGS = {'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN'}
@@ -119,10 +120,27 @@ def classify(raw: str, number: int, *, crlf=False) -> Event:
     m = re.fullmatch(r'Unixbench (.+?):[ \t]*(.*?)[ \t]*', text)
     if m:
         return event('unixbench', m.groups(), ('unixbench',))
-    if re.search(
-        r'iozone .*measurements|Max throughput per process|Children see throughput for', text
-    ):
-        return event('iozone', (text,), ('iozone',))
+    if 'iozone ' in text and 'measurements' in text:
+        return event('iozone_header', (text,), ('iozone',))
+    m = re.fullmatch(
+        r'Children see throughput for[ \t]+(.+?)[ \t]*=[ \t]*(' + NUMBER + r')[ \t]+kB/sec', text
+    )
+    if m:
+        return event('iozone_child', m.groups(), ('iozone',))
+    m = re.fullmatch(r'Max throughput per process[ \t]*=[ \t]*(' + NUMBER + r')[ \t]+kB/sec', text)
+    if m:
+        return event('iozone_max', m.groups(), ('iozone',))
+    m = re.match(r'Children see throughput for[ \t]+(.+?)(?:[ \t]*=|$)', text)
+    if m:
+        return event('iozone_child', (m[1].strip(' \t'), ''), ('iozone',), False)
+    if 'Max throughput per process' in text:
+        return event('iozone_max', ('',), ('iozone',), False)
+    if 'Children see throughput for' in text or 'Max throughput per process' in text:
+        return event('invalid_iozone', groups=('iozone',), canonical=False)
+    if re.search(r'\b(?:iperf|netperf|cyclictest)[ \t]+.*end:', text):
+        return event(
+            'invalid_team_result', groups=('iperf', 'netperf', 'cyclictest'), canonical=False
+        )
     if text.startswith('+ '):
         try:
             args = shlex.split(text[2:])
@@ -137,6 +155,18 @@ def classify(raw: str, number: int, *, crlf=False) -> Event:
         return event('lmbench_metric', m.groups(), ('lmbench',))
     if text in LMBENCH_HEADERS:
         return event('lmbench_header', (text,), ('lmbench',))
+    if any(text.startswith(label + ':') for label in LMBENCH_LABELS):
+        return event('invalid_lmbench_metric', groups=('lmbench',), canonical=False)
+    m = re.fullmatch(r'(' + NUMBER + r')[ \t]+(' + NUMBER + r')', text)
+    if m:
+        return event('numbers', m.groups())
+    m = re.fullmatch(r'([0-9]+)k[ \t]+([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)', text)
+    if m:
+        return event('fs_row', m.groups(), ('lmbench',))
+    if re.fullmatch(r'"size=32k ovr=' + NUMBER, text):
+        return event('ctx_header', (text,), ('lmbench',))
+    if re.fullmatch(NUMBER, text):
+        return event('scalar', (text,))
     # 数字行只有在已冻结 trace/表头上下文内才能归属，不单独作为组边界结果。
     return event('text')
 

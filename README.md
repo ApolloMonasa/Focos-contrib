@@ -109,6 +109,8 @@ Focos/
 │   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
 │   ├── test001.py                     # TEST-001 实现快照入口
 │   ├── test001/                       # 清单读取、LTP/官方判据适配与报告
+│   │   ├── formats.py                 # 冻结格式表，供词法与语义共用
+│   │   ├── proofs.py                  # 单次语义计划、正向证据与事件归属
 │   │   ├── protocol.py                # 共享结构事件、原始位置与格式规则
 │   │   └── worker.py                  # 私有快照中的独立分析入口
 │   ├── test_test001_analyze.py        # 历史回放、运行包和 LTP 负例
@@ -119,6 +121,7 @@ Focos/
 │   ├── test_test001_report.py          # Markdown 名称/占位符边界
 │   ├── test_test001_protocol_edges.py # 结构空白、汇总一致性与诊断位置
 │   ├── test_test001_protocol.py       # 格式、基数、位置组合与验收不变量
+│   ├── test_test001_evidence.py       # 最终报告证据门槛与归属不变量
 │   ├── test_test001_snapshot.py       # 实现快照与重执行
 │   └── update_test001_manifest.py     # 生成分析实现清单
 ├── tests/                             # 往届测例清单与来源

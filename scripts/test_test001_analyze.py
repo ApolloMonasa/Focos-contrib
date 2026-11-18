@@ -723,7 +723,8 @@ class RunPackageTests(TemporaryOutput):
         self.assertEqual(result.returncode, 1, result.stderr)
         report = load_report(output)
         self.assertEqual(report['acceptance']['status'], 'BLOCKED')
-        self.assertEqual(report['groups'][0]['counts']['pass'], len(names))
+        self.assertEqual(report['groups'][0]['counts']['pass'], 0)
+        self.assertTrue(all(i['adapter']['pass']==1 for i in report['groups'][0]['items']))
         self.assertEqual(report['totals']['accepted_pass'], 0)
         self.assertTrue(any('MALFORMED_OBSERVATION' in error
                             for error in report['groups'][0]['judge_errors']))
@@ -1031,7 +1032,7 @@ class RunPackageTests(TemporaryOutput):
         self.assertEqual(report['acceptance']['status'], 'BLOCKED')
         self.assertIn('LTP_SUMMARY_MISMATCH:ltp-musl:1', report['acceptance']['reasons'])
         self.assertEqual(report['totals']['accepted_pass'], 0)
-        self.assertEqual(report['groups'][0]['counts']['pass'], 2820)
+        self.assertEqual(report['groups'][0]['counts']['pass'], 2819)
 
     def test_ltp_reversed_order_blocks(self):
         rows = [json.loads(line) for line in

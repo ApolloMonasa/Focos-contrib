@@ -89,7 +89,7 @@ class EventConsumerInvariants(unittest.TestCase):
         self.assertEqual(result.items[0]['end_line'], 23)
         self.assertEqual(result.items[0]['run_section_line'], 1)
         records = lex('Simple syscall: 1 microseconds', line_offset=40)
-        with patch('test001.observations.lex', side_effect=AssertionError('must reuse events')):
+        with patch('test001.proofs.lex', side_effect=AssertionError('must reuse events')):
             self.assertEqual(extract_metrics('lmbench', '', [], events=records)[0]['line'], 41)
             check_observations('lmbench', '', [], events=records)
 
