@@ -26,7 +26,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
 
-测试接入的重设计见 [TEST-001 草案](specs/TEST-001.md)：将构建、采集和日志分析拆开，先审接口与验收，再分期实现。当前未交付新 runner；参考 Linux 与外部日志都不能计为 FocOS 成绩。
+测试接入第三轮设计见 [TEST-001 草案](specs/TEST-001.md)：保留构建/采集分离，新增唯一解析路径、逐记录归属与 A0–A3 交付门槛，替代 #29/#46 的实现路线。当前未交付新 runner；参考 Linux 与外部日志都不能计为 FocOS 成绩。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -126,7 +126,8 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
-│       ├── test001-redesign.md         # TEST-001 接口、历史教训与分期验收
+│       ├── test001-redesign.md         # TEST-001 包、采集和批次契约
+│       ├── test001-analysis-contract.md # 唯一解析路径、两轮教训与 A0–A3 门槛
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
