@@ -36,6 +36,8 @@ def sample_report():
                 'unattributed': [{'event': 'TFAIL', 'line': 42,
                                   'section_line': 3}],
             },
+            'metrics': [{'name': 'b_malloc_sparse (0)', 'value': 0.0614294,
+                         'unit': 's', 'line': 7}],
         }],
         'implementation': {'manifest_sha256': 'a' * 64},
     }
@@ -60,6 +62,8 @@ class MarkdownEscapingTests(unittest.TestCase):
         self.assertIn('| ltp | musl | COMPLETE | ltp_native |', text)
         self.assertIn('line 42', text)
         self.assertIn('`TFAIL`', text)
+        self.assertIn('性能原值', text)
+        self.assertIn('0.0614294', text)
 
 
 if __name__ == '__main__':

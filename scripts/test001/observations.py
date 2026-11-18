@@ -3,10 +3,15 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+import math
 import re
 import shlex
 
 MARKER = re.compile(r'^=+\s*(START|END)\s+(.+?)\s*=+\s*$')
+ANSI = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
+NUMBER = r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
+LIBCBENCH_TIME = re.compile(rf'time:\s*({NUMBER}),')
+LMBENCH_METRIC = re.compile(rf'^(.+?):\s*({NUMBER})\s+(microseconds|KB/sec|MB/sec)$')
 TESTCASE = re.compile(r'testcase (.+) (\bsuccess\b|\bfail\b)')
 UNIXBENCH = re.compile(r'^Unixbench (.+?):\s*(.*?)\s*$', re.M)
 LIBCBENCH = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', re.M)
@@ -233,6 +238,38 @@ def _lmbench(text: str, expected: list[str]) -> list[str]:
         else:
             names.append('lmbench ' + shlex.join(command))
     return names
+
+
+def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
+    """从原始段保留性能数值和单位；冻结 adapter 仍只给 PASS/FAIL。"""
+    metrics = []
+    if group == 'libcbench':
+        names = set(expected)
+        current = None
+        for line_number, raw in enumerate(text.splitlines(), 1):
+            line = ANSI.sub('', raw).strip()
+            if line in names:
+                current = line
+                continue
+            if current is not None:
+                match = LIBCBENCH_TIME.match(line)
+                if match:
+                    value = float(match.group(1))
+                    if math.isfinite(value):
+                        metrics.append({'name': current, 'value': value,
+                                        'unit': 's', 'line': line_number})
+                    current = None
+        return metrics
+    if group == 'lmbench':
+        for line_number, raw in enumerate(text.splitlines(), 1):
+            match = LMBENCH_METRIC.fullmatch(ANSI.sub('', raw).strip())
+            if match:
+                value = float(match.group(2))
+                if math.isfinite(value):
+                    metrics.append({'label': match.group(1).strip(),
+                                    'value': value, 'unit': match.group(3),
+                                    'line': line_number})
+    return metrics
 
 
 def observed_names(group: str, text: str, expected: list[str] | None = None) -> list[str]:

@@ -48,7 +48,7 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 `--run` 只接受完整采集清单，而不是一张自报 `VERIFIED` 的最小 JSON：
 
-- `run_id`、PROFILE identity、selection、subject/platform、capture 状态/退出码、serial 与 firmware 文件哈希/长度；
+- `run_id`、PROFILE identity、selection、subject/platform、capture 状态/退出码、serial 与 firmware 文件哈希/长度；`scripts` 必须逐项列出 selected shard 的脚本退出码，缺失或非 0 阻断；
 - `build.manifest_sha256`、`kernel_sha256`、`initramfs_sha256`、`base_img_sha256`；其中 `base_img_sha256` 必须等于 PROFILE `inputs.image.uncompressed_sha256`；
 - `qemu.path/sha256/version`、实际 `argv`、`started_at/finished_at`、`limits`；
 - argv 严格解析：`argv[0]` 必须逐字等于 `qemu.path`；只允许冻结启动参数（`-machine virt`、`-m`、`-smp`、`-nographic`、`-no-reboot`、`-bios`、`-kernel`、`-initrd`、`-append`、`-drive`、`-device`），并必须含 `-machine/-m/-smp/-bios/-kernel/-initrd/-append/-drive/-device`；拒绝重复参数、`-blockdev` 和任何未登记参数。`-kernel/-initrd/-bios` 必须逐字等于对应只读角色路径；`-append` 固定为 `console=ttyS0 rdinit=/init`；唯一 `-drive` 必须 `if=none`、指向 `cow_layer.path`、format 与 COW 一致、不是基盘且不能 `readonly=on`；唯一 `-device` 必须是 `virtio-blk-device,drive=<COW id>`；
@@ -64,8 +64,8 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 - 来源分 `external_log` 与 `recorded_capture`。外部日志的 subject/platform 固定 `unknown`、capture 为 `NOT_RECORDED`、input_integrity 为 `UNVERIFIED`，即使逐项全 PASS 也不能验收通过。
 - 采集状态、完整性、协议、段和判分分字段保存。截断段保留已观察值，但 acceptance 仍 BLOCKED，`accepted_pass=0`。
-- 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。Lua/BusyBox 的 `testcase` 行按官方判据的非锚定 `success|fail` 语法解析，尾随诊断文本仍可识别；同一名称的 fail+success 记为重复/失败，含 `testcase` 但无法唯一解析结果的行记 `MALFORMED_OBSERVATION` 并阻断。basic/libctest 逐用例校验 START/END 配对和名称一致；嵌套 START、END 无 START、END 名称错配、缺 END 都保留已见观察值并记 `MALFORMED_OBSERVATION` 阻断。官方判据能识别的非规范边界（START/END 带尾随文本、缺 `=` 等）也先报错；libctest 的 `Pass!` 必须位于当前 START/END 内，END 后的 `Pass!` 记 case 外结果，adapter 报 PASS 但没有尝试内成功证据时记 `NO_IN_ATTEMPT_PASS` 并阻断。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
-- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。已有原生汇总与事件冲突时 J1/J2 都阻断；J2 另外要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。调用顺序必须匹配冻结列表，否则记 `LTP_ORDER_MISMATCH`。组内 invocation 外的结果事件保留段内/全局行号并记入 `native.unattributed`；组 END 之外的 LTP 结果事件保留全局行号并进入协议错误，二者都阻断验收。未知名称单列且阻断验收，不进入分母。
+- 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。Lua/BusyBox 的 `testcase` 行按官方判据的非锚定 `success|fail` 语法解析，尾随诊断文本仍可识别；同一名称的 fail+success 记为重复/失败，含 `testcase` 但无法唯一解析结果的行记 `MALFORMED_OBSERVATION` 并阻断。basic/libctest 逐用例校验 START/END 配对和名称一致；嵌套 START、END 无 START、END 名称错配、缺 END 都保留已见观察值并记 `MALFORMED_OBSERVATION` 阻断。官方判据能识别的非规范边界（START/END 带尾随文本、缺 `=` 等）也先报错；libctest 的 `Pass!` 必须位于当前 START/END 内，END 后的 `Pass!` 记 case 外结果，adapter 报 PASS 但没有尝试内成功证据时记 `NO_IN_ATTEMPT_PASS` 并阻断。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。libcbench/lmbench 的冻结 adapter 仍只输出 PASS/FAIL；分析器从原始段文本提取 `group.metrics`，保留 name/label、数值、单位和行号，并在 report.md/JSON 中展示。
+- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。已有原生汇总与事件冲突时 J1/J2 都阻断；J2 另外要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。调用顺序必须匹配冻结列表，否则记 `LTP_ORDER_MISMATCH`。组内 invocation 外的结果事件保留段内/全局行号并记入 `native.unattributed`；组 END 之外的 LTP 结果事件保留全局行号并进入协议错误；组外的 `testcase ... success/fail`、basic/libctest 边界、`Pass!`、team 标记和性能结果行也保留行号并作为非 LTP 协议错误阻断。二者都阻断验收。未知名称单列且阻断验收，不进入分母。
 - 同一运行包用 J1/J2 重判时，`run_id`、采集清单哈希、PROFILE 哈希、selection 和分母不变；CRITERIA 身份与结论可以不同。J2 的额外 LTP 汇总要求只影响分析，不重跑 QEMU。
 
 ## 15 份历史结果对照

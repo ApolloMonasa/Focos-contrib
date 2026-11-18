@@ -8,6 +8,13 @@ from .ltp import RESULT_RE, UNATTRIBUTED_FLAGS, strip_ansi
 
 GROUP_RE = re.compile(r'^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$')
 LIBC_RE = re.compile(r'-(musl|glibc)\Z')
+TESTCASE_RESULT = re.compile(r'\btestcase .+ \b(?:success|fail)\b')
+CASE_MARKER = re.compile(r'^=+\s*(?:START|END)\s+')
+TEAM_RESULT = re.compile(r'^=+\s*\S+\s+\S+\s+end:\s*\S+\s*=+\s*$')
+LIBCBENCH_RESULT = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)')
+UNIXBENCH_RESULT = re.compile(r'^Unixbench .+:')
+IOZONE_RESULT = re.compile(r'(?:iozone .*measurements|Max throughput per process)')
+LMBENCH_RESULT = re.compile(r'^\+ \./lmbench_all\b')
 
 
 @dataclass
@@ -74,12 +81,41 @@ def split_sections(text: str) -> SplitResult:
             if current is not None:
                 current.lines.append(raw)
                 continue
-            for result in RESULT_RE.finditer(strip_ansi(raw)):
+            cleaned = strip_ansi(raw).strip()
+            ltp_found = False
+            for result in RESULT_RE.finditer(cleaned):
                 flag = result.group(1)
                 if flag not in UNATTRIBUTED_FLAGS:
                     continue
-                unattributed.append({'line': line_number, 'event': flag})
+                ltp_found = True
+                unattributed.append({'line': line_number, 'kind': 'ltp',
+                                     'event': flag})
                 errors.append(f'line {line_number}: LTP result outside group: {flag}')
+            if ltp_found:
+                continue
+            non_ltp = None
+            if cleaned == 'Pass!':
+                non_ltp = 'Pass!'
+            elif TESTCASE_RESULT.search(cleaned):
+                non_ltp = 'testcase'
+            elif CASE_MARKER.match(cleaned):
+                non_ltp = 'case marker'
+            elif TEAM_RESULT.fullmatch(cleaned):
+                non_ltp = 'team marker'
+            elif LIBCBENCH_RESULT.match(cleaned):
+                non_ltp = 'libcbench'
+            elif UNIXBENCH_RESULT.match(cleaned):
+                non_ltp = 'unixbench'
+            elif IOZONE_RESULT.search(cleaned):
+                non_ltp = 'iozone'
+            elif LMBENCH_RESULT.match(cleaned):
+                non_ltp = 'lmbench'
+            if non_ltp is not None:
+                unattributed.append({'line': line_number, 'kind': 'non_ltp',
+                                     'event': non_ltp, 'text': cleaned[:200]})
+                errors.append(
+                    f'line {line_number}: non-LTP result outside group: {non_ltp}'
+                )
             continue
         state, name = match.groups()
         key = _key(name, errors=errors, section_errors=section_errors, line_number=line_number)

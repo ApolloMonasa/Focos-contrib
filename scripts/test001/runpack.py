@@ -16,8 +16,9 @@ CAPTURE_KEYS = {
     'schema_version', 'kind', 'run_id', 'profile', 'selection', 'subject',
     'platform', 'capture', 'input_integrity', 'serial', 'build', 'firmware',
     'campaign', 'qemu', 'argv', 'started_at', 'finished_at', 'limits',
-    'cow_layer', 'read_only_inputs', 'capture_implementation',
+    'cow_layer', 'read_only_inputs', 'capture_implementation', 'scripts',
 }
+SCRIPT_KEYS = {'shard_id', 'exit_code'}
 CAPTURE_STATUS = {'EXITED', 'TIMEOUT', 'OUTPUT_LIMIT', 'START_ERROR', 'NOT_RECORDED'}
 INTEGRITY = {'VERIFIED', 'CHANGED', 'UNVERIFIED'}
 READ_ONLY_ROLES = {'kernel', 'initramfs', 'base_img', 'firmware', 'qemu'}
@@ -42,6 +43,7 @@ class RunPackage:
     qemu_sha256: str
     capture_implementation_sha256: str
     selection: list[str]
+    script_exit_codes: dict[str, int]
 
 
 def _require_keys(value: dict, required: set, *, label: str):
@@ -281,6 +283,24 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
     for shard_id in selection:
         if shard_id not in expected_hashes:
             raise InputError(f'capture selection names an unknown shard: {shard_id}')
+    scripts = capture['scripts']
+    if not isinstance(scripts, list) or not scripts:
+        raise InputError('capture scripts is invalid')
+    script_exit_codes = {}
+    for index, item in enumerate(scripts):
+        _require_keys(item, SCRIPT_KEYS, label=f'capture scripts[{index}]')
+        _check_unknown(item, SCRIPT_KEYS, label=f'capture scripts[{index}]')
+        shard_id = _string(item['shard_id'], label=f'capture scripts[{index}].shard_id')
+        if shard_id in script_exit_codes:
+            raise InputError(f'capture scripts has duplicate shard: {shard_id}')
+        if shard_id not in selection:
+            raise InputError(f'capture scripts names an unselected shard: {shard_id}')
+        if type(item['exit_code']) is not int or not 0 <= item['exit_code'] <= 255:
+            raise InputError(f'capture scripts[{index}].exit_code is invalid')
+        script_exit_codes[shard_id] = item['exit_code']
+    if set(script_exit_codes) != set(selection):
+        missing = sorted(set(selection) - set(script_exit_codes))
+        raise InputError(f'capture scripts missing selected shards: {missing}')
     if capture['subject'] != 'reference_linux' or capture['platform'] != 'qemu_riscv64':
         raise InputError('capture subject/platform is not allowed in this criteria')
     if capture['input_integrity'] not in INTEGRITY:
@@ -416,5 +436,5 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
         serial_bytes=serial_raw, serial_sha256=sha256_bytes(serial_raw),
         firmware_sha256=sha256_bytes(firmware_raw), qemu_sha256=qemu['sha256'],
         capture_implementation_sha256=implementation_hash,
-        selection=list(selection),
+        selection=list(selection), script_exit_codes=script_exit_codes,
     )

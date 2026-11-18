@@ -115,6 +115,8 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
         'capture_implementation': {
             'files': [{'path': 'capture/main.py', 'sha256': 'f' * 64}],
         },
+        'scripts': [{'shard_id': shard_id, 'exit_code': 0}
+                    for shard_id in selection],
         'campaign': campaign,
     }
     (base / 'capture.json').write_text(json.dumps(capture, indent=2, sort_keys=True))
@@ -209,6 +211,22 @@ class HistoricalReplayTests(TemporaryOutput):
                                  report['report_md']['sha256'])
                 self.assertEqual(sorted(path.name for path in output.iterdir()),
                                  ['report.json', 'report.md', 'source.log'])
+
+    def test_performance_metrics_are_preserved(self):
+        for group in ('libcbench', 'lmbench'):
+            with self.subTest(group=group):
+                output = self.out(group)
+                result = cli(
+                    'analyze', '--log', HISTORICAL / 'logs/ref_perf.log',
+                    '--profile', PROFILE, '--criteria', J1,
+                    '--group', group, '--libc', 'glibc', '--out', output,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = load_report(output)
+                metrics = report['groups'][0].get('metrics', [])
+                self.assertTrue(metrics)
+                self.assertTrue(all(metric['unit'] for metric in metrics))
+                self.assertTrue(all(metric['line'] > 0 for metric in metrics))
 
     def test_external_all_pass_is_still_blocked(self):
         output = self.out()
@@ -545,6 +563,23 @@ class RunContractTests(TemporaryOutput):
         self.mutate(run, wrong_image)
         self.assert_rejected(run)
 
+    def test_nonzero_script_exit_blocks(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture['scripts'][0].__setitem__('exit_code', 1))
+        result, output = self.analyze_run(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('SCRIPT_EXIT_lua-glibc:1', report['acceptance']['reasons'])
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+
+    def test_missing_script_exit_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture.pop('scripts'))
+        self.assert_rejected(run)
+
     def test_changed_integrity_blocks_but_package_is_analyzed(self):
         serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
         run = make_run(self.base / 'run', ['lua-glibc'], serial, integrity='CHANGED')
@@ -859,6 +894,19 @@ class RunPackageTests(TemporaryOutput):
         unattributed = report['groups'][0]['native']['unattributed']
         self.assertEqual(unattributed[0]['event'], 'TFAIL')
         self.assertGreater(unattributed[0]['line'], 0)
+
+    def test_non_ltp_result_after_group_end_blocks(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        serial += b'testcase lua date.lua fail\n'
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['protocol']['status'], 'ERROR')
+        self.assertIn('NON_LTP_UNATTRIBUTED_RESULT:outside:1',
+                      report['acceptance']['reasons'])
+        self.assertEqual(report['protocol']['unattributed'][0]['event'], 'testcase')
+        self.assertEqual(report['totals']['accepted_pass'], 0)
 
     def test_ltp_failure_after_group_end_blocks(self):
         rows = [json.loads(line) for line in

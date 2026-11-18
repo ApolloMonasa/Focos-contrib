@@ -136,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
                 'read_only_inputs': run.capture['read_only_inputs'],
                 'capture_implementation': run.capture['capture_implementation'],
                 'capture_implementation_sha256': run.capture_implementation_sha256,
+                'script_exit_codes': run.script_exit_codes,
                 'started_at': run.capture['started_at'],
                 'finished_at': run.capture['finished_at'],
                 'limits': run.capture['limits'],

@@ -7,7 +7,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
-from test001.observations import LMBENCH_COMMANDS, check_observations, observed_names
+from test001.observations import (LMBENCH_COMMANDS, check_observations,
+                                  extract_metrics, observed_names)
 
 
 class DuplicateObservationTests(unittest.TestCase):
@@ -100,6 +101,30 @@ class DuplicateObservationTests(unittest.TestCase):
         )
         guard = check_observations('basic', text, ['test_brk'])
         self.assertEqual(guard.duplicates, ['test_brk'])
+
+
+class PerformanceMetricTests(unittest.TestCase):
+    """性能原值/单位必须能从原始段保留，adapter 的折叠不影响报告。"""
+
+    def test_libcbench_time_is_preserved(self):
+        text = (
+            'b_malloc_sparse (0)\n'
+            '  time: 0.061429400, virt: 38992, res: 38980, dirty: 38980\n'
+        )
+        metrics = extract_metrics('libcbench', text, ['b_malloc_sparse (0)'])
+        self.assertEqual(len(metrics), 1)
+        self.assertAlmostEqual(metrics[0]['value'], 0.0614294)
+        self.assertEqual(metrics[0]['unit'], 's')
+        self.assertEqual(metrics[0]['name'], 'b_malloc_sparse (0)')
+
+    def test_lmbench_value_and_unit_are_preserved(self):
+        metrics = extract_metrics(
+            'lmbench', 'Simple syscall: 0.5762 microseconds\n', []
+        )
+        self.assertEqual(len(metrics), 1)
+        self.assertAlmostEqual(metrics[0]['value'], 0.5762)
+        self.assertEqual(metrics[0]['unit'], 'microseconds')
+        self.assertEqual(metrics[0]['label'], 'Simple syscall')
 
 
 class FrozenTableTests(unittest.TestCase):

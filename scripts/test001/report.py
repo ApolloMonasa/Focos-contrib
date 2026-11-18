@@ -104,6 +104,24 @@ def _markdown(report: dict) -> str:
                 )
             lines.append('')
 
+    metrics = [(group, metric)
+               for group in report['groups']
+               for metric in group.get('metrics', [])]
+    if metrics:
+        lines += ['## 性能原值', '',
+                  '冻结 adapter 只给 PASS/FAIL；以下数值和单位直接来自原始段文本。', '',
+                  '| 组 | 指标 | 值 | 单位 | 行 |',
+                  '| --- | --- | ---: | --- | ---: |']
+        for group, metric in metrics[:100]:
+            label = metric.get('name', metric.get('label', ''))
+            lines.append(
+                f"| {_cell(group['group'])} | {_cell(label)} | "
+                f"{metric['value']} | {_cell(metric['unit'])} | {metric['line']} |"
+            )
+        if len(metrics) > 100:
+            lines.append(f'- 其余 {len(metrics) - 100} 项见 report.json。')
+        lines.append('')
+
     non_pass = []
     for group in report['groups']:
         for item in group['items']:

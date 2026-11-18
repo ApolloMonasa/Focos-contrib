@@ -12,7 +12,7 @@ from .config import Criteria, Profile, Shard
 from .errors import InputError
 from .logs import Section, SplitResult, split_sections
 from .ltp import parse_ltp_section
-from .observations import check_observations
+from .observations import check_observations, extract_metrics
 
 
 @dataclass
@@ -27,6 +27,7 @@ class GroupAnalysis:
     native: dict | None
     counts: dict
     order_matches: bool | None = None
+    metrics: list[dict] | None = None
 
 
 def _empty_counts() -> dict:
@@ -223,10 +224,16 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
         reasons.append(f'INPUT_INTEGRITY_{input_integrity}')
     if protocol['status'] != policy['require_protocol']:
         reasons.append(f'PROTOCOL_{protocol["status"]}')
-    if protocol.get('unattributed'):
-        reasons.append(
-            f'LTP_UNATTRIBUTED_RESULT:outside:{len(protocol["unattributed"])}'
-        )
+    unattributed = protocol.get('unattributed', [])
+    ltp_outside = [item for item in unattributed if item.get('kind') == 'ltp']
+    if ltp_outside:
+        reasons.append(f'LTP_UNATTRIBUTED_RESULT:outside:{len(ltp_outside)}')
+    non_ltp_outside = [item for item in unattributed if item.get('kind') == 'non_ltp']
+    if non_ltp_outside:
+        reasons.append(f'NON_LTP_UNATTRIBUTED_RESULT:outside:{len(non_ltp_outside)}')
+    for shard_id, exit_code in sorted(protocol.get('script_exit_codes', {}).items()):
+        if exit_code != 0:
+            reasons.append(f'SCRIPT_EXIT_{shard_id}:{exit_code}')
     for analysis in analyses:
         if analysis.section_status != policy['require_sections']:
             reasons.append(f'SECTION_{analysis.section_status}:{analysis.shard.shard_id}')
@@ -292,6 +299,8 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
         if analysis.native is not None:
             group['native'] = analysis.native
             group['order_matches'] = analysis.order_matches
+        if analysis.metrics is not None:
+            group['metrics'] = analysis.metrics
         groups.append(group)
 
     report = {
@@ -374,11 +383,19 @@ def analyze_log(profile: Profile, criteria: Criteria, shards: list[Shard],
         if need_adapters:
             adapter_root = prepare_adapter_snapshot(criteria, profile, Path(temporary))
         for shard in shards:
-            analyses.append(_analyze_group(
+            analysis = _analyze_group(
                 profile, criteria, shard, split_obj,
                 adapter_root=adapter_root,
-            ))
+            )
+            if analysis.section is not None and shard.group in ('libcbench', 'lmbench'):
+                analysis.metrics = extract_metrics(
+                    shard.group, analysis.section.text,
+                    [item['name'] for item in profile.items_for(shard)],
+                )
+            analyses.append(analysis)
     protocol = _protocol(split_obj, shards, origin=origin)
+    if input_info.get('script_exit_codes'):
+        protocol['script_exit_codes'] = dict(input_info['script_exit_codes'])
     return _build_report(
         profile, criteria, shards, analyses, origin=origin,
         input_info=input_info, capture=capture, input_integrity=input_integrity,
