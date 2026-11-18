@@ -35,6 +35,7 @@ PR #32 的架构约定已经合入，先把以下边界落实到实现与测试�
 | --- | --- |
 | [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 含 LTP 的规格修订](../specs/TEST-001.md)，再按 A→D 分期交付；当前进度见 Issue |
 | [#47 TEST-001 A 阶段后续硬化](https://github.com/MindScrath/Focos/issues/47) | 多 shard 拒绝、零观测语义、协议错误码与四类测试缺口；不阻塞 A 阶段合并 |
+| [#48 BusyBox 清单审计](https://github.com/MindScrath/Focos/issues/48) | 镜像/历史为 55 条，PROFILE/judge 为 53 条；需决定修订或冻结例外，当前 extras/阻断保持 |
 | [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与 host 只读测试 |
 | [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 动态 ELF 的解释器/库依赖；架构 ABI 与公共运行时分工 |
 | [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时测试 |

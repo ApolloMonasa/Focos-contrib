@@ -74,13 +74,15 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 | --- | --- | --- |
 | basic glibc/musl | 32 项一致 | musl 仍按旧镜像的已知构建问题记失败 |
 | lua glibc/musl | 9 项一致 | 参考历史全 PASS，但来源仍是 external_log |
-| busybox glibc/musl | 53 项一致 | 计划重复 `bbbbbbb` 允许两次成功；judge 输出多出 2 个镜像实际执行项，作为 extras 单列并阻断验收 |
+| busybox glibc/musl | 53 项一致（当前口径） | 计划重复 `bbbbbbb` 允许两次成功；当前 extras/阻断行为正确，但镜像/历史命令表是 55 条，审计未闭合，见 [#48](https://github.com/MindScrath/Focos/issues/48) |
 | libctest glibc/musl | 220 项一致 | 镜像缺少的项按失败保留 |
 | iozone/libcbench | 20/27 项一致 | 性能结果只作参考，不合成总分 |
 | lmbench | 24 项一致 | 历史日志在 END 前挂住，段为 TRUNCATED、协议 INCOMPLETE |
 | cyclictest/iperf/netperf/unixbench | 4/6/5/27 项一致 | 适配器输出与旧摘要逐项一致 |
 
 busybox 的两个 extras 是这次重放发现的诊断差异，不是把旧摘要改成分数。
+
+**BusyBox 清单审计未闭合（2026-11-18）。** 冻结镜像 `/musl|glibc/busybox_cmd.txt` 为 55 行、54 个唯一命令（SHA256 `e970e5ec…d623`），包含 `printf "abc\n"`、`sh -c 'sleep 5' & ./busybox kill $!` 和两次 `bbbbbbb`，不含 `kill 10`；镜像脚本哈希与 PROFILE 记录一致。15 份历史日志的 BusyBox 段也是 55 条并逐项与镜像对应，因此不是历史日志版本不同。当前 PROFILE 的 53 条与官方 judge 基线一致，却含 `kill 10`、缺上述两项；所以当前 extras/阻断是正确的，但调用清单需要修订。修订会同时影响 profile/CRITERIA 身份、shard 范围和历史对照，单独改 PROFILE 还会让官方 judge 继续输出 `kill 10` extra；具体决策见 Issue #48。
 
 ## 真实 LTP 样本
 
