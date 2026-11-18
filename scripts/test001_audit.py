@@ -29,9 +29,9 @@ def check_bytes(raw, meta, name):
         raise ValueError(f'input identity mismatch: {name}')
 
 
-def load_inputs(root):
+def load_inputs(root, lock_path=LOCK):
     # 读取后只消费内存副本，不在审计中重开路径。
-    lock = json.loads(LOCK.read_bytes())
+    lock = json.loads(lock_path.read_bytes())
     root = Path(root)
     if root.is_symlink():
         raise ValueError('input root is a symlink')
@@ -211,7 +211,10 @@ def verify_image(image, lock):
             # 路径来自仓库锁，不接受调用者的 debugfs 命令。
             if not re.fullmatch(r'/[a-z0-9_./]+', meta['path']) or '..' in meta['path']:
                 raise ValueError('invalid locked image path')
-            result = run_debugfs(['-R', 'cat ' + meta['path'], str(snapshot)],
+            operation = meta.get('operation', 'cat')
+            if operation not in ('cat', 'ls -p'):
+                raise ValueError('unsupported locked image operation')
+            result = run_debugfs(['-R', operation + ' ' + meta['path'], str(snapshot)],
                                  f'member read: {name}', 30)
             # debugfs 某些读取错误仍退出 0，长度和哈希必须同时符合。
             try:
