@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 from test001.adapters import run_adapter
 from test001.errors import InputError, PublishError
-from test001.fsutil import create_output_dir
+from test001.fsutil import create_output_dir, read_regular_bytes
 
 
 class FakeCriteria:
@@ -66,6 +66,25 @@ class AdapterLimitTests(unittest.TestCase):
     def test_timeout_kills_process_group(self):
         result = self.adapter('import time\ntime.sleep(10)\n', timeout=1)
         self.assertIn('timed out', result.error)
+
+    def test_parent_exit_does_not_bypass_deadline(self):
+        started = time.monotonic()
+        result = self.adapter(
+            "import subprocess, sys\n"
+            "subprocess.Popen([sys.executable, '-c', "
+            "'import time; time.sleep(3)'])\n",
+            timeout=0.2,
+        )
+        self.assertIn('timed out', result.error)
+        self.assertLess(time.monotonic() - started, 1.5)
+
+    def test_fifo_open_is_nonblocking(self):
+        fifo = self.root / 'fifo'
+        os.mkfifo(fifo)
+        started = time.monotonic()
+        with self.assertRaises(InputError):
+            read_regular_bytes(fifo, label='fifo')
+        self.assertLess(time.monotonic() - started, 1)
 
 
 class OutputBoundaryTests(unittest.TestCase):

@@ -74,11 +74,14 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
         'qemu': {'path': '/usr/bin/qemu-system-riscv64', 'sha256': qemu_sha,
                  'version': '10.2.2'},
         'argv': [
-            'qemu-system-riscv64', '-machine', 'virt',
+            '/usr/bin/qemu-system-riscv64', '-machine', 'virt',
+            '-m', '1G', '-smp', '1', '-nographic', '-no-reboot',
             '-bios', '/fixture/firmware.bin',
             '-kernel', '/build/kernel',
             '-initrd', '/build/initramfs',
+            '-append', 'console=ttyS0 rdinit=/init',
             '-drive', 'file=/run/cow.qcow2,if=none,format=qcow2,id=x0',
+            '-device', 'virtio-blk-device,drive=x0',
         ],
         'started_at': '2026-11-18T00:00:00+00:00',
         'finished_at': '2026-11-18T00:01:00+00:00',
@@ -457,6 +460,27 @@ class RunContractTests(TemporaryOutput):
             index = capture['argv'].index('-kernel') + 1
             capture['argv'][index] = '/unverified/other-kernel'
         self.mutate(run, other_kernel)
+        self.assert_rejected(run)
+
+    def test_unverified_qemu_executable_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture['argv'].__setitem__(
+            0, '/unverified/qemu-system-riscv64'))
+        self.assert_rejected(run)
+
+    def test_extra_blockdev_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture['argv'].extend(
+            ['-blockdev', 'node-name=unverified']))
+        self.assert_rejected(run)
+
+    def test_extra_device_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture['argv'].extend(
+            ['-device', 'virtio-blk-device,drive=unverified']))
         self.assert_rejected(run)
 
     def test_duplicate_bios_is_rejected(self):

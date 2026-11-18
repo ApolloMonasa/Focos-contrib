@@ -50,7 +50,8 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 - `run_id`、PROFILE identity、selection、subject/platform、capture 状态/退出码、serial 与 firmware 文件哈希/长度；
 - `build.manifest_sha256`、`kernel_sha256`、`initramfs_sha256`、`base_img_sha256`；
-- `qemu.path/sha256/version`、实际 `argv`、`started_at/finished_at`、`limits`；argv 严格解析：拒绝重复的 `-bios/-kernel/-initrd/-drive` 等单例参数，`-kernel/-initrd/-bios` 必须逐字等于对应只读角色路径，唯一 `-drive` 必须指向 `cow_layer.path`、format 与 COW 一致、不是基盘且不能 `readonly=on`；
+- `qemu.path/sha256/version`、实际 `argv`、`started_at/finished_at`、`limits`；
+- argv 严格解析：`argv[0]` 必须逐字等于 `qemu.path`；只允许冻结启动参数（`-machine virt`、`-m`、`-smp`、`-nographic`、`-no-reboot`、`-bios`、`-kernel`、`-initrd`、`-append`、`-drive`、`-device`），并必须含 `-machine/-m/-smp/-bios/-kernel/-initrd/-append/-drive/-device`；拒绝重复参数、`-blockdev` 和任何未登记参数。`-kernel/-initrd/-bios` 必须逐字等于对应只读角色路径；`-append` 固定为 `console=ttyS0 rdinit=/init`；唯一 `-drive` 必须 `if=none`、指向 `cow_layer.path`、format 与 COW 一致、不是基盘且不能 `readonly=on`；唯一 `-device` 必须是 `virtio-blk-device,drive=<COW id>`；
 - `firmware.source/version/original_path`、`cow_layer.path/format` 的初始哈希/长度/创建结果及基盘绑定；
 - `read_only_inputs` 必须恰好包含 kernel/initramfs/base_img/firmware/qemu 五个角色及各自前后 SHA256；
 - `capture_implementation.files` 的完整相对路径和逐文件 SHA256。

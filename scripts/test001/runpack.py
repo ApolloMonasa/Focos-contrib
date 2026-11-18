@@ -1,6 +1,7 @@
 """只读运行包：固定布局、完整采集身份、前后完整性校验和显式 shard 选择。"""
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -96,8 +97,11 @@ def _positive_int(value, *, label: str) -> int:
     return value
 
 
-SINGLETON_FLAGS = {'-bios', '-kernel', '-initrd', '-drive', '-machine',
-                   '-m', '-smp', '-append'}
+FLAGS_WITH_VALUE = {'-machine', '-m', '-smp', '-bios', '-kernel',
+                     '-initrd', '-append', '-drive', '-device'}
+FLAGS_NO_VALUE = {'-nographic', '-no-reboot'}
+DRIVE_KEYS = {'file', 'format', 'if', 'id', 'readonly'}
+APPEND = 'console=ttyS0 rdinit=/init'
 
 
 def _parse_drive(value: str) -> dict:
@@ -109,8 +113,14 @@ def _parse_drive(value: str) -> dict:
         if not separator or not key or key in options:
             raise InputError('capture -drive options are malformed or duplicated')
         options[key] = option
+    if set(options) - DRIVE_KEYS:
+        raise InputError('capture -drive has unregistered options')
     if not options.get('file'):
         raise InputError('capture -drive has no file')
+    if options.get('if') != 'none':
+        raise InputError('capture -drive must use if=none')
+    if not options.get('id'):
+        raise InputError('capture -drive has no id')
     if 'readonly' in options and options['readonly'] not in ('on', 'off'):
         raise InputError('capture -drive readonly is invalid')
     if 'format' not in options:
@@ -118,29 +128,71 @@ def _parse_drive(value: str) -> dict:
     return options
 
 
+def _parse_device(value: str) -> dict:
+    parts = value.split(',')
+    if not parts or parts[0] != 'virtio-blk-device':
+        raise InputError('capture -device is not the frozen virtio block device')
+    options = {}
+    for part in parts[1:]:
+        key, separator, option = part.partition('=')
+        if not separator or not key or key in options:
+            raise InputError('capture -device options are malformed or duplicated')
+        options[key] = option
+    if set(options) != {'drive'} or not options['drive']:
+        raise InputError('capture -device must only bind the COW drive')
+    return options
+
+
+def _parse_argv(argv):
+    values = {}
+    flags = set()
+    index = 1
+    while index < len(argv):
+        flag = argv[index]
+        if flag in FLAGS_NO_VALUE:
+            if flag in flags:
+                raise InputError(f'capture argv repeats {flag}')
+            flags.add(flag)
+            index += 1
+        elif flag in FLAGS_WITH_VALUE:
+            if flag in values:
+                raise InputError(f'capture argv repeats {flag}')
+            if index + 1 >= len(argv) or not argv[index + 1]:
+                raise InputError(f'capture argv has no value for {flag}')
+            values[flag] = argv[index + 1]
+            index += 2
+        else:
+            raise InputError(f'capture argv has unregistered argument: {flag}')
+    return values, flags
+
+
 def _check_argv(argv, paths: dict, qemu_path: str, cow: dict):
     if (not isinstance(argv, list) or not argv
             or any(not isinstance(value, str) or not value or '\x00' in value
                    for value in argv)):
         raise InputError('capture argv is invalid')
-    for flag in SINGLETON_FLAGS:
-        if argv.count(flag) > 1:
-            raise InputError(f'capture argv repeats {flag}')
-    for flag in ('-bios', '-kernel', '-initrd', '-drive'):
-        if flag not in argv:
+    if argv[0] != qemu_path:
+        raise InputError('capture argv does not name the exact recorded QEMU binary')
+    values, _ = _parse_argv(argv)
+    for flag in ('-machine', '-m', '-smp', '-bios', '-kernel', '-initrd',
+                 '-append', '-drive', '-device'):
+        if flag not in values:
             raise InputError(f'capture argv is missing {flag}')
-        index = argv.index(flag)
-        if index + 1 >= len(argv) or not argv[index + 1]:
-            raise InputError(f'capture argv has no value for {flag}')
-    if Path(argv[0]).name != Path(qemu_path).name:
-        raise InputError('capture argv does not name the recorded QEMU binary')
-    if argv[argv.index('-bios') + 1] != paths['firmware']:
+    if values['-machine'] != 'virt':
+        raise InputError('capture argv -machine is not virt')
+    if not re.fullmatch(r'[1-9][0-9]*[MG]', values['-m']):
+        raise InputError('capture argv -m is not a frozen memory size')
+    if not re.fullmatch(r'[1-9][0-9]*', values['-smp']):
+        raise InputError('capture argv -smp is invalid')
+    if values['-append'] != APPEND:
+        raise InputError('capture argv -append is not the frozen command line')
+    if values['-bios'] != paths['firmware']:
         raise InputError('capture argv -bios is not the verified firmware')
-    if argv[argv.index('-kernel') + 1] != paths['kernel']:
+    if values['-kernel'] != paths['kernel']:
         raise InputError('capture argv -kernel is not the verified kernel')
-    if argv[argv.index('-initrd') + 1] != paths['initramfs']:
+    if values['-initrd'] != paths['initramfs']:
         raise InputError('capture argv -initrd is not the verified initramfs')
-    drive = _parse_drive(argv[argv.index('-drive') + 1])
+    drive = _parse_drive(values['-drive'])
     if drive['file'] == paths['base_img']:
         raise InputError('capture argv attaches the base image as a writable drive')
     if drive['file'] != cow['path']:
@@ -149,6 +201,9 @@ def _check_argv(argv, paths: dict, qemu_path: str, cow: dict):
         raise InputError('capture argv drive format does not match the COW layer')
     if drive.get('readonly') == 'on':
         raise InputError('capture argv COW layer is read-only')
+    device = _parse_device(values['-device'])
+    if device['drive'] != drive['id']:
+        raise InputError('capture argv device does not attach the COW drive')
 
 
 def _check_read_only_inputs(items, expected: dict[str, str], integrity: str):

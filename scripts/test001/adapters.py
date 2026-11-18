@@ -4,10 +4,12 @@ from __future__ import annotations
 import json
 import math
 import os
+import selectors
 import signal
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -202,15 +204,16 @@ def run_adapter(criteria: Criteria, group: str, section_text: str,
 
 def _run_bounded(command: list[str], input_bytes: bytes, *, timeout: int, limit: int,
                  cwd: Path, environment: dict[str, str]):
-    """流式读取两个输出管道；超过总字节限额就终止整个进程组。"""
+    """非阻塞读取两个输出管道；截止时间覆盖进程组、管道和遗留后代。"""
     process = subprocess.Popen(
         command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, env=environment, start_new_session=True,
     )
     stdout_parts: list[bytes] = []
     stderr_parts: list[bytes] = []
-    lock = threading.Lock()
     state = {'total': 0, 'overflow': False, 'timeout': False}
+    deadline = time.monotonic() + timeout
+    selector = selectors.DefaultSelector()
 
     def terminate():
         try:
@@ -218,27 +221,36 @@ def _run_bounded(command: list[str], input_bytes: bytes, *, timeout: int, limit:
         except ProcessLookupError:
             pass
 
-    def reader(pipe, parts):
+    for pipe, parts in ((process.stdout, stdout_parts),
+                        (process.stderr, stderr_parts)):
+        os.set_blocking(pipe.fileno(), False)
+        selector.register(pipe, selectors.EVENT_READ, parts)
+
+    def read_ready(key):
+        pipe = key.fileobj
         try:
-            while True:
-                try:
-                    chunk = pipe.read(65536)
-                except (OSError, ValueError):
-                    break
-                if not chunk:
-                    break
-                with lock:
-                    if state['total'] + len(chunk) > limit:
-                        state['overflow'] = True
-                        terminate()
-                        break
-                    state['total'] += len(chunk)
-                    parts.append(chunk)
-        finally:
+            chunk = os.read(pipe.fileno(), 65536)
+        except BlockingIOError:
+            return True
+        except OSError:
+            chunk = b''
+        if not chunk:
+            try:
+                selector.unregister(pipe)
+            except KeyError:
+                pass
             try:
                 pipe.close()
             except OSError:
                 pass
+            return True
+        if state['total'] + len(chunk) > limit:
+            state['overflow'] = True
+            terminate()
+            return False
+        state['total'] += len(chunk)
+        key.data.append(chunk)
+        return True
 
     def writer():
         try:
@@ -252,26 +264,50 @@ def _run_bounded(command: list[str], input_bytes: bytes, *, timeout: int, limit:
             except OSError:
                 pass
 
-    threads = [
-        threading.Thread(target=reader, args=(process.stdout, stdout_parts), daemon=True),
-        threading.Thread(target=reader, args=(process.stderr, stderr_parts), daemon=True),
-        threading.Thread(target=writer, daemon=True),
-    ]
-    for thread in threads:
-        thread.start()
+    writer_thread = threading.Thread(target=writer, daemon=True)
+    writer_thread.start()
     try:
-        process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        state['timeout'] = True
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                state['timeout'] = True
+                terminate()
+                break
+            if not selector.get_map() and process.poll() is not None:
+                break
+            for key, _ in selector.select(timeout=min(remaining, 0.1)):
+                if not read_ready(key):
+                    break
+            if state['overflow']:
+                break
+    finally:
+        # 父进程退出不代表后代退出；统一在截止时间后清理整个进程组。
         terminate()
-        process.wait()
-    for thread in threads:
-        thread.join(timeout=5)
-    for pipe in (process.stdout, process.stderr, process.stdin):
+        if process.poll() is None:
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    pass
+        for key in list(selector.get_map().values()):
+            try:
+                selector.unregister(key.fileobj)
+            except KeyError:
+                pass
+            try:
+                key.fileobj.close()
+            except OSError:
+                pass
+        selector.close()
+        writer_thread.join(timeout=1)
         try:
-            pipe.close()
+            process.stdin.close()
         except OSError:
             pass
+
     error = None
     if state['overflow']:
         error = 'adapter output exceeds limit'

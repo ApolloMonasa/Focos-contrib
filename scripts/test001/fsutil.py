@@ -26,7 +26,7 @@ def read_regular_bytes(path: Path, *, label: str, max_bytes: int | None = None) 
     """只读取普通文件；拒绝符号链接和特殊文件，并检查读取前后身份。"""
     path = Path(path)
     try:
-        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     except OSError as exc:
         raise InputError(f'{label}: cannot open {path}: {exc}') from exc
     try:
