@@ -49,6 +49,14 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
     (base / 'serial.log').write_bytes(serial)
     firmware = b'fixture-firmware\n'
     (base / 'firmware.bin').write_bytes(firmware)
+    build = {
+        'manifest_sha256': 'a' * 64,
+        'kernel_sha256': 'b' * 64,
+        'initramfs_sha256': 'c' * 64,
+        'base_img_sha256': 'd' * 64,
+    }
+    qemu_sha = 'e' * 64
+    firmware_sha = hashlib.sha256(firmware).hexdigest()
     capture = {
         'schema_version': 2, 'kind': 'test001_capture', 'run_id': str(uuid.uuid4()),
         'profile': {'profile_id': PROFILE, 'revision': 1, 'profile_hash': profile_hash()},
@@ -57,9 +65,47 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
         'input_integrity': integrity,
         'serial': {'file': 'serial.log', 'sha256': hashlib.sha256(serial).hexdigest(),
                    'size': len(serial)},
-        'build': {'manifest_sha256': 'a' * 64},
-        'firmware': {'file': 'firmware.bin', 'sha256': hashlib.sha256(firmware).hexdigest(),
-                     'size': len(firmware)},
+        'build': build,
+        'firmware': {
+            'file': 'firmware.bin', 'sha256': firmware_sha, 'size': len(firmware),
+            'source': 'fixture release', 'version': '1.7',
+            'original_path': '/fixture/firmware.bin',
+        },
+        'qemu': {'path': '/usr/bin/qemu-system-riscv64', 'sha256': qemu_sha,
+                 'version': '10.2.2'},
+        'argv': [
+            'qemu-system-riscv64', '-machine', 'virt',
+            '-bios', '/fixture/firmware.bin',
+            '-kernel', '/fixture/kernel',
+            '-initrd', '/fixture/initramfs',
+            '-drive', 'file=/fixture/base.img,if=none,format=raw,id=x0',
+        ],
+        'started_at': '2026-11-18T00:00:00+00:00',
+        'finished_at': '2026-11-18T00:01:00+00:00',
+        'limits': {'timeout_seconds': 180, 'serial_bytes': 268435456,
+                   'output_bytes': 1048576},
+        'cow_layer': {
+            'format': 'qcow2', 'sha256': '1' * 64, 'size': 65536,
+            'created': True, 'base_img_sha256': build['base_img_sha256'],
+        },
+        'read_only_inputs': [
+            {'role': 'kernel', 'path': '/build/kernel',
+             'sha256_before': build['kernel_sha256'],
+             'sha256_after': build['kernel_sha256']},
+            {'role': 'initramfs', 'path': '/build/initramfs',
+             'sha256_before': build['initramfs_sha256'],
+             'sha256_after': build['initramfs_sha256']},
+            {'role': 'base_img', 'path': '/build/base.img',
+             'sha256_before': build['base_img_sha256'],
+             'sha256_after': build['base_img_sha256']},
+            {'role': 'firmware', 'path': '/fixture/firmware.bin',
+             'sha256_before': firmware_sha, 'sha256_after': firmware_sha},
+            {'role': 'qemu', 'path': '/usr/bin/qemu-system-riscv64',
+             'sha256_before': qemu_sha, 'sha256_after': qemu_sha},
+        ],
+        'capture_implementation': {
+            'files': [{'path': 'capture/main.py', 'sha256': 'f' * 64}],
+        },
         'campaign': campaign,
     }
     (base / 'capture.json').write_text(json.dumps(capture, indent=2, sort_keys=True))
@@ -79,13 +125,14 @@ def ltp_log(cases: list[tuple[str, list[str], int]]) -> bytes:
     return ('\n'.join(parts) + '\n').encode()
 
 
-def ltp_log_with_summaries(names: list[str], *, incomplete_name: str | None = None) -> bytes:
+def ltp_log_with_summaries(names: list[str], *, incomplete_name: str | None = None,
+                           mismatch_name: str | None = None) -> bytes:
     parts = ['#### OS COMP TEST GROUP START ltp-musl ####']
     for name in names:
         parts.append(f'RUN LTP CASE {name}')
         parts.append('TPASS: ok')
         parts.append('Summary:')
-        parts.append('passed   1')
+        parts.append('passed   2' if name == mismatch_name else 'passed   1')
         if name != incomplete_name:
             parts.extend(['failed   0', 'broken   0', 'skipped  0', 'warnings 0'])
         parts.append(f'FAIL LTP CASE {name} : 0')
@@ -334,6 +381,87 @@ class LtpIntegrationTests(TemporaryOutput):
         self.assertEqual(entry['judgment'], 'JUDGE_ERROR')
 
 
+class RunContractTests(TemporaryOutput):
+    """运行包必须带完整采集身份和前后完整性记录，不能只信 VERIFIED。"""
+
+    def mutate(self, run: Path, callback):
+        path = run / 'capture.json'
+        capture = json.loads(path.read_text())
+        callback(capture)
+        path.write_text(json.dumps(capture, indent=2, sort_keys=True))
+
+    def assert_rejected(self, run: Path):
+        output = self.out(str(uuid.uuid4()))
+        result = cli('analyze', '--run', run, '--criteria', J1,
+                     '--out', output, '--require-pass')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(output.exists())
+
+    def analyze_run(self, run: Path, criteria: str, *, require_pass=False):
+        output = self.out(str(uuid.uuid4()))
+        args = ['analyze', '--run', run, '--criteria', criteria, '--out', output]
+        if require_pass:
+            args.append('--require-pass')
+        result = cli(*args)
+        return result, output
+
+    def test_missing_qemu_identity_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture.pop('qemu'))
+        self.assert_rejected(run)
+
+    def test_missing_integrity_records_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture.pop('read_only_inputs'))
+        self.assert_rejected(run)
+
+    def test_missing_capture_implementation_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture.pop('capture_implementation'))
+        self.assert_rejected(run)
+
+    def test_missing_argv_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture.pop('argv'))
+        self.assert_rejected(run)
+
+    def test_verified_but_changed_read_only_input_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def changed(capture):
+            capture['read_only_inputs'][0]['sha256_after'] = '0' * 64
+        self.mutate(run, changed)
+        self.assert_rejected(run)
+
+    def test_bios_not_private_firmware_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def bad_bios(capture):
+            index = capture['argv'].index('-bios') + 1
+            capture['argv'][index] = 'default'
+        self.mutate(run, bad_bios)
+        self.assert_rejected(run)
+
+    def test_changed_integrity_blocks_but_package_is_analyzed(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial, integrity='CHANGED')
+
+        def changed(capture):
+            capture['read_only_inputs'][0]['sha256_after'] = '0' * 64
+        self.mutate(run, changed)
+        result, output = self.analyze_run(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('INPUT_INTEGRITY_CHANGED', report['acceptance']['reasons'])
+
+
 class RealLtpSampleTests(TemporaryOutput):
     """冻结镜像的真实短时 LTP 样本：ANSI 颜色、两种 TPASS 格式和截断都要能读。"""
 
@@ -496,6 +624,36 @@ class RunPackageTests(TemporaryOutput):
                     if item['name'] == 'busybox date')
         self.assertEqual(item['judgment'], 'JUDGE_ERROR')
         self.assertTrue(any('DUPLICATE_OBSERVATION' in reason for reason in item['reasons']))
+
+    def test_ltp_summary_mismatch_blocks_j1(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log_with_summaries(names, mismatch_name=names[0])
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('LTP_SUMMARY_MISMATCH:ltp-musl:1', report['acceptance']['reasons'])
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertEqual(report['groups'][0]['counts']['pass'], 2820)
+
+    def test_ltp_reversed_order_blocks(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log([(name, ['TPASS: ok'], 0) for name in reversed(names)])
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        result, output = self.run_analyze(run, J1)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('LTP_ORDER_MISMATCH:ltp-musl', report['acceptance']['reasons'])
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertEqual(report['groups'][0]['counts']['pass'], 2820)
 
     def test_incomplete_ltp_summary_blocks_j2(self):
         rows = [json.loads(line) for line in

@@ -96,7 +96,7 @@
       "timeout_seconds": 30
     }
   },
-  "criteria_hash": "56e20a625871ac0122caf4d2aa0ef5efe3c9d45db96679de75af9e169154947d",
+  "criteria_hash": "b17872139488fea4e59672a2884cce18983cec1c0774b0fe806b3765079d4cc7",
   "criteria_id": "regional-2025-log-v2",
   "frozen_at": "2026-11-18",
   "implementation": {
@@ -106,7 +106,7 @@
       "scripts/test001",
       "tests/test001/criteria/v1/adapters"
     ],
-    "sha256": "7247dfc8582d8edf0e0fe4f3497546aa98034504da51bddea0263f53db65800a"
+    "sha256": "3dfe059ae548ee3ae2c8259faac837aae5e31fa0cf9f78cb7e1150a2175256d5"
   },
   "kind": "test001_criteria",
   "mapping": {

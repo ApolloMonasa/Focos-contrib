@@ -122,8 +122,23 @@ def main(argv: list[str] | None = None) -> int:
                 'kind': 'run_package', 'sha256': run.serial_sha256,
                 'size': len(run.serial_bytes), 'source_hint': str(args.run),
                 'capture_sha256': run.capture_sha256, 'run_id': run.capture['run_id'],
+                'build': run.capture['build'],
                 'build_manifest_sha256': run.capture['build']['manifest_sha256'],
                 'firmware_sha256': run.firmware_sha256,
+                'qemu': run.capture['qemu'],
+                'qemu_sha256': run.qemu_sha256,
+                'argv': run.capture['argv'],
+                'firmware': {
+                    key: run.capture['firmware'][key]
+                    for key in ('source', 'version', 'original_path', 'sha256', 'size')
+                },
+                'cow_layer': run.capture['cow_layer'],
+                'read_only_inputs': run.capture['read_only_inputs'],
+                'capture_implementation': run.capture['capture_implementation'],
+                'capture_implementation_sha256': run.capture_implementation_sha256,
+                'started_at': run.capture['started_at'],
+                'finished_at': run.capture['finished_at'],
+                'limits': run.capture['limits'],
             }
             input_integrity = run.capture['input_integrity']
             analysis_role = 'standalone' if run.capture['campaign'] is None else 'reanalysis'
@@ -135,13 +150,16 @@ def main(argv: list[str] | None = None) -> int:
         validate_selection(profile, shards)
         serial_bytes = raw if args.log is not None else run.serial_bytes
         output = create_output_dir(args.out)
-        report = analyze_log(
-            profile, criteria, shards, serial_bytes,
-            origin=origin, input_info=input_info, capture=capture,
-            input_integrity=input_integrity, analysis_role=analysis_role,
-            campaign=campaign,
-        )
-        write_report(output, report, source_raw=source_raw)
+        try:
+            report = analyze_log(
+                profile, criteria, shards, serial_bytes,
+                origin=origin, input_info=input_info, capture=capture,
+                input_integrity=input_integrity, analysis_role=analysis_role,
+                campaign=campaign,
+            )
+            write_report(output, report, source_raw=source_raw)
+        finally:
+            output.close()
         if args.require_pass and report['acceptance']['status'] != 'PASS':
             return 1
         return 0

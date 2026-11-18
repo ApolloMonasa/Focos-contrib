@@ -59,7 +59,7 @@
 
 2026-11-17，Codex 按 PR #44 新一轮评审补齐 campaign/汇总实现身份：计划与最终 summary 记录完整实现文件集合及逐文件 SHA256，编排和汇总从同一私有快照执行并归档，身份缺失或不一致禁止全套 PASS。新增源码切换、helper 变化和不同版本重判的待实现验收；本次仅修改设计。
 
-2026-11-18，DeepSeek Harness（deepseek-flash）完成 TEST-001 A 阶段：从最新 upstream/main 新建 worktree，按 #8 冻结镜像与 LTP 20240524 调用清单，实现 `test001 analyze`、PROFILE/CRITERIA 身份、官方/团队结果适配器快照、LTP 原生结果解析和独占报告发布；用 7 份旧参考日志的 15 份结果逐项对照旧摘要，并用冻结镜像跑了一次 120 秒真实参考 LTP 短样本。新增 84 项 Python 测试覆盖历史回放、运行包重判、LTP 原生语义、原始观测守卫和输入所有权，当前 `make test` 与历史对照通过；busybox 的 2 个 extras 作为诊断差异单列。Codex 审阅的 6 条意见均已核对修复：Lua/BusyBox 重复观测、团队/iozone 未知名称、J2 不完整汇总、适配器流式限额、fsync 失败撤销完成标记、mkdir 故障退出码分类。未实现 B/C/D，未跑 FocOS、VF2 或完整 LTP 批次；真实短样本因超时截断，不能计为成绩。待非作者审阅。
+2026-11-18，DeepSeek Harness（deepseek-flash）完成 TEST-001 A 阶段：从最新 upstream/main 新建 worktree，按 #8 冻结镜像与 LTP 20240524 调用清单，实现 `test001 analyze`、PROFILE/CRITERIA 身份、官方/团队结果适配器快照、LTP 原生结果解析和独占报告发布；用 7 份旧参考日志的 15 份结果逐项对照旧摘要，并用冻结镜像跑了一次 120 秒真实参考 LTP 短样本。新增 99 项 Python 测试覆盖历史回放、运行包完整契约、LTP 原生语义、原始观测守卫、实现快照和输出所有权，当前 `make test` 与历史对照通过；busybox 的 2 个 extras 作为诊断差异单列。Codex 审阅的 6 条意见均已核对修复；合并标准复查又补了不完整运行包、J1 汇总矛盾、实现快照、LTP 顺序和输出目录句柄五项。未实现 B/C/D，未跑 FocOS、VF2 或完整 LTP 批次；真实短样本因超时截断，不能计为成绩。待非作者审阅。
 
 ## 后续怎样记
 

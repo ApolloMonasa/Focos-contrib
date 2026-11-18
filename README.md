@@ -107,13 +107,14 @@ Focos/
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
-│   ├── test001.py                     # TEST-001 analyze 入口
+│   ├── test001.py                     # TEST-001 实现快照入口
 │   ├── test001/                       # 清单读取、LTP/官方判据适配与报告
 │   ├── test_test001_analyze.py        # 历史回放、运行包和 LTP 负例
 │   ├── test_test001_boundaries.py     # 适配器限额、fsync 与 mkdir 边界
 │   ├── test_test001_config.py         # PROFILE/CRITERIA/夹具身份检查
 │   ├── test_test001_ltp.py            # LTP 原生结果正反例
 │   ├── test_test001_observations.py   # 重复/未知观测守卫
+│   ├── test_test001_snapshot.py       # 实现快照与重执行
 │   └── update_test001_manifest.py     # 生成分析实现清单
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单

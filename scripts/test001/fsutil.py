@@ -1,6 +1,7 @@
 """输入快照与独占输出目录；不跟随符号链接。"""
 from __future__ import annotations
 
+import errno
 import hashlib
 import os
 import stat
@@ -62,35 +63,47 @@ def _reject_symlink_ancestors(path: Path, *, label: str):
             raise InputError(f'{label}: cannot inspect {component}: {exc}') from exc
 
 
-def create_output_dir(path: Path, *, label: str = 'output') -> Path:
-    """独占创建输出目录；已存在、带祖先链接或父目录缺失都拒绝。"""
+def create_output_dir(path: Path, *, label: str = 'output') -> 'OutputDir':
+    """独占地创建并立即持有目录句柄；后续发布不再按路径重新打开。"""
     path = Path(path).absolute()
-    _reject_symlink_ancestors(path, label=label)
-    if path.exists():
-        raise InputError(f'{label}: output already exists: {path}')
     parent = path.parent
-    if not parent.is_dir():
-        raise InputError(f'{label}: parent directory does not exist: {parent}')
+    name = path.name
+    if not name or name in ('.', '..'):
+        raise InputError(f'{label}: invalid output directory: {path}')
+    _reject_symlink_ancestors(parent, label=label)
     try:
-        os.mkdir(path, 0o700)
-    except FileExistsError as exc:
-        raise InputError(f'{label}: output already exists: {path}') from exc
-    except (FileNotFoundError, NotADirectoryError) as exc:
-        raise InputError(f'{label}: cannot create output: {exc}') from exc
+        parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     except OSError as exc:
-        raise PublishError(f'{label}: cannot create output: {exc}') from exc
-    return path
+        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+            raise InputError(f'{label}: cannot open parent directory: {parent}: {exc}') from exc
+        raise PublishError(f'{label}: cannot open parent directory: {parent}: {exc}') from exc
+    try:
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except FileExistsError as exc:
+            raise InputError(f'{label}: output already exists: {path}') from exc
+        except (FileNotFoundError, NotADirectoryError) as exc:
+            raise InputError(f'{label}: cannot create output: {exc}') from exc
+        except OSError as exc:
+            raise PublishError(f'{label}: cannot create output: {exc}') from exc
+        try:
+            descriptor = os.open(
+                name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
+            )
+        except OSError as exc:
+            raise PublishError(f'{label}: cannot open created output: {exc}') from exc
+    finally:
+        os.close(parent_fd)
+    return OutputDir(path, descriptor)
 
 
 class OutputDir:
-    """通过目录句柄写文件；后续写入不重新解析可能被改名的祖先。"""
+    """从创建到发布持有同一个目录句柄；路径被改名也不会写错目录。"""
 
-    def __init__(self, path: Path):
+    def __init__(self, path: Path, descriptor: int):
         self.path = path
-        try:
-            self._fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        except OSError as exc:
-            raise PublishError(f'cannot open output directory: {exc}') from exc
+        self._fd = descriptor
 
     def write(self, name: str, raw: bytes, *, mode: int = 0o600):
         if '/' in name or name in ('', '.', '..'):

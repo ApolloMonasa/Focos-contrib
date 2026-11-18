@@ -27,7 +27,8 @@ python3 scripts/test001.py analyze \
 - `--group/--libc` 与 `--shard` 二选一；未知组、未知 shard、缺参数都在开始前退出 2。
 - `--run` 消费固定布局的 `capture.json`、`serial.log`、`firmware.bin`；不能再用 `--profile/--group/--libc/--shard` 覆盖运行包选择。
 - 普通分析完成报告即退出 0，即使结论是 BLOCKED；`--require-pass` 只在结论不是 PASS 时退出 1。
-- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。适配器输出按流式读取，超过显式字节限额即终止整个进程组；目录 fsync 失败会撤销已可见的 `report.json`。`report.json` 最后原子发布，`report.md` 的哈希记录在其中。
+- 入口先把当前实现和配置复制到私有快照，再从快照执行；报告中的实现哈希对应实际执行的代码，不依赖调用前导入的内存副本。
+- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。创建时即打开并持有目录句柄，发布阶段不再按路径重新打开。适配器输出按流式读取，超过显式字节限额即终止整个进程组；目录 fsync 失败会撤销已可见的 `report.json`。`report.json` 最后原子发布，`report.md` 的哈希记录在其中。
 
 ## 冻结了什么
 
@@ -43,12 +44,25 @@ python3 scripts/test001.py analyze \
 
 LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `datafiles`、`ftrace_stress` 不执行；每个文件无参数、按文件名排序，工作目录为 `/musl` 或 `/glibc`。逐文件的路径、长度、权限和 SHA256 在调用清单里。包装脚本无条件打印 `FAIL LTP CASE`，所以不能按该字样判失败。busybox 镜像脚本中的 `echo "bbbbbbb" >> test.txt` 计划执行两次，PROFILE 的 `planned_occurrences` 记为 2；这是计划重复，不是意外重试。
 
+## 运行包契约
+
+`--run` 只接受完整采集清单，而不是一张自报 `VERIFIED` 的最小 JSON：
+
+- `run_id`、PROFILE identity、selection、subject/platform、capture 状态/退出码、serial 与 firmware 文件哈希/长度；
+- `build.manifest_sha256`、`kernel_sha256`、`initramfs_sha256`、`base_img_sha256`；
+- `qemu.path/sha256/version`、实际 `argv`（必须含 `-bios`、`-kernel`、`-initrd`、`-drive`，且 `-bios` 指向 `firmware.bin`）、`started_at/finished_at`、`limits`；
+- `firmware.source/version/original_path`、`cow_layer` 的初始哈希/长度/格式/创建结果及基盘绑定；
+- `read_only_inputs` 必须恰好包含 kernel/initramfs/base_img/firmware/qemu 五个角色及各自前后 SHA256；
+- `capture_implementation.files` 的完整相对路径和逐文件 SHA256。
+
+字段缺失、角色重复/缺失、前后哈希与 build/firmware/qemu 身份不符，或 `input_integrity=VERIFIED` 但任一 before/after 不同，均在分析前退出 2。`CHANGED/UNVERIFIED` 的完整包仍可分析，但 acceptance 阻断。A 阶段只校验这份契约并分析；实际产出由 C 阶段采集器负责。
+
 ## 分析边界
 
 - 来源分 `external_log` 与 `recorded_capture`。外部日志的 subject/platform 固定 `unknown`、capture 为 `NOT_RECORDED`、input_integrity 为 `UNVERIFIED`，即使逐项全 PASS 也不能验收通过。
 - 采集状态、完整性、协议、段和判分分字段保存。截断段保留已观察值，但 acceptance 仍 BLOCKED，`accepted_pass=0`。
 - 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
-- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。J2 还要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。未知名称单列且阻断验收，不进入分母。
+- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。已有原生汇总与事件冲突时 J1/J2 都阻断；J2 另外要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。调用顺序必须匹配冻结列表，否则记 `LTP_ORDER_MISMATCH`。未知名称单列且阻断验收，不进入分母。
 - 同一运行包用 J1/J2 重判时，`run_id`、采集清单哈希、PROFILE 哈希、selection 和分母不变；CRITERIA 身份与结论可以不同。J2 的额外 LTP 汇总要求只影响分析，不重跑 QEMU。
 
 ## 15 份历史结果对照

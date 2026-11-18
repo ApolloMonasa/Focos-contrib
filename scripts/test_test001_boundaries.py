@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 
 from test001.adapters import run_adapter
 from test001.errors import InputError, PublishError
-from test001.fsutil import OutputDir, create_output_dir
+from test001.fsutil import create_output_dir
 
 
 class FakeCriteria:
@@ -78,21 +78,29 @@ class OutputBoundaryTests(unittest.TestCase):
 
     def test_sync_failure_removes_completion_file(self):
         output = create_output_dir(self.root / 'out')
-        writer = OutputDir(output)
-        self.addCleanup(writer.close)
+        self.addCleanup(output.close)
         with mock.patch.object(
-                writer, 'sync', side_effect=[PublishError('sync failed'), None],
+                output, 'sync', side_effect=[PublishError('sync failed'), None],
         ):
             with self.assertRaises(PublishError):
-                writer.write_atomic('report.json', b'{}')
-        self.assertFalse((output / 'report.json').exists())
+                output.write_atomic('report.json', b'{}')
+        self.assertFalse((output.path / 'report.json').exists())
 
     def test_complete_publish_leaves_no_temporary_file(self):
         output = create_output_dir(self.root / 'out')
-        writer = OutputDir(output)
-        self.addCleanup(writer.close)
-        writer.write_atomic('report.json', b'{}')
-        self.assertEqual([path.name for path in output.iterdir()], ['report.json'])
+        self.addCleanup(output.close)
+        output.write_atomic('report.json', b'{}')
+        self.assertEqual([path.name for path in output.path.iterdir()], ['report.json'])
+
+    def test_created_handle_survives_parent_rename(self):
+        parent = self.root / 'parent'
+        parent.mkdir()
+        output = create_output_dir(parent / 'out')
+        self.addCleanup(output.close)
+        parent.rename(self.root / 'renamed')
+        output.write('marker', b'x')
+        self.assertEqual((self.root / 'renamed' / 'out' / 'marker').read_bytes(), b'x')
+        self.assertFalse((self.root / 'parent').exists())
 
 
 if __name__ == '__main__':

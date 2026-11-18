@@ -1,22 +1,33 @@
-"""只读运行包：固定布局、清单哈希和显式 shard 选择。"""
+"""只读运行包：固定布局、完整采集身份、前后完整性校验和显式 shard 选择。"""
 from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from pathlib import Path
+from datetime import datetime
+from pathlib import Path, PurePosixPath
 
 from .config import Profile
 from .errors import InputError
 from .fsutil import read_regular_bytes, sha256_bytes
-from .strictjson import StrictJSONError, loads
+from .strictjson import StrictJSONError, canonical_bytes, loads
 
 CAPTURE_KEYS = {
     'schema_version', 'kind', 'run_id', 'profile', 'selection', 'subject',
     'platform', 'capture', 'input_integrity', 'serial', 'build', 'firmware',
-    'campaign',
+    'campaign', 'qemu', 'argv', 'started_at', 'finished_at', 'limits',
+    'cow_layer', 'read_only_inputs', 'capture_implementation',
 }
 CAPTURE_STATUS = {'EXITED', 'TIMEOUT', 'OUTPUT_LIMIT', 'START_ERROR', 'NOT_RECORDED'}
 INTEGRITY = {'VERIFIED', 'CHANGED', 'UNVERIFIED'}
+READ_ONLY_ROLES = {'kernel', 'initramfs', 'base_img', 'firmware', 'qemu'}
+BUILD_KEYS = {'manifest_sha256', 'kernel_sha256', 'initramfs_sha256', 'base_img_sha256'}
+QEMU_KEYS = {'path', 'sha256', 'version'}
+FIRMWARE_KEYS = {'file', 'sha256', 'size', 'source', 'version', 'original_path'}
+LIMIT_KEYS = {'timeout_seconds', 'serial_bytes', 'output_bytes'}
+COW_KEYS = {'format', 'sha256', 'size', 'created', 'base_img_sha256'}
+READ_KEYS = {'role', 'path', 'sha256_before', 'sha256_after'}
+IMPLEMENTATION_KEYS = {'files'}
+IMPLEMENTATION_FILE_KEYS = {'path', 'sha256'}
 
 
 @dataclass
@@ -27,6 +38,8 @@ class RunPackage:
     serial_bytes: bytes
     serial_sha256: str
     firmware_sha256: str
+    qemu_sha256: str
+    capture_implementation_sha256: str
     selection: list[str]
 
 
@@ -48,6 +61,80 @@ def _hex(value, *, label: str):
     if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
         raise InputError(f'{label}: expected a lowercase SHA256')
     return value
+
+
+def _string(value, *, label: str, nonempty: bool = True):
+    if not isinstance(value, str) or (nonempty and not value):
+        raise InputError(f'{label}: expected a non-empty string')
+    return value
+
+
+def _safe_relative(value, *, label: str):
+    _string(value, label=label)
+    if value.startswith('/') or '\\' in value or '\x00' in value:
+        raise InputError(f'{label}: unsafe relative path')
+    parts = PurePosixPath(value).parts
+    if not parts or any(part in ('', '.', '..') for part in parts):
+        raise InputError(f'{label}: unsafe relative path')
+    return value
+
+
+def _timestamp(value, *, label: str) -> datetime:
+    _string(value, label=label)
+    try:
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError as exc:
+        raise InputError(f'{label}: invalid ISO-8601 timestamp') from exc
+    if parsed.tzinfo is None:
+        raise InputError(f'{label}: timestamp needs a timezone')
+    return parsed
+
+
+def _positive_int(value, *, label: str) -> int:
+    if type(value) is not int or value <= 0:
+        raise InputError(f'{label}: expected a positive integer')
+    return value
+
+
+def _check_argv(argv):
+    if (not isinstance(argv, list) or not argv
+            or any(not isinstance(value, str) or not value or '\x00' in value for value in argv)):
+        raise InputError('capture argv is invalid')
+    for flag in ('-bios', '-kernel', '-initrd', '-drive'):
+        if flag not in argv:
+            raise InputError(f'capture argv is missing {flag}')
+        index = argv.index(flag)
+        if index + 1 >= len(argv) or not argv[index + 1]:
+            raise InputError(f'capture argv has no value for {flag}')
+    bios_index = argv.index('-bios') + 1
+    if Path(argv[bios_index]).name != 'firmware.bin':
+        raise InputError('capture argv -bios is not the private firmware copy')
+
+
+def _check_read_only_inputs(items, expected: dict[str, str], integrity: str):
+    if not isinstance(items, list) or not items:
+        raise InputError('capture read_only_inputs is invalid')
+    roles = {}
+    for index, item in enumerate(items):
+        _require_keys(item, READ_KEYS, label=f'read_only_inputs[{index}]')
+        _check_unknown(item, READ_KEYS, label=f'read_only_inputs[{index}]')
+        role = _string(item['role'], label=f'read_only_inputs[{index}].role')
+        if role in roles:
+            raise InputError(f'capture read_only_inputs has duplicate role: {role}')
+        _string(item['path'], label=f'read_only_inputs[{index}].path')
+        before = _hex(item['sha256_before'], label=f'read_only_inputs[{index}].before')
+        after = _hex(item['sha256_after'], label=f'read_only_inputs[{index}].after')
+        roles[role] = (before, after)
+    if set(roles) != READ_ONLY_ROLES:
+        missing = sorted(READ_ONLY_ROLES - set(roles))
+        extra = sorted(set(roles) - READ_ONLY_ROLES)
+        raise InputError(f'capture read_only_inputs roles mismatch; missing={missing}, extra={extra}')
+    for role, expected_hash in expected.items():
+        before, after = roles[role]
+        if expected_hash not in (before, after):
+            raise InputError(f'capture read_only_inputs {role} does not match frozen identity')
+        if integrity == 'VERIFIED' and before != after:
+            raise InputError(f'capture read_only_inputs {role} changed under VERIFIED')
 
 
 def load_run_package(path: Path, profile: Profile) -> RunPackage:
@@ -79,6 +166,7 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
         uuid.UUID(str(capture['run_id']))
     except (ValueError, AttributeError, TypeError) as exc:
         raise InputError('capture run_id is not a UUID') from exc
+
     profile_spec = capture['profile']
     _require_keys(profile_spec, {'profile_id', 'revision', 'profile_hash'}, label='capture profile')
     _check_unknown(profile_spec, {'profile_id', 'revision', 'profile_hash'}, label='capture profile')
@@ -117,16 +205,85 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
     if serial['file'] != 'serial.log' or type(serial['size']) is not int or serial['size'] < 0:
         raise InputError('capture serial entry is invalid')
     _hex(serial['sha256'], label='capture serial')
+
     firmware = capture['firmware']
-    _require_keys(firmware, {'file', 'sha256', 'size'}, label='capture firmware')
-    _check_unknown(firmware, {'file', 'sha256', 'size'}, label='capture firmware')
+    _require_keys(firmware, FIRMWARE_KEYS, label='capture firmware')
+    _check_unknown(firmware, FIRMWARE_KEYS, label='capture firmware')
     if firmware['file'] != 'firmware.bin' or type(firmware['size']) is not int or firmware['size'] < 0:
         raise InputError('capture firmware entry is invalid')
     _hex(firmware['sha256'], label='capture firmware')
+    _string(firmware['source'], label='capture firmware source')
+    _string(firmware['version'], label='capture firmware version')
+    _string(firmware['original_path'], label='capture firmware original_path')
+
     build = capture['build']
-    _require_keys(build, {'manifest_sha256'}, label='capture build')
-    _check_unknown(build, {'manifest_sha256'}, label='capture build')
-    _hex(build['manifest_sha256'], label='capture build')
+    _require_keys(build, BUILD_KEYS, label='capture build')
+    _check_unknown(build, BUILD_KEYS, label='capture build')
+    for key in BUILD_KEYS:
+        _hex(build[key], label=f'capture build {key}')
+
+    qemu = capture['qemu']
+    _require_keys(qemu, QEMU_KEYS, label='capture qemu')
+    _check_unknown(qemu, QEMU_KEYS, label='capture qemu')
+    _string(qemu['path'], label='capture qemu path')
+    _string(qemu['version'], label='capture qemu version')
+    _hex(qemu['sha256'], label='capture qemu sha256')
+
+    _check_argv(capture['argv'])
+    if Path(capture['argv'][0]).name != Path(qemu['path']).name:
+        raise InputError('capture argv does not name the recorded QEMU binary')
+    started = _timestamp(capture['started_at'], label='capture started_at')
+    finished = _timestamp(capture['finished_at'], label='capture finished_at')
+    if finished < started:
+        raise InputError('capture finished_at precedes started_at')
+
+    limits = capture['limits']
+    _require_keys(limits, LIMIT_KEYS, label='capture limits')
+    _check_unknown(limits, LIMIT_KEYS, label='capture limits')
+    for key in LIMIT_KEYS:
+        _positive_int(limits[key], label=f'capture limits {key}')
+    if serial['size'] > limits['serial_bytes']:
+        raise InputError('capture serial size exceeds serial limit')
+
+    cow = capture['cow_layer']
+    _require_keys(cow, COW_KEYS, label='capture cow_layer')
+    _check_unknown(cow, COW_KEYS, label='capture cow_layer')
+    _string(cow['format'], label='capture cow_layer format')
+    _hex(cow['sha256'], label='capture cow_layer sha256')
+    if type(cow['size']) is not int or cow['size'] < 0:
+        raise InputError('capture cow_layer size is invalid')
+    if cow['created'] is not True:
+        raise InputError('capture cow_layer was not created')
+    _hex(cow['base_img_sha256'], label='capture cow_layer base_img_sha256')
+    if cow['base_img_sha256'] != build['base_img_sha256']:
+        raise InputError('capture cow_layer base image binding mismatch')
+
+    expected_read_only = {
+        'kernel': build['kernel_sha256'],
+        'initramfs': build['initramfs_sha256'],
+        'base_img': build['base_img_sha256'],
+        'firmware': firmware['sha256'],
+        'qemu': qemu['sha256'],
+    }
+    _check_read_only_inputs(capture['read_only_inputs'], expected_read_only,
+                            capture['input_integrity'])
+
+    implementation = capture['capture_implementation']
+    _require_keys(implementation, IMPLEMENTATION_KEYS, label='capture implementation')
+    _check_unknown(implementation, IMPLEMENTATION_KEYS, label='capture implementation')
+    files = implementation['files']
+    if not isinstance(files, list) or not files:
+        raise InputError('capture implementation files are invalid')
+    seen_paths = set()
+    for index, item in enumerate(files):
+        _require_keys(item, IMPLEMENTATION_FILE_KEYS, label=f'capture implementation file {index}')
+        _check_unknown(item, IMPLEMENTATION_FILE_KEYS, label=f'capture implementation file {index}')
+        relative = _safe_relative(item['path'], label=f'capture implementation file {index} path')
+        if relative in seen_paths:
+            raise InputError(f'capture implementation has duplicate path: {relative}')
+        seen_paths.add(relative)
+        _hex(item['sha256'], label=f'capture implementation file {index} sha256')
+
     campaign = capture['campaign']
     if campaign is not None:
         _require_keys(campaign, {'campaign_id', 'slot_id', 'campaign_sha256'}, label='capture campaign')
@@ -147,8 +304,11 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
         raise InputError('run serial log hash/size mismatch')
     if len(firmware_raw) != firmware['size'] or sha256_bytes(firmware_raw) != firmware['sha256']:
         raise InputError('run firmware hash/size mismatch')
+    implementation_hash = sha256_bytes(canonical_bytes(implementation))
     return RunPackage(
         path=path, capture=capture, capture_sha256=sha256_bytes(capture_raw),
         serial_bytes=serial_raw, serial_sha256=sha256_bytes(serial_raw),
-        firmware_sha256=sha256_bytes(firmware_raw), selection=list(selection),
+        firmware_sha256=sha256_bytes(firmware_raw), qemu_sha256=qemu['sha256'],
+        capture_implementation_sha256=implementation_hash,
+        selection=list(selection),
     )

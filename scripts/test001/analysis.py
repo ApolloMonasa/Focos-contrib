@@ -226,23 +226,28 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
             reasons.append(f'EXTRA_ITEMS:{analysis.shard.shard_id}:{len(analysis.extras)}')
         if analysis.judge_errors and policy['forbid_judge_errors']:
             reasons.append(f'JUDGE_ERROR:{analysis.shard.shard_id}:{len(analysis.judge_errors)}')
-        if policy['ltp_summary_required'] and analysis.shard.group == 'ltp':
+        if analysis.shard.group == 'ltp':
             native = analysis.native or {}
-            if native.get('summary_missing'):
-                reasons.append(
-                    f'LTP_SUMMARY_MISSING:{analysis.shard.shard_id}:'
-                    f'{native["summary_missing"]}'
-                )
-            if native.get('summary_incomplete'):
-                reasons.append(
-                    f'LTP_SUMMARY_INCOMPLETE:{analysis.shard.shard_id}:'
-                    f'{native["summary_incomplete"]}'
-                )
+            # 已有汇总的矛盾证据属于采集/判分事实，J1 也不能忽略；
+            # 只有“缺汇总/汇总不完整”才是 J2 的额外要求。
             if native.get('summary_mismatch'):
                 reasons.append(
                     f'LTP_SUMMARY_MISMATCH:{analysis.shard.shard_id}:'
                     f'{native["summary_mismatch"]}'
                 )
+            if policy['ltp_summary_required']:
+                if native.get('summary_missing'):
+                    reasons.append(
+                        f'LTP_SUMMARY_MISSING:{analysis.shard.shard_id}:'
+                        f'{native["summary_missing"]}'
+                    )
+                if native.get('summary_incomplete'):
+                    reasons.append(
+                        f'LTP_SUMMARY_INCOMPLETE:{analysis.shard.shard_id}:'
+                        f'{native["summary_incomplete"]}'
+                    )
+            if analysis.order_matches is False:
+                reasons.append(f'LTP_ORDER_MISMATCH:{analysis.shard.shard_id}')
     acceptance = 'PASS' if not reasons else 'BLOCKED'
     totals = _empty_counts()
     for analysis in analyses:

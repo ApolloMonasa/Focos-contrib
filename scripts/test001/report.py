@@ -115,7 +115,7 @@ def _markdown(report: dict) -> str:
     return '\n'.join(lines)
 
 
-def write_report(output: Path, report: dict, source_raw: bytes | None = None) -> Path:
+def write_report(output: OutputDir, report: dict, source_raw: bytes | None = None) -> Path:
     """报告目录已独占创建；report.json 是最后写入的完成标记。"""
     if source_raw is not None:
         expected = report['input']['sha256']
@@ -127,13 +127,12 @@ def write_report(output: Path, report: dict, source_raw: bytes | None = None) ->
     report['report_md'] = {'file': 'report.md', 'sha256': sha256_bytes(markdown_raw)}
     report_raw = dumps(report).encode('utf-8')
     try:
-        with OutputDir(output) as directory:
-            if source_raw is not None:
-                directory.write('source.log', source_raw)
-            directory.write('report.md', markdown_raw, mode=0o644)
-            directory.write_atomic('report.json', report_raw, mode=0o644)
+        if source_raw is not None:
+            output.write('source.log', source_raw)
+        output.write('report.md', markdown_raw, mode=0o644)
+        output.write_atomic('report.json', report_raw, mode=0o644)
     except PublishError:
         raise
     except OSError as exc:
         raise PublishError(f'cannot publish report: {exc}') from exc
-    return output / 'report.json'
+    return output.path / 'report.json'
