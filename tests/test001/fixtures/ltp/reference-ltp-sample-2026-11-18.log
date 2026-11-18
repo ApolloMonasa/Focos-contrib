@@ -1,0 +1,1310 @@
+
+OpenSBI v1.7
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name               : riscv-virtio,qemu
+Platform Features           : medeleg
+Platform HART Count         : 1
+Platform IPI Device         : aclint-mswi
+Platform Timer Device       : aclint-mtimer @ 10000000Hz
+Platform Console Device     : uart8250
+Platform HSM Device         : ---
+Platform PMU Device         : ---
+Platform Reboot Device      : syscon-reboot
+Platform Shutdown Device    : syscon-poweroff
+Platform Suspend Device     : ---
+Platform CPPC Device        : ---
+Firmware Base               : 0x80000000
+Firmware Size               : 317 KB
+Firmware RW Offset          : 0x40000
+Firmware RW Size            : 61 KB
+Firmware Heap Offset        : 0x46000
+Firmware Heap Size          : 37 KB (total), 2 KB (reserved), 11 KB (used), 23 KB (free)
+Firmware Scratch Size       : 4096 B (total), 1400 B (used), 2696 B (free)
+Runtime SBI Version         : 3.0
+Standard SBI Extensions     : time,rfnc,ipi,base,hsm,srst,pmu,dbcn,fwft,legacy,dbtr,sse
+Experimental SBI Extensions : none
+
+Domain0 Name                : root
+Domain0 Boot HART           : 0
+Domain0 HARTs               : 0*
+Domain0 Region00            : 0x0000000000100000-0x0000000000100fff M: (I,R,W) S/U: (R,W)
+Domain0 Region01            : 0x0000000010000000-0x0000000010000fff M: (I,R,W) S/U: (R,W)
+Domain0 Region02            : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region03            : 0x0000000080040000-0x000000008004ffff M: (R,W) S/U: ()
+Domain0 Region04            : 0x0000000080000000-0x000000008003ffff M: (R,X) S/U: ()
+Domain0 Region05            : 0x000000000c400000-0x000000000c5fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region06            : 0x000000000c000000-0x000000000c3fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region07            : 0x0000000000000000-0xffffffffffffffff M: () S/U: (R,W,X)
+Domain0 Next Address        : 0x0000000080200000
+Domain0 Next Arg1           : 0x00000000bfe00000
+Domain0 Next Mode           : S-mode
+Domain0 SysReset            : yes
+Domain0 SysSuspend          : yes
+
+Boot HART ID                : 0
+Boot HART Domain            : root
+Boot HART Priv Version      : v1.12
+Boot HART Base ISA          : rv64imafdch
+Boot HART ISA Extensions    : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
+Boot HART PMP Count         : 16
+Boot HART PMP Granularity   : 2 bits
+Boot HART PMP Address Bits  : 54
+Boot HART MHPM Info         : 16 (0x0007fff8)
+Boot HART Debug Triggers    : 2 triggers
+Boot HART MIDELEG           : 0x0000000000001666
+Boot HART MEDELEG           : 0x0000000000f4b509
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.63-0-lts (buildozer@build-3-23-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-11-11 01:31:28
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v3.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10007
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] SBI FWFT extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008004ffff (64 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008004ffff]
+[    0.000000]   node   0: [mem 0x0000000080050000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50776 r8192 d31144 u90112
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bdd00000-0x00000000bde00000] (1MB)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000038] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000104] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.005739] Console: colour dummy device 80x25
+[    0.007015] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.007098] pid_max: default: 32768 minimum: 301
+[    0.008587] LSM: initializing lsm=capability
+[    0.009985] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.010009] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.033296] riscv: ELF compat mode supported
+[    0.033541] ASID allocator using 16 bits (65536 entries)
+[    0.034407] rcu: Hierarchical SRCU implementation.
+[    0.034428] rcu: 	Max phase no-delay instances is 400.
+[    0.035878] EFI services will not be available.
+[    0.036161] smp: Bringing up secondary CPUs ...
+[    0.036573] smp: Brought up 1 node, 1 CPU
+[    0.040752] Memory: 985556K/1048576K available (8895K kernel code, 5217K rwdata, 4096K rodata, 2302K init, 503K bss, 43232K reserved, 16384K cma-reserved)
+[    0.045768] devtmpfs: initialized
+[    0.053818] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.053951] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.056224] pinctrl core: initialized pinctrl subsystem
+[    0.062171] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.067555] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.067919] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.070949] thermal_sys: Registered thermal governor 'step_wise'
+[    0.070978] thermal_sys: Registered thermal governor 'user_space'
+[    0.071157] cpuidle: using governor menu
+[    0.072057] SBI misaligned access exception delegation ok
+[    0.078722] cpu0: Ratio of byte access time to unaligned word access is 7.75, unaligned accesses are fast
+[    0.091405] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.091424] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.091436] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.091439] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.095450] iommu: Default domain type: Translated
+[    0.095470] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.096293] SCSI subsystem initialized
+[    0.097175] usbcore: registered new interface driver usbfs
+[    0.097437] usbcore: registered new interface driver hub
+[    0.097527] usbcore: registered new device driver usb
+[    0.097839] pps_core: LinuxPPS API ver. 1 registered
+[    0.097847] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.107006] vgaarb: loaded
+[    0.107760] clocksource: Switched to clocksource riscv_clocksource
+[    0.108722] VFS: Disk quotas dquot_6.6.0
+[    0.108782] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.122219] NET: Registered PF_INET protocol family
+[    0.123189] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.128172] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.128210] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.128251] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.128402] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.128524] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.129554] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.129754] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.129904] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.131028] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.131345] PCI: CLS 0 bytes, default 64
+[    0.136117] Initialise system trusted keyrings
+[    0.137364] Unpacking initramfs...
+[    0.139852] workingset: timestamp_bits=46 max_order=18 bucket_order=0
+[    0.200648] Freeing initrd memory: 1268K
+[    0.235363] NET: Registered PF_ALG protocol family
+[    0.235479] Key type asymmetric registered
+[    0.235569] Asymmetric key parser 'x509' registered
+[    0.236162] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.239141] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.243186] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.243714] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.244057] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.244105] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.244450] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.244838] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.245946] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.246089] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.246132] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.246163] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.246169] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.247022] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.250687] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.250712] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.250719] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.256995] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.267873] printk: legacy console [ttyS0] disabled
+[    0.271209] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.272513] printk: legacy console [ttyS0] enabled
+[    0.293136] usbcore: registered new interface driver uas
+[    0.293457] usbcore: registered new interface driver usb-storage
+[    0.296464] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.297098] goldfish_rtc 101000.rtc: setting system clock to 2026-11-18T04:45:07 UTC (1794977107)
+[    0.297770] i2c_dev: i2c /dev entries driver
+[    0.301324] riscv-pmu-sbi: SBI PMU extension is available
+[    0.301831] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.301942] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.304485] NET: Registered PF_INET6 protocol family
+[    0.311258] Segment Routing with IPv6
+[    0.311450] In-situ OAM (IOAM) with IPv6
+[    0.339748] registered taskstats version 1
+[    0.342268] Loading compiled-in X.509 certificates
+[    0.351513] Loaded X.509 cert 'alpinelinux.org: Alpine Linux kernel key: 6b9af90fcec91b5a5b53e42935a606b791ef508f'
+[    0.363740] Key type .fscrypt registered
+[    0.363832] Key type fscrypt-provisioning registered
+[    0.366498] clk: Disabling unused clocks
+[    0.366769] PM: genpd: Disabling unused power domains
+[    0.395740] Freeing unused kernel image (initmem) memory: 2300K
+[    0.396303] Run /init as init process
+REF_PROTOCOL 1
+REF_BUILD_ID 20a2cfff233de1fde2d0024d0d111e4a5fff754a9dede2aebaf7287c594e4a1a
+[    0.503025] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.507968] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+REF_MODULES_OK
+[    0.589903] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+REF_MOUNT_OK
+REF_PREPARED glibc
+#### OS COMP TEST GROUP START ltp-glibc ####
+RUN LTP CASE abort01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+abort01.c:62: [1;32mTPASS: [0mabort() dumped core
+abort01.c:65: [1;32mTPASS: [0mabort() raised SIGIOT
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE abort01 : 0
+RUN LTP CASE abs01
+abs01       1  [1;32mTPASS[0m  :  Test passed
+abs01       2  [1;32mTPASS[0m  :  Test passed
+abs01       3  [1;32mTPASS[0m  :  Test passed
+FAIL LTP CASE abs01 : 0
+RUN LTP CASE accept01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+accept01.c:92: [1;32mTPASS: [0mbad file descriptor : EBADF (9)
+accept01.c:92: [1;32mTPASS: [0minvalid socket buffer : EINVAL (22)
+accept01.c:92: [1;32mTPASS: [0minvalid salen : EINVAL (22)
+accept01.c:92: [1;32mTPASS: [0mno queued connections : EINVAL (22)
+accept01.c:92: [1;32mTPASS: [0mUDP accept : EOPNOTSUPP (95)
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE accept01 : 0
+RUN LTP CASE accept02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+accept02.c:131: [1;34mTINFO: [0mStarting listener on port: 42297
+accept02.c:54: [1;31mTBROK: [0msetsockopt(3, 0, 42, 0x7fff9f9a2f78, 136) failed: ENODEV (19)
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=657831ff
+
+[1;33mHINT: [0mYou _MAY_ be vulnerable to CVE(s):
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-8890
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE accept02 : 2
+RUN LTP CASE accept03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+accept03.c:48: [1;32mTPASS: [0maccept() on file : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on O_PATH file : EBADF (9)
+accept03.c:48: [1;32mTPASS: [0maccept() on directory : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on /dev/zero : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on /proc/self/maps : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on pipe read end : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on pipe write end : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on epoll : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on eventfd : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on signalfd : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on timerfd : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on pidfd : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on fanotify : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on inotify : ENOTSOCK (88)
+tst_fd.c:170: [1;33mTCONF: [0mSkipping userfaultfd: ENOSYS (38)
+accept03.c:48: [1;32mTPASS: [0maccept() on perf event : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on io uring : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on bpf map : ENOTSOCK (88)
+accept03.c:48: [1;32mTPASS: [0maccept() on fsopen : ENOTSOCK (88)
+tst_fd.c:233: [1;33mTCONF: [0mSkipping fspick: EINVAL (22)
+accept03.c:48: [1;32mTPASS: [0maccept() on open_tree : EBADF (9)
+accept03.c:48: [1;32mTPASS: [0maccept() on memfd : ENOTSOCK (88)
+tst_fd.c:260: [1;33mTCONF: [0mSkipping memfd secret: ENOSYS (38)
+
+Summary:
+passed   20
+failed   0
+broken   0
+skipped  3
+warnings 0
+FAIL LTP CASE accept03 : 0
+RUN LTP CASE accept4_01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+accept4_01.c:71: [1;34mTINFO: [0mTesting variant: libc accept4()
+accept4_01.c:78: [1;34mTINFO: [0mserver listening on: 45215
+accept4_01.c:105: [1;31mTBROK: [0mconnect(4, 127.0.0.1:45215, 16) failed: ENETUNREACH (101)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE accept4_01 : 2
+RUN LTP CASE access01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+access01.c:275: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE access01 : 2
+RUN LTP CASE access02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+access02.c:165: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE access02 : 2
+RUN LTP CASE access03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+access03.c:55: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE access03 : 2
+RUN LTP CASE access04
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1017: [1;34mTINFO: [0mMounting (null) to /tmp/LTP_acc3cip5e/mntpoint fstyp=tmpfs flags=21
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+access04.c:92: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE access04 : 2
+RUN LTP CASE acct01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1017: [1;34mTINFO: [0mMounting (null) to /tmp/LTP_accYWwpAP/ro_mntpoint fstyp=tmpfs flags=21
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+acct01.c:84: [1;33mTCONF: [0macct() system call isn't configured in kernel
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+FAIL LTP CASE acct01 : 32
+RUN LTP CASE acct02
+tst_kconfig.c:71: [1;34mTINFO: [0mCouldn't locate kernel config!
+tst_kconfig.c:207: [1;31mTBROK: [0mCannot parse kernel .config
+FAIL LTP CASE acct02 : 2
+RUN LTP CASE acct02_helper
+FAIL LTP CASE acct02_helper : 128
+RUN LTP CASE acl1
+The acl library was missing upon compilation.
+FAIL LTP CASE acl1 : 32
+RUN LTP CASE add_ipv6addr
+ltp/testcases/bin/add_ipv6addr: .: line 58: check_envval: not found
+FAIL LTP CASE add_ipv6addr : 2
+RUN LTP CASE add_key01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+add_key01.c:63: [1;34mTINFO: [0mThe key type is keyrings and plen is 0
+add_key01.c:79: [1;32mTPASS: [0madd_key call succeeded as expected
+add_key01.c:63: [1;34mTINFO: [0mthe key type is keyrings and plen is 1
+add_key01.c:83: [1;32mTPASS: [0madd_key call failed as expected: EINVAL (22)
+add_key01.c:63: [1;34mTINFO: [0mThe key type is user and plen is 32767
+add_key01.c:79: [1;32mTPASS: [0madd_key call succeeded as expected
+add_key01.c:63: [1;34mTINFO: [0mThe key type is user and plen is 32768
+add_key01.c:83: [1;32mTPASS: [0madd_key call failed as expected: EINVAL (22)
+add_key01.c:63: [1;34mTINFO: [0mThe key type is logon and plen is 32767
+add_key01.c:79: [1;32mTPASS: [0madd_key call succeeded as expected
+add_key01.c:63: [1;34mTINFO: [0mThe key type is logon and plen is 32768
+add_key01.c:83: [1;32mTPASS: [0madd_key call failed as expected: EINVAL (22)
+add_key01.c:63: [1;34mTINFO: [0mThe key type is big_key and plen is 1048575
+add_key01.c:70: [1;33mTCONF: [0mskipping unsupported big_key key
+add_key01.c:63: [1;34mTINFO: [0mThe key type is big_key and plen is 1048576
+add_key01.c:70: [1;33mTCONF: [0mskipping unsupported big_key key
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  2
+warnings 0
+FAIL LTP CASE add_key01 : 0
+RUN LTP CASE add_key02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'asymmetric'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'cifs.idmap'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'cifs.spnego'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'pkcs7_test'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'rxrpc'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'rxrpc_s'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'user'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'logon'
+add_key02.c:59: [1;32mTPASS: [0mreceived expected EFAULT with key type 'big_key'
+
+Summary:
+passed   9
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE add_key02 : 0
+RUN LTP CASE add_key03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+add_key03.c:80: [1;32mTPASS: [0mexpectedly could not create another user's keyrings
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE add_key03 : 0
+RUN LTP CASE add_key04
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+add_key04.c:71: [1;32mTPASS: [0mdidn't crash while filling keyring
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE add_key04 : 0
+RUN LTP CASE add_key05
+tst_cmd.c:257: [1;33mTCONF: [0mCouldn't find 'useradd' in $PATH
+FAIL LTP CASE add_key05 : 32
+RUN LTP CASE adjtimex01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+adjtimex01.c:24: [1;32mTPASS: [0madjtimex() with mode 0x403f 
+adjtimex01.c:33: [1;32mTPASS: [0madjtimex() with mode 0x8001 
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE adjtimex01 : 0
+RUN LTP CASE adjtimex02
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+adjtimex02.c:111: [1;34mTINFO: [0mTesting variant: libc adjtimex()
+adjtimex02.c:115: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+adjtimex02.c:141: [1;35mTWARN: [0mFailed to restore saved parameters
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 1
+FAIL LTP CASE adjtimex02 : 6
+RUN LTP CASE adjtimex03
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:53: [1;34mTINFO: [0mexpecting adjtimex() to fail with EINVAL with mode 0x8000
+adjtimex03.c:62: [1;34mTINFO: [0mtai : 0x00000000
+adjtimex03.c:73: [1;32mTPASS: [0mData leak not observed
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE adjtimex03 : 0
+RUN LTP CASE af_alg01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+af_alg01.c:36: [1;31mTFAIL: [0minstantiated nested hmac algorithm ('hmac(hmac(md5))')!
+tst_af_alg.c:46: [1;31mTBROK: [0munexpected error binding AF_ALG socket to hash algorithm 'hmac(hmac(md5))': EINVAL (22)
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=af3ff8045bbf
+
+[1;33mHINT: [0mYou _MAY_ be vulnerable to CVE(s):
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-17806
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=af3ff8045bbf
+
+[1;33mHINT: [0mYou _MAY_ be vulnerable to CVE(s):
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2017-17806
+
+Summary:
+passed   0
+failed   1
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE af_alg01 : 3
+RUN LTP CASE af_alg02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 50s
+tst_af_alg.c:42: [1;33mTCONF: [0mkernel doesn't support skcipher algorithm 'salsa20'
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+FAIL LTP CASE af_alg02 : 32
+RUN LTP CASE af_alg03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_af_alg.c:42: [1;33mTCONF: [0mkernel doesn't support aead algorithm 'rfc7539(chacha20,poly1305)'
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+FAIL LTP CASE af_alg03 : 32
+RUN LTP CASE af_alg04
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac64(aes)'
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac(aes)'
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac64(sm4)'
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac(sm4)'
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac64(sm4-generic)'
+tst_af_alg.c:106: [1;33mTCONF: [0mkernel doesn't have hash algorithm 'vmac(sm4-generic)'
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  6
+warnings 0
+FAIL LTP CASE af_alg04 : 32
+RUN LTP CASE af_alg05
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_af_alg.c:42: [1;33mTCONF: [0mkernel doesn't support skcipher algorithm 'cbc(aes-generic)'
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+FAIL LTP CASE af_alg05 : 32
+RUN LTP CASE af_alg06
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_af_alg.c:42: [1;33mTCONF: [0mkernel doesn't support aead algorithm 'authenc(hmac(sha256),cbc(aes))'
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  1
+warnings 0
+FAIL LTP CASE af_alg06 : 32
+RUN LTP CASE af_alg07
+tst_test.c:1242: [1;33mTCONF: [0mTest needs at least 2 CPUs online
+FAIL LTP CASE af_alg07 : 32
+RUN LTP CASE aio-stress
+tst_test.c:1175: [1;33mTCONF: [0mtest requires libaio and its development packages
+FAIL LTP CASE aio-stress : 32
+RUN LTP CASE aio01
+aio01       1  [1;33mTCONF[0m  :  aio01.c:421: test requires libaio and it's development packages
+aio01       2  [1;33mTCONF[0m  :  aio01.c:421: Remaining cases not appropriate for configuration
+FAIL LTP CASE aio01 : 32
+RUN LTP CASE aio02
+tst_test.c:1175: [1;33mTCONF: [0mtest requires libaio and its development packages
+FAIL LTP CASE aio02 : 32
+RUN LTP CASE aiocp
+tst_test.c:1175: [1;33mTCONF: [0mtest requires libaio and its development packages
+FAIL LTP CASE aiocp : 32
+RUN LTP CASE aiodio_append
+tst_test.c:1175: [1;33mTCONF: [0mtest requires libaio and its development packages
+FAIL LTP CASE aiodio_append : 32
+RUN LTP CASE aiodio_sparse
+tst_test.c:1175: [1;33mTCONF: [0mtest requires libaio and its development packages
+FAIL LTP CASE aiodio_sparse : 32
+RUN LTP CASE alarm02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+alarm02.c:36: [1;32mTPASS: [0malarm(2147483647) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+alarm02.c:36: [1;32mTPASS: [0malarm(2147483647) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+alarm02.c:36: [1;32mTPASS: [0malarm(1073741823) passed
+alarm02.c:38: [1;32mTPASS: [0malarm(0) passed
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE alarm02 : 0
+RUN LTP CASE alarm03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+alarm03.c:26: [1;32mTPASS: [0malarm(0) in child process passed
+alarm03.c:30: [1;32mTPASS: [0malarm(0) in parent process passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE alarm03 : 0
+RUN LTP CASE alarm05
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+alarm05.c:28: [1;32mTPASS: [0malarm(10) passed
+alarm05.c:30: [1;32mTPASS: [0malarm(1) passed
+alarm05.c:32: [1;32mTPASS: [0malarms_fired == 1 (1)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE alarm05 : 0
+RUN LTP CASE alarm06
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+alarm06.c:35: [1;32mTPASS: [0malarm(0) passed
+alarm06.c:40: [1;32mTPASS: [0malarms_received == 0 (0)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE alarm06 : 0
+RUN LTP CASE alarm07
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+alarm07.c:36: [1;32mTPASS: [0malarm_cnt == 1 (1)
+alarm07.c:32: [1;32mTPASS: [0malarm_cnt == 0 (0)
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE alarm07 : 0
+RUN LTP CASE ar01.sh
+ltp/testcases/bin/ar01.sh: .: line 349: tst_test.sh: not found
+FAIL LTP CASE ar01.sh : 2
+RUN LTP CASE arch_prctl01
+tst_test.c:1201: [1;33mTCONF: [0mThis arch 'unknown' is not supported for test!
+FAIL LTP CASE arch_prctl01 : 32
+RUN LTP CASE arping01.sh
+ltp/testcases/bin/arping01.sh: .: line 21: tst_net.sh: not found
+FAIL LTP CASE arping01.sh : 2
+RUN LTP CASE asapi_01
+asapi_01    1  [1;32mTPASS[0m  :  IN6_ARE_ADDR_EQUAL
+asapi_01    2  [1;31mTFAIL[0m  :  asapi_01.c:119: "hopopt" protocols entry
+asapi_01    3  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6" protocols entry
+asapi_01    4  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6-route" protocols entry
+asapi_01    5  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6-frag" protocols entry
+asapi_01    6  [1;31mTFAIL[0m  :  asapi_01.c:119: "esp" protocols entry
+asapi_01    7  [1;31mTFAIL[0m  :  asapi_01.c:119: "ah" protocols entry
+asapi_01    8  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6-icmp" protocols entry
+asapi_01    9  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6-nonxt" protocols entry
+asapi_01   10  [1;31mTFAIL[0m  :  asapi_01.c:119: "ipv6-opts" protocols entry
+asapi_01   11  [1;31mTBROK[0m  :  asapi_01.c:369: connect(4, 127.0.0.1:33195, 16) failed: errno=ENETUNREACH(101): Network is unreachable
+asapi_01   12  [1;31mTBROK[0m  :  asapi_01.c:369: Remaining cases broken
+FAIL LTP CASE asapi_01 : 3
+RUN LTP CASE asapi_02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+asapi_02.c:170: [1;34mTINFO: [0mTesting ICMP6_FILTER_SETPASS, send type: 20, filter type: 20
+asapi_02.c:104: [1;31mTBROK: [0msendto(5, 0x7fffe23ebc10, 8, 0, ::1, 28) failed: EADDRNOTAVAIL (99)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE asapi_02 : 2
+RUN LTP CASE asapi_03
+asapi_03    1  [1;31mTBROK[0m  :  asapi_03.c:261: bind(3, ::1, 28) failed: errno=EADDRNOTAVAIL(99): Cannot assign requested address
+asapi_03    2  [1;31mTBROK[0m  :  asapi_03.c:261: Remaining cases broken
+FAIL LTP CASE asapi_03 : 2
+RUN LTP CASE ask_password.sh
+/ltp_testcode.sh: line 15: ltp/testcases/bin/ask_password.sh: not found
+FAIL LTP CASE ask_password.sh : 127
+RUN LTP CASE aslr01
+tst_kconfig.c:71: [1;34mTINFO: [0mCouldn't locate kernel config!
+tst_kconfig.c:207: [1;31mTBROK: [0mCannot parse kernel .config
+FAIL LTP CASE aslr01 : 2
+RUN LTP CASE assign_password.sh
+/ltp_testcode.sh: line 15: ltp/testcases/bin/assign_password.sh: not found
+FAIL LTP CASE assign_password.sh : 127
+RUN LTP CASE atof01
+atof01      1  [1;32mTPASS[0m  :  Test passed
+atof01      2  [1;32mTPASS[0m  :  Test passed
+atof01      3  [1;32mTPASS[0m  :  Test passed
+atof01      4  [1;32mTPASS[0m  :  Test passed
+FAIL LTP CASE atof01 : 0
+RUN LTP CASE autogroup01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+autogroup01.c:59: [1;32mTPASS: [0mBug not reproduced
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE autogroup01 : 0
+RUN LTP CASE bbr01.sh
+ltp/testcases/bin/bbr01.sh: .: line 31: tcp_cc_lib.sh: not found
+FAIL LTP CASE bbr01.sh : 2
+RUN LTP CASE bbr02.sh
+ltp/testcases/bin/bbr02.sh: .: line 37: tcp_cc_lib.sh: not found
+FAIL LTP CASE bbr02.sh : 2
+RUN LTP CASE bind01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bind01.c:60: [1;32mTPASS: [0minvalid salen : EINVAL (22)
+bind01.c:60: [1;32mTPASS: [0minvalid socket : ENOTSOCK (88)
+bind01.c:63: [1;32mTPASS: [0mINADDR_ANYPORT passed
+bind01.c:60: [1;32mTPASS: [0mUNIX-domain of current directory : EAFNOSUPPORT (97)
+bind01.c:60: [1;31mTFAIL: [0mnon-local address succeeded
+bind01.c:60: [1;32mTPASS: [0msockfd is not a valid file descriptor : EBADF (9)
+bind01.c:60: [1;32mTPASS: [0ma component of addr prefix is not a directory : ENOTDIR (20)
+
+Summary:
+passed   6
+failed   1
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bind01 : 1
+RUN LTP CASE bind02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bind02.c:49: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE bind02 : 2
+RUN LTP CASE bind03
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bind03.c:31: [1;32mTPASS: [0mre-bind() socket : EINVAL (22)
+bind03.c:38: [1;32mTPASS: [0mbind() with bound pathname : EADDRINUSE (98)
+bind03.c:49: [1;32mTPASS: [0mcheck exist of SNAME_B : ENOENT (2)
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bind03 : 0
+RUN LTP CASE bind04
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bind04.c:117: [1;34mTINFO: [0mTesting AF_UNIX pathname stream
+bind04.c:149: [1;32mTPASS: [0mCommunication successful
+bind04.c:117: [1;34mTINFO: [0mTesting AF_UNIX pathname seqpacket
+bind04.c:149: [1;32mTPASS: [0mCommunication successful
+bind04.c:117: [1;34mTINFO: [0mTesting AF_UNIX abstract stream
+bind04.c:149: [1;32mTPASS: [0mCommunication successful
+bind04.c:117: [1;34mTINFO: [0mTesting AF_UNIX abstract seqpacket
+bind04.c:149: [1;32mTPASS: [0mCommunication successful
+bind04.c:117: [1;34mTINFO: [0mTesting IPv4 loop TCP variant 1
+bind04.c:92: [1;31mTBROK: [0mconnect(5, 127.0.0.1:39987, 16) failed: ENETUNREACH (101)
+
+Summary:
+passed   4
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE bind04 : 2
+RUN LTP CASE bind05
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bind05.c:131: [1;34mTINFO: [0mTesting AF_UNIX pathname datagram
+bind05.c:167: [1;32mTPASS: [0mCommunication successful
+bind05.c:131: [1;34mTINFO: [0mTesting AF_UNIX abstract datagram
+bind05.c:167: [1;32mTPASS: [0mCommunication successful
+bind05.c:131: [1;34mTINFO: [0mTesting IPv4 loop UDP variant 1
+bind05.c:101: [1;31mTBROK: [0mconnect(4, 127.0.0.1:50533, 16) failed: ENETUNREACH (101)
+
+Summary:
+passed   2
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE bind05 : 2
+RUN LTP CASE bind06
+tst_kconfig.c:71: [1;34mTINFO: [0mCouldn't locate kernel config!
+tst_kconfig.c:207: [1;31mTBROK: [0mCannot parse kernel .config
+FAIL LTP CASE bind06 : 2
+RUN LTP CASE bind_noport01.sh
+ltp/testcases/bin/bind_noport01.sh: .: line 33: tst_net.sh: not found
+FAIL LTP CASE bind_noport01.sh : 2
+RUN LTP CASE binfmt_misc01.sh
+ltp/testcases/bin/binfmt_misc01.sh: .: line 63: binfmt_misc_lib.sh: not found
+FAIL LTP CASE binfmt_misc01.sh : 2
+RUN LTP CASE binfmt_misc02.sh
+ltp/testcases/bin/binfmt_misc02.sh: .: line 108: binfmt_misc_lib.sh: not found
+FAIL LTP CASE binfmt_misc02.sh : 2
+RUN LTP CASE binfmt_misc_lib.sh
+ltp/testcases/bin/binfmt_misc_lib.sh: .: line 74: tst_test.sh: not found
+FAIL LTP CASE binfmt_misc_lib.sh : 2
+RUN LTP CASE block_dev
+block_dev    1  [1;33mTCONF[0m  :  tst_module.c:69: Failed to find module 'ltp_block_dev.ko'
+block_dev    2  [1;33mTCONF[0m  :  tst_module.c:69: Remaining cases not appropriate for configuration
+FAIL LTP CASE block_dev : 32
+RUN LTP CASE bpf_map01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+bpf_map01.c:53: [1;32mTPASS: [0mCreated hash map
+bpf_map01.c:70: [1;32mTPASS: [0mEmpty hash map lookup: ENOENT (2)
+bpf_map01.c:102: [1;32mTPASS: [0mUpdate hash map element
+bpf_map01.c:122: [1;32mTPASS: [0mhash map lookup
+bpf_map01.c:53: [1;32mTPASS: [0mCreated array map
+bpf_map01.c:102: [1;32mTPASS: [0mUpdate array map element
+bpf_map01.c:122: [1;32mTPASS: [0marray map lookup
+
+Summary:
+passed   7
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bpf_map01 : 0
+RUN LTP CASE bpf_prog01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+bpf_common.c:114: [1;32mTPASS: [0mLoaded program
+bpf_prog01.c:95: [1;32mTPASS: [0mval = 1
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bpf_prog01 : 0
+RUN LTP CASE bpf_prog02
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+bpf_common.c:114: [1;32mTPASS: [0mLoaded program
+bpf_prog02.c:93: [1;32mTPASS: [0mval = 1152921504606846976 + 1
+bpf_prog02.c:103: [1;32mTPASS: [0mval = 1152921504606846976 - 1
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bpf_prog02 : 0
+RUN LTP CASE bpf_prog03
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+bpf_prog03.c:105: [1;32mTPASS: [0mFailed verification: EACCES (13)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bpf_prog03 : 0
+RUN LTP CASE bpf_prog04
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+bpf_prog04.c:79: [1;32mTPASS: [0mBPF program failed verification: EINVAL (22)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE bpf_prog04 : 0
+RUN LTP CASE bpf_prog05
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_BPF(39)
+bpf_common.c:39: [1;33mTCONF: [0mHint: check also /proc/sys/kernel/unprivileged_bpf_disabled
+bpf_common.c:40: [1;33mTCONF: [0mbpf() requires CAP_SYS_ADMIN or CAP_BPF on this system: EPERM (1)
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  2
+warnings 0
+FAIL LTP CASE bpf_prog05 : 32
+RUN LTP CASE bpf_prog06
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_BPF(39)
+bpf_common.c:39: [1;33mTCONF: [0mHint: check also /proc/sys/kernel/unprivileged_bpf_disabled
+bpf_common.c:40: [1;33mTCONF: [0mbpf() requires CAP_SYS_ADMIN or CAP_BPF on this system: EPERM (1)
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  2
+warnings 0
+FAIL LTP CASE bpf_prog06 : 32
+RUN LTP CASE bpf_prog07
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+bpf_common.c:16: [1;34mTINFO: [0mRaising RLIMIT_MEMLOCK to 10485760
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_SYS_ADMIN(21)
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_BPF(39)
+bpf_common.c:39: [1;33mTCONF: [0mHint: check also /proc/sys/kernel/unprivileged_bpf_disabled
+bpf_common.c:40: [1;33mTCONF: [0mbpf() requires CAP_SYS_ADMIN or CAP_BPF on this system: EPERM (1)
+
+Summary:
+passed   0
+failed   0
+broken   0
+skipped  2
+warnings 0
+FAIL LTP CASE bpf_prog07 : 32
+RUN LTP CASE brk01
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+brk01.c:24: [1;34mTINFO: [0mTesting libc variant
+brk01.c:70: [1;32mTPASS: [0mbrk() works fine
+brk01.c:21: [1;34mTINFO: [0mTesting syscall variant
+brk01.c:70: [1;32mTPASS: [0mbrk() works fine
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE brk01 : 0
+RUN LTP CASE brk02
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+brk02.c:42: [1;34mTINFO: [0mTesting libc variant
+brk02.c:86: [1;32mTPASS: [0mmunmap at least two VMAs of brk() passed
+brk02.c:39: [1;34mTINFO: [0mTesting syscall variant
+brk02.c:86: [1;32mTPASS: [0mmunmap at least two VMAs of brk() passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE brk02 : 0
+RUN LTP CASE broken_ip-checksum.sh
+ltp/testcases/bin/broken_ip-checksum.sh: .: line 21: tst_net.sh: not found
+FAIL LTP CASE broken_ip-checksum.sh : 2
+RUN LTP CASE broken_ip-dstaddr.sh
+ltp/testcases/bin/broken_ip-dstaddr.sh: .: line 17: tst_net.sh: not found
+FAIL LTP CASE broken_ip-dstaddr.sh : 2
+RUN LTP CASE broken_ip-fragment.sh
+ltp/testcases/bin/broken_ip-fragment.sh: .: line 21: tst_net.sh: not found
+FAIL LTP CASE broken_ip-fragment.sh : 2
+RUN LTP CASE broken_ip-ihl.sh
+ltp/testcases/bin/broken_ip-ihl.sh: .: line 21: tst_net.sh: not found
+FAIL LTP CASE broken_ip-ihl.sh : 2
+RUN LTP CASE broken_ip-nexthdr.sh
+ltp/testcases/bin/broken_ip-nexthdr.sh: .: line 17: tst_net.sh: not found
+FAIL LTP CASE broken_ip-nexthdr.sh : 2
+RUN LTP CASE broken_ip-plen.sh
+ltp/testcases/bin/broken_ip-plen.sh: .: line 17: tst_net.sh: not found
+FAIL LTP CASE broken_ip-plen.sh : 2
+RUN LTP CASE broken_ip-protcol.sh
+ltp/testcases/bin/broken_ip-protcol.sh: .: line 21: tst_net.sh: not found
+FAIL LTP CASE broken_ip-protcol.sh : 2
+RUN LTP CASE broken_ip-version.sh
+ltp/testcases/bin/broken_ip-version.sh: .: line 17: tst_net.sh: not found
+FAIL LTP CASE broken_ip-version.sh : 2
+RUN LTP CASE busy_poll01.sh
+ltp/testcases/bin/busy_poll01.sh: .: line 48: busy_poll_lib.sh: not found
+FAIL LTP CASE busy_poll01.sh : 2
+RUN LTP CASE busy_poll02.sh
+ltp/testcases/bin/busy_poll02.sh: .: line 40: busy_poll_lib.sh: not found
+FAIL LTP CASE busy_poll02.sh : 2
+RUN LTP CASE busy_poll03.sh
+ltp/testcases/bin/busy_poll03.sh: .: line 43: busy_poll_lib.sh: not found
+FAIL LTP CASE busy_poll03.sh : 2
+RUN LTP CASE busy_poll_lib.sh
+ltp/testcases/bin/busy_poll_lib.sh: .: line 29: tst_net.sh: not found
+FAIL LTP CASE busy_poll_lib.sh : 2
+RUN LTP CASE cacheflush01
+tst_test.c:1175: [1;33mTCONF: [0msystem doesn't support cacheflush()
+FAIL LTP CASE cacheflush01 : 32
+RUN LTP CASE can_bcm01
+tst_kernel.c:90: [1;34mTINFO: [0muname.machine=riscv64 kernel is 64bit
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.dep does not exist or not a file
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.builtin does not exist or not a file
+tst_test.c:1229: [1;33mTCONF: [0mvcan driver not available
+FAIL LTP CASE can_bcm01 : 32
+RUN LTP CASE can_filter
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.dep does not exist or not a file
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.builtin does not exist or not a file
+tst_test.c:1229: [1;33mTCONF: [0mvcan driver not available
+FAIL LTP CASE can_filter : 32
+RUN LTP CASE can_rcv_own_msgs
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.dep does not exist or not a file
+tst_kernel.c:126: [1;35mTWARN: [0mexpected file /lib/modules/6.18.63-0-lts/modules.builtin does not exist or not a file
+tst_test.c:1229: [1;33mTCONF: [0mvcan driver not available
+FAIL LTP CASE can_rcv_own_msgs : 32
+RUN LTP CASE cap_bounds_r
+cap_bounds_r    1  [1;33mTCONF[0m  :  cap_bounds_r.c:103: System doesn't have POSIX capabilities.
+FAIL LTP CASE cap_bounds_r : 32
+RUN LTP CASE cap_bounds_rw
+cap_bounds_rw    1  [1;33mTCONF[0m  :  cap_bounds_rw.c:161: System doesn't have POSIX capabilities.
+FAIL LTP CASE cap_bounds_rw : 32
+RUN LTP CASE cap_bset_inh_bounds
+cap_bounds_r    1  [1;33mTCONF[0m  :  cap_bset_inh_bounds.c:132: System doesn't have sys/capability.h.
+FAIL LTP CASE cap_bset_inh_bounds : 32
+RUN LTP CASE capget01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+tst_capability.c:29: [1;34mTINFO: [0mDropping CAP_NET_RAW(13)
+[   15.758808] capability: warning: `capget01' uses 32-bit capabilities (legacy support in use)
+capget01.c:35: [1;32mTPASS: [0mcapget() with LINUX_CAPABILITY_VERSION_1 passed
+capget01.c:41: [1;32mTPASS: [0mcapget() doesn't get CAP_NET_RAW as expected in PE
+[   15.759725] capability: warning: `capget01' uses deprecated v2 capabilities in a way that may be insecure
+capget01.c:35: [1;32mTPASS: [0mcapget() with LINUX_CAPABILITY_VERSION_2 passed
+capget01.c:41: [1;32mTPASS: [0mcapget() doesn't get CAP_NET_RAW as expected in PE
+capget01.c:35: [1;32mTPASS: [0mcapget() with LINUX_CAPABILITY_VERSION_3 passed
+capget01.c:41: [1;32mTPASS: [0mcapget() doesn't get CAP_NET_RAW as expected in PE
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capget01 : 0
+RUN LTP CASE capget02
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+capget02.c:57: [1;32mTPASS: [0mcapget() with bad address header : EFAULT (14)
+capget02.c:57: [1;32mTPASS: [0mcapget() with bad address data : EFAULT (14)
+capget02.c:57: [1;32mTPASS: [0mcapget() with bad version : EINVAL (22)
+capget02.c:57: [1;32mTPASS: [0mcapget() with bad pid : EINVAL (22)
+capget02.c:57: [1;32mTPASS: [0mcapget() with unused pid : ESRCH (3)
+
+Summary:
+passed   5
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capget02 : 0
+RUN LTP CASE capset01
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+capset01.c:47: [1;32mTPASS: [0mcapset() with LINUX_CAPABILITY_VERSION_1 passed
+capset01.c:47: [1;32mTPASS: [0mcapset() with LINUX_CAPABILITY_VERSION_2 passed
+capset01.c:47: [1;32mTPASS: [0mcapset() with LINUX_CAPABILITY_VERSION_3 passed
+
+Summary:
+passed   3
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capset01 : 0
+RUN LTP CASE capset02
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad address header : EFAULT (14)
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad address data : EFAULT (14)
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad version : EINVAL (22)
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad value data(when pE is not in pP) : EPERM (1)
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad value data(when pP is not in old pP) : EPERM (1)
+capset02.c:71: [1;32mTPASS: [0mcapset() with bad value data(when pI is not in bounding set or old pI) : EPERM (1)
+
+Summary:
+passed   6
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capset02 : 0
+RUN LTP CASE capset03
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+capset03.c:30: [1;34mTINFO: [0mTest bad value data(when pI is not old pP or old pI without CAP_SETPCAP)
+capset03.c:32: [1;32mTPASS: [0mcapset() : EPERM (1)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capset03 : 0
+RUN LTP CASE capset04
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+capset04.c:33: [1;34mTINFO: [0mTest capset() for a different process
+capset04.c:37: [1;32mTPASS: [0mcapset() : EPERM (1)
+
+Summary:
+passed   1
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE capset04 : 0
+RUN LTP CASE cfs_bandwidth01
+tst_kconfig.c:71: [1;34mTINFO: [0mCouldn't locate kernel config!
+tst_kconfig.c:207: [1;31mTBROK: [0mCannot parse kernel .config
+FAIL LTP CASE cfs_bandwidth01 : 2
+RUN LTP CASE cgroup_core01
+tst_cgroup.c:706: [1;34mTINFO: [0mMounted V2 CGroups on /tmp/cgroup_unified
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+cgroup_core01.c:79: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=1756d7994ad8
+
+[1;33mHINT: [0mYou _MAY_ be vulnerable to CVE(s):
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-4197
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE cgroup_core01 : 2
+RUN LTP CASE cgroup_core02
+tst_cgroup.c:706: [1;34mTINFO: [0mMounted V2 CGroups on /tmp/cgroup_unified
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 30s
+cgroup_core02.c:100: [1;31mTBROK: [0mgetpwnam(nobody) failed: ENOENT (2)
+
+[1;33mHINT: [0mYou _MAY_ be missing kernel fixes:
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=e57457641613
+
+[1;33mHINT: [0mYou _MAY_ be vulnerable to CVE(s):
+
+https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-4197
+
+Summary:
+passed   0
+failed   0
+broken   1
+skipped  0
+warnings 0
+FAIL LTP CASE cgroup_core02 : 2
+RUN LTP CASE cgroup_core03
+tst_cgroup.c:706: [1;34mTINFO: [0mMounted V2 CGroups on /tmp/cgroup_unified
+tst_test.c:1733: [1;34mTINFO: [0mLTP version: 20240524
+tst_test.c:1617: [1;34mTINFO: [0mTimeout per run is 0h 00m 50s
+tst_buffers.c:57: [1;34mTINFO: [0mTest is using guarded buffers
+cgroup_core03.c:99: [1;32mTPASS: [0mcg_count_procs(cg_child_test_simple) passed
+cgroup_core03.c:105: [1;32mTPASS: [0mcg_count_procs(cg_child_test_simple) passed
+
+Summary:
+passed   2
+failed   0
+broken   0
+skipped  0
+warnings 0
+FAIL LTP CASE cgroup_core03 : 0
+RUN LTP CASE cgroup_fj_common.sh
+ltp/testcases/bin/cgroup_fj_common.sh: .: line 81: cgroup_lib.sh: not found
+FAIL LTP CASE cgroup_fj_common.sh : 2
+RUN LTP CASE cgroup_fj_function.sh
+usage of cgroup_fj_function2.sh: 
+  ./cgroup_fj_function2.sh subsystem
+example: ./cgroup_fj_function2.sh cpuset
+ltp/testcases/bin/cgroup_fj_function.sh: line 23: tst_brk: not found
+ltp/testcases/bin/cgroup_fj_function.sh: .: line 238: cgroup_fj_common.sh: not found
+FAIL LTP CASE cgroup_fj_function.sh : 2
+RUN LTP CASE cgroup_fj_proc
+qemu-system-riscv64: terminating on signal 15 from pid 494565 (timeout)

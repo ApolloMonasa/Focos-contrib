@@ -1,0 +1,725 @@
+
+OpenSBI v1.5.1
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : uart8250
+Platform HSM Device       : ---
+Platform PMU Device       : ---
+Platform Reboot Device    : syscon-reboot
+Platform Shutdown Device  : syscon-poweroff
+Platform Suspend Device   : ---
+Platform CPPC Device      : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 327 KB
+Firmware RW Offset        : 0x40000
+Firmware RW Size          : 71 KB
+Firmware Heap Offset      : 0x49000
+Firmware Heap Size        : 35 KB (total), 2 KB (reserved), 11 KB (used), 21 KB (free)
+Firmware Scratch Size     : 4096 B (total), 416 B (used), 3680 B (free)
+Runtime SBI Version       : 2.0
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000000100000-0x0000000000100fff M: (I,R,W) S/U: (R,W)
+Domain0 Region01          : 0x0000000010000000-0x0000000010000fff M: (I,R,W) S/U: (R,W)
+Domain0 Region02          : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region03          : 0x0000000080040000-0x000000008005ffff M: (R,W) S/U: ()
+Domain0 Region04          : 0x0000000080000000-0x000000008003ffff M: (R,X) S/U: ()
+Domain0 Region05          : 0x000000000c400000-0x000000000c5fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region06          : 0x000000000c000000-0x000000000c3fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region07          : 0x0000000000000000-0xffffffffffffffff M: () S/U: (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x00000000bfe00000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+Domain0 SysSuspend        : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART Priv Version    : v1.12
+Boot HART Base ISA        : rv64imafdch
+Boot HART ISA Extensions  : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 2 bits
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Info       : 16 (0x0007fff8)
+Boot HART Debug Triggers  : 2 triggers
+Boot HART MIDELEG         : 0x0000000000001666
+Boot HART MEDELEG         : 0x0000000000f0b509
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.60-0-lts (buildozer@build-edge-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10005
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfff10c0-0xbfff2f7f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50904 r8192 d31016 u90112
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bcd00000-0x00000000bce00000] (1MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000043] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000118] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.006776] Console: colour dummy device 80x25
+[    0.008891] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.009017] pid_max: default: 32768 minimum: 301
+[    0.010591] LSM: initializing lsm=capability
+[    0.012346] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.012387] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.040091] riscv: ELF compat mode supported
+[    0.040300] ASID allocator using 16 bits (65536 entries)
+[    0.042001] rcu: Hierarchical SRCU implementation.
+[    0.042031] rcu: 	Max phase no-delay instances is 400.
+[    0.043861] EFI services will not be available.
+[    0.044199] smp: Bringing up secondary CPUs ...
+[    0.044730] smp: Brought up 1 node, 1 CPU
+[    0.049550] Memory: 969144K/1048576K available (9115K kernel code, 5214K rwdata, 4096K rodata, 2311K init, 504K bss, 59644K reserved, 16384K cma-reserved)
+[    0.056118] devtmpfs: initialized
+[    0.066001] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.066234] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.069029] pinctrl core: initialized pinctrl subsystem
+[    0.075510] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.082144] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.082678] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.086572] thermal_sys: Registered thermal governor 'step_wise'
+[    0.086612] thermal_sys: Registered thermal governor 'user_space'
+[    0.086868] cpuidle: using governor menu
+[    0.098938] cpu0: Ratio of byte access time to unaligned word access is 7.37, unaligned accesses are fast
+[    0.114229] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.114270] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.114284] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.114288] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.119682] iommu: Default domain type: Translated
+[    0.119712] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.120720] SCSI subsystem initialized
+[    0.121666] usbcore: registered new interface driver usbfs
+[    0.121906] usbcore: registered new interface driver hub
+[    0.122020] usbcore: registered new device driver usb
+[    0.122499] pps_core: LinuxPPS API ver. 1 registered
+[    0.122510] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.133210] vgaarb: loaded
+[    0.134225] clocksource: Switched to clocksource riscv_clocksource
+[    0.136312] VFS: Disk quotas dquot_6.6.0
+[    0.136794] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.152149] NET: Registered PF_INET protocol family
+[    0.153142] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.158080] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.158130] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.158178] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.158356] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.158587] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.160027] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.160269] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.160432] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.161698] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.162060] PCI: CLS 0 bytes, default 64
+[    0.166750] Initialise system trusted keyrings
+[    0.168827] Unpacking initramfs...
+[    0.172703] workingset: timestamp_bits=44 max_order=18 bucket_order=0
+[    0.240143] Freeing initrd memory: 1208K
+[    0.260042] NET: Registered PF_ALG protocol family
+[    0.260182] Key type asymmetric registered
+[    0.260265] Asymmetric key parser 'x509' registered
+[    0.261108] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.264636] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.271638] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.272194] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.272664] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.272717] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.273092] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.273394] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.274884] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.275063] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.275111] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.275141] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.275145] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.276095] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.279927] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.279954] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.279960] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.288793] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.302047] printk: legacy console [ttyS0] disabled
+[    0.306030] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.307369] printk: legacy console [ttyS0] enabled
+[    0.377147] usbcore: registered new interface driver uas
+[    0.378028] usbcore: registered new interface driver usb-storage
+[    0.381853] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.382931] goldfish_rtc 101000.rtc: setting system clock to 2026-11-08T14:40:05 UTC (1794148805)
+[    0.384159] i2c_dev: i2c /dev entries driver
+[    0.388056] riscv-pmu-sbi: SBI PMU extension is available
+[    0.389374] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.389759] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.393720] NET: Registered PF_INET6 protocol family
+[    0.399890] Segment Routing with IPv6
+[    0.400293] In-situ OAM (IOAM) with IPv6
+[    0.432943] registered taskstats version 1
+[    0.435819] Loading compiled-in X.509 certificates
+[    0.448301] Loaded X.509 cert 'alpinelinux.org: Build time autogenerated kernel key: 349db16f407a8214eee0c67a7bd6e906f71d99d1'
+[    0.458834] Demotion targets for Node 0: null
+[    0.460175] Key type .fscrypt registered
+[    0.460435] Key type fscrypt-provisioning registered
+[    0.463588] clk: Disabling unused clocks
+[    0.463990] PM: genpd: Disabling unused power domains
+[    0.499037] Freeing unused kernel image (initmem) memory: 2308K
+[    0.500156] Run /init as init process
+[    0.585951] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.591896] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+REF_MODULES_OK
+[    0.680733] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+REF_MOUNT_OK
+REF_PERF_START_glibc
+#### OS COMP TEST GROUP START iozone-glibc ####
+iozone automatic measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:40:05 2026
+
+	Auto Mode
+	Record Size 1 kB
+	File size set to 4096 kB
+	Command line used: ./iozone -a -r 1k -s 4m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+                                                                    random    random      bkwd     record     stride                                        
+              kB  reclen    write    rewrite      read    reread      read     write      read    rewrite       read    fwrite  frewrite     fread   freread
+            4096       1    168283    302847    458217    457351    298107    225986    295081     264975     295568    264172    276102    448679    381479
+
+iozone test complete.
+iozone throughput write/read measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:40:06 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 0 -i 1 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 initial writers 	=  210822.96 kB/sec
+	Parent sees throughput for  4 initial writers 	=   86768.26 kB/sec
+	Min throughput per process 			=   38362.48 kB/sec 
+	Max throughput per process 			=   64346.20 kB/sec
+	Avg throughput per process 			=   52705.74 kB/sec
+	Min xfer 					=     599.00 kB
+
+	Children see throughput for  4 rewriters 	=  251357.16 kB/sec
+	Parent sees throughput for  4 rewriters 	=  124853.04 kB/sec
+	Min throughput per process 			=   48106.97 kB/sec 
+	Max throughput per process 			=   79743.46 kB/sec
+	Avg throughput per process 			=   62839.29 kB/sec
+	Min xfer 					=     555.00 kB
+
+	Children see throughput for  4 readers 		=  633514.09 kB/sec
+	Parent sees throughput for  4 readers 		=  260454.30 kB/sec
+	Min throughput per process 			=  124201.12 kB/sec 
+	Max throughput per process 			=  245261.23 kB/sec
+	Avg throughput per process 			=  158378.52 kB/sec
+	Min xfer 					=     410.00 kB
+
+	Children see throughput for 4 re-readers 	=  579349.83 kB/sec
+	Parent sees throughput for 4 re-readers 	=  243421.42 kB/sec
+	Min throughput per process 			=   82268.93 kB/sec 
+	Max throughput per process 			=  249029.72 kB/sec
+	Avg throughput per process 			=  144837.46 kB/sec
+	Min xfer 					=     361.00 kB
+
+
+
+iozone test complete.
+iozone throughput random-read measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:40:18 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 0 -i 2 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 initial writers 	=  205252.90 kB/sec
+	Parent sees throughput for  4 initial writers 	=  117148.67 kB/sec
+	Min throughput per process 			=   41802.52 kB/sec 
+	Max throughput per process 			=   59573.05 kB/sec
+	Avg throughput per process 			=   51313.23 kB/sec
+	Min xfer 					=     948.00 kB
+
+	Children see throughput for  4 rewriters 	=  320529.86 kB/sec
+	Parent sees throughput for  4 rewriters 	=  150858.55 kB/sec
+	Min throughput per process 			=   65844.84 kB/sec 
+	Max throughput per process 			=   96153.24 kB/sec
+	Avg throughput per process 			=   80132.46 kB/sec
+	Min xfer 					=     932.00 kB
+
+	Children see throughput for 4 random readers 	=  343063.37 kB/sec
+	Parent sees throughput for 4 random readers 	=  190062.57 kB/sec
+	Min throughput per process 			=   67308.98 kB/sec 
+	Max throughput per process 			=  106814.18 kB/sec
+	Avg throughput per process 			=   85765.84 kB/sec
+	Min xfer 					=     741.00 kB
+
+	Children see throughput for 4 random writers 	=  215009.55 kB/sec
+	Parent sees throughput for 4 random writers 	=  105249.75 kB/sec
+	Min throughput per process 			=   47130.65 kB/sec 
+	Max throughput per process 			=   68430.64 kB/sec
+	Avg throughput per process 			=   53752.39 kB/sec
+	Min xfer 					=     604.00 kB
+
+
+
+iozone test complete.
+iozone throughput read-backwards measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:40:35 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 0 -i 3 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 initial writers 	=  197721.56 kB/sec
+	Parent sees throughput for  4 initial writers 	=   89157.55 kB/sec
+	Min throughput per process 			=   43551.76 kB/sec 
+	Max throughput per process 			=   62173.99 kB/sec
+	Avg throughput per process 			=   49430.39 kB/sec
+	Min xfer 					=     724.00 kB
+
+	Children see throughput for  4 rewriters 	=  309144.95 kB/sec
+	Parent sees throughput for  4 rewriters 	=  154772.58 kB/sec
+	Min throughput per process 			=   51169.88 kB/sec 
+	Max throughput per process 			=  121540.30 kB/sec
+	Avg throughput per process 			=   77286.24 kB/sec
+	Min xfer 					=     667.00 kB
+
+	Children see throughput for 4 reverse readers 	=  290688.18 kB/sec
+	Parent sees throughput for 4 reverse readers 	=  188187.49 kB/sec
+	Min throughput per process 			=   57623.58 kB/sec 
+	Max throughput per process 			=   93731.52 kB/sec
+	Avg throughput per process 			=   72672.04 kB/sec
+	Min xfer 					=     765.00 kB
+
+
+
+iozone test complete.
+iozone throughput stride-read measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:40:48 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 0 -i 5 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 initial writers 	=  198820.53 kB/sec
+	Parent sees throughput for  4 initial writers 	=  101986.15 kB/sec
+	Min throughput per process 			=   42861.93 kB/sec 
+	Max throughput per process 			=   59910.43 kB/sec
+	Avg throughput per process 			=   49705.13 kB/sec
+	Min xfer 					=     592.00 kB
+
+	Children see throughput for  4 rewriters 	=  325661.01 kB/sec
+	Parent sees throughput for  4 rewriters 	=  141479.40 kB/sec
+	Min throughput per process 			=   60960.43 kB/sec 
+	Max throughput per process 			=  123256.37 kB/sec
+	Avg throughput per process 			=   81415.25 kB/sec
+	Min xfer 					=     500.00 kB
+
+	Children see throughput for 4 stride readers 	=  325078.09 kB/sec
+	Parent sees throughput for 4 stride readers 	=  187237.58 kB/sec
+	Min throughput per process 			=   56993.10 kB/sec 
+	Max throughput per process 			=  114246.68 kB/sec
+	Avg throughput per process 			=   81269.52 kB/sec
+	Min xfer 					=     612.00 kB
+
+
+
+iozone test complete.
+iozone throughput fwrite/fread measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:41:00 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 6 -i 7 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 fwriters 	=  207805.72 kB/sec
+	Parent sees throughput for  4 fwriters 		=  100889.03 kB/sec
+	Min throughput per process 			=   43088.50 kB/sec 
+	Max throughput per process 			=   58894.22 kB/sec
+	Avg throughput per process 			=   51951.43 kB/sec
+	Min xfer 					=    1024.00 kB
+
+	Children see throughput for  4 freaders 	=  629948.04 kB/sec
+	Parent sees throughput for  4 freaders 		=  290746.60 kB/sec
+	Min throughput per process 			=   92702.20 kB/sec 
+	Max throughput per process 			=  222033.20 kB/sec
+	Avg throughput per process 			=  157487.01 kB/sec
+	Min xfer 					=    1024.00 kB
+
+
+
+iozone test complete.
+iozone throughput pwrite/pread measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:41:09 2026
+
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 9 -i 10 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for 4 pwrite writers 	=  201626.50 kB/sec
+	Parent sees throughput for 4 pwrite writers 	=  105583.07 kB/sec
+	Min throughput per process 			=   45573.84 kB/sec 
+	Max throughput per process 			=   53704.95 kB/sec
+	Avg throughput per process 			=   50406.62 kB/sec
+	Min xfer 					=     816.00 kB
+
+	Children see throughput for 4 pread readers 	=  535593.54 kB/sec
+	Parent sees throughput for 4 pread readers 	=  208824.58 kB/sec
+	Min throughput per process 			=   32681.32 kB/sec 
+	Max throughput per process 			=  197105.22 kB/sec
+	Avg throughput per process 			=  133898.39 kB/sec
+	Min xfer 					=     294.00 kB
+
+
+
+iozone test complete.
+iozone throughtput pwritev/preadv measurements
+	Iozone: Performance Test of File I/O
+	        Version $Revision: 3.506 $
+		Compiled for 64 bit mode.
+		Build: linux 
+
+	Contributors:William Norcott, Don Capps, Isom Crawford, Kirby Collins
+	             Al Slater, Scott Rhine, Mike Wisner, Ken Goss
+	             Steve Landherr, Brad Smith, Mark Kelly, Dr. Alain CYR,
+	             Randy Dunlap, Mark Montague, Dan Million, Gavin Brebner,
+	             Jean-Marc Zucconi, Jeff Blomberg, Benny Halevy, Dave Boone,
+	             Erik Habbinga, Kris Strecker, Walter Wong, Joshua Root,
+	             Fabrice Bacchella, Zhenghua Xue, Qin Li, Darren Sawyer,
+	             Vangel Bojaxhi, Ben England, Vikentsi Lapa,
+	             Alexey Skidanov, Sudhir Kumar.
+
+	Run began: Sun Nov  8 14:41:21 2026
+
+	Selected test not available on the version.
+	Record Size 1 kB
+	File size set to 1024 kB
+	Command line used: ./iozone -t 4 -i 11 -i 12 -r 1k -s 1m
+	Output is in kBytes/sec
+	Time Resolution = 0.000001 seconds.
+	Processor cache size set to 1024 kBytes.
+	Processor cache line size set to 32 bytes.
+	File stride size set to 17 * record size.
+	Throughput test with 4 processes
+	Each process writes a 1024 kByte file in 1 kByte records
+
+	Children see throughput for  4 initial writers 	=  185547.83 kB/sec
+	Parent sees throughput for  4 initial writers 	=   79676.02 kB/sec
+	Min throughput per process 			=   36318.75 kB/sec 
+	Max throughput per process 			=   59386.07 kB/sec
+	Avg throughput per process 			=   46386.96 kB/sec
+	Min xfer 					=     740.00 kB
+
+	Children see throughput for  4 rewriters 	=  270054.08 kB/sec
+	Parent sees throughput for  4 rewriters 	=  122995.59 kB/sec
+	Min throughput per process 			=   32821.23 kB/sec 
+	Max throughput per process 			=  122784.20 kB/sec
+	Avg throughput per process 			=   67513.52 kB/sec
+	Min xfer 					=     367.00 kB
+
+
+
+iozone test complete.
+#### OS COMP TEST GROUP END iozone-glibc ####
+REF_IOZONE_DONE
+#### OS COMP TEST GROUP START libcbench-glibc ####
+b_malloc_sparse (0)
+  time: 0.061429400, virt: 38992, res: 38980, dirty: 38980
+
+b_malloc_bubble (0)
+  time: 0.058118200, virt: 39364, res: 39244, dirty: 39244
+
+b_malloc_tiny1 (0)
+  time: 0.003245000, virt: 688, res: 572, dirty: 572
+
+b_malloc_tiny2 (0)
+  time: 0.002486300, virt: 688, res: 572, dirty: 572
+
+b_malloc_big1 (0)
+  time: 0.015515500, virt: 164, res: 36, dirty: 36
+
+b_malloc_big2 (0)
+  time: 0.013639000, virt: 80196, res: 8052, dirty: 8052
+
+b_malloc_thread_stress (0)
+  time: 0.043184600, virt: 16808, res: 168, dirty: 168
+
+b_malloc_thread_local (0)
+  time: 0.030356100, virt: 16808, res: 184, dirty: 184
+
+b_string_strstr ("abcdefghijklmnopqrstuvwxyz")
+  time: 0.009045100, virt: 160, res: 24, dirty: 24
+
+b_string_strstr ("azbycxdwevfugthsirjqkplomn")
+  time: 0.008076300, virt: 160, res: 24, dirty: 24
+
+b_string_strstr ("aaaaaaaaaaaaaacccccccccccc")
+  time: 0.012912000, virt: 160, res: 24, dirty: 24
+
+b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaac")
+  time: 0.007880300, virt: 160, res: 24, dirty: 24
+
+b_string_strstr ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac")
+  time: 0.009115200, virt: 160, res: 24, dirty: 24
+
+b_string_memset (0)
+  time: 0.003707100, virt: 160, res: 24, dirty: 24
+
+b_string_strchr (0)
+  time: 0.008670500, virt: 160, res: 24, dirty: 24
+
+b_string_strlen (0)
+  time: 0.006144900, virt: 160, res: 24, dirty: 24
+
+b_pthread_createjoin_serial1 (0)
+  time: 0.246831300, virt: 8352, res: 32, dirty: 32
+
+b_pthread_createjoin_serial2 (0)
+  time: 0.648161400, virt: 32928, res: 72, dirty: 72
+
+b_pthread_create_serial1 (0)
+  time: 0.372542200, virt: 40820, res: 20728, dirty: 20728
+
+b_pthread_uselesslock (0)
+  time: 0.042891800, virt: 8352, res: 32, dirty: 32
+
+b_utf8_bigbuf (0)
+  time: 0.002196400, virt: 160, res: 28, dirty: 28
+
+b_utf8_onebyone (0)
+  time: 0.000364700, virt: 160, res: 28, dirty: 28
+
+b_stdio_putcgetc (0)
+  time: 0.195891000, virt: 160, res: 28, dirty: 28
+
+b_stdio_putcgetc_unlocked (0)
+  time: 0.158736000, virt: 160, res: 28, dirty: 28
+
+b_regex_compile ("(a|b|c)*d*b")
+  time: 0.018177100, virt: 160, res: 36, dirty: 36
+
+b_regex_search ("(a|b|c)*d*b")
+  time: 0.004602300, virt: 160, res: 32, dirty: 32
+
+b_regex_search ("a{25}b")
+  time: 0.088690400, virt: 160, res: 88, dirty: 88
+
+#### OS COMP TEST GROUP END libcbench-glibc ####
+REF_LIBCBENCH_DONE
+#### OS COMP TEST GROUP START lmbench-glibc ####
+latency measurements
+Simple syscall: 0.5762 microseconds
+Simple read: 0.8289 microseconds
+Simple write: 0.6853 microseconds
+Simple stat: 3.6014 microseconds
+Simple fstat: 1.2531 microseconds
+Simple open/close: 6.2316 microseconds
+Select on 100 fd's: 4.3815 microseconds
+Signal handler installation: 1.0535 microseconds
+Signal handler overhead: 5.2155 microseconds
+Protection fault: 0.6638 microseconds
+Pipe latency: 57.8243 microseconds

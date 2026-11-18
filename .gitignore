@@ -6,3 +6,7 @@
 .env
 # 省略IDE配置
 .idea
+
+# TEST-001 冻结的串口证据需要入库（不是运行日志）
+!tests/test001/fixtures/historical/logs/*.log
+!tests/test001/fixtures/ltp/*.log

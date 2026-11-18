@@ -1,0 +1,1583 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "glibc",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_libctest.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:39:36"
+  },
+  "totals": {
+    "subcases": 220,
+    "pass": 177,
+    "partial": 0,
+    "fail": 43,
+    "not_run": 0,
+    "score": 177.0,
+    "groups": {
+      "PASS": 0,
+      "PARTIAL": 1,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 0.8045
+  },
+  "groups": [
+    {
+      "group": "libctest",
+      "libc": "glibc",
+      "status": "PARTIAL",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "libctest static argv",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static basename",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static clocale_mbfuncs",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static clock_gettime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static crypt",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static dirname",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static env",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static fdopen",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static fnmatch",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static fscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static fwscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static iconv_open",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static inet_pton",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static mbc",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static memstream",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_cancel_points",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static pthread_cancel",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_cond",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_tsd",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static qsort",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static random",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static search_hsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static search_insque",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static search_lsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static search_tsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static setjmp",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static snprintf",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static socket",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static sscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static sscanf_long",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static stat",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strftime",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static string",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_memcpy",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_memmem",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_memset",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_strchr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_strcspn",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static string_strstr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strptime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strtod",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strtod_simple",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strtof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strtol",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static strtold",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static swprintf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static tgmath",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static time",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static tls_align",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static udiv",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static ungetc",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static utime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static wcsstr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static wcstol",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static pleval",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static daemon_failure",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static dn_expand_empty",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static dn_expand_ptr_0",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static fflush_exit",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static fgets_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static fgetwc_buffering",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static fpclassify_invalid_ld80",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static ftello_unflushed_append",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static getpwnam_r_crash",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static getpwnam_r_errno",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static iconv_roundtrips",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static inet_ntop_v4mapped",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static inet_pton_empty_last_field",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static iswspace_null",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static lrand48_signextend",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static lseek_large",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static malloc_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static mbsrtowcs_overflow",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static memmem_oob_read",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static memmem_oob",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static mkdtemp_failure",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static mkstemp_failure",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static printf_1e9_oob",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static printf_fmt_g_round",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static printf_fmt_g_zeros",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static printf_fmt_n",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_robust_detach",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_cancel_sem_wait",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_cond_smasher",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_condattr_setclock",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_exit_cancel",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_once_deadlock",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static pthread_rwlock_ebusy",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static putenv_doublefree",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static regex_backref_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static regex_bracket_icase",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static regex_ere_backref",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static regex_escaped_high_byte",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static regex_negated_range",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static regexec_nosub",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static rewind_clear_error",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static rlimit_open_files",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static scanf_bytes_consumed",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static scanf_match_literal_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static scanf_nullbyte_char",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static setvbuf_unget",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest static sigprocmask_internal",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static sscanf_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static statvfs",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static strverscmp",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static syscall_sign_extend",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static uselocale_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static wcsncpy_read_overflow",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest static wcsstr_false_negative",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic argv",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic basename",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic clocale_mbfuncs",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic clock_gettime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic crypt",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic dirname",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic dlopen",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic env",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic fdopen",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic fnmatch",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic fscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic fwscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic iconv_open",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic inet_pton",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic mbc",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic memstream",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_cancel_points",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic pthread_cancel",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic pthread_cond",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_tsd",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic qsort",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic random",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic search_hsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic search_insque",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic search_lsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic search_tsearch",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic sem_init",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic setjmp",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic snprintf",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic socket",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic sscanf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic sscanf_long",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic stat",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strftime",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic string",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_memcpy",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_memmem",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_memset",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_strchr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_strcspn",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic string_strstr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strptime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strtod",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strtod_simple",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strtof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strtol",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic strtold",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic swprintf",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic tgmath",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic time",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic tls_init",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic tls_local_exec",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic udiv",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic ungetc",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic utime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic wcsstr",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic wcstol",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic daemon_failure",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic dn_expand_empty",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic dn_expand_ptr_0",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic fflush_exit",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic fgets_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic fgetwc_buffering",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic fpclassify_invalid_ld80",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic ftello_unflushed_append",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic getpwnam_r_crash",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic getpwnam_r_errno",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic iconv_roundtrips",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic inet_ntop_v4mapped",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic inet_pton_empty_last_field",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic iswspace_null",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic lrand48_signextend",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic lseek_large",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic malloc_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic mbsrtowcs_overflow",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic memmem_oob_read",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic memmem_oob",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic mkdtemp_failure",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic mkstemp_failure",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic printf_1e9_oob",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic printf_fmt_g_round",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic printf_fmt_g_zeros",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic printf_fmt_n",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_robust_detach",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_cond_smasher",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_condattr_setclock",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_exit_cancel",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic pthread_once_deadlock",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic pthread_rwlock_ebusy",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic putenv_doublefree",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic regex_backref_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic regex_bracket_icase",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic regex_ere_backref",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic regex_escaped_high_byte",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic regex_negated_range",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic regexec_nosub",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic rewind_clear_error",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic rlimit_open_files",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic scanf_bytes_consumed",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic scanf_match_literal_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic scanf_nullbyte_char",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic setvbuf_unget",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "libctest dynamic sigprocmask_internal",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic sscanf_eof",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic statvfs",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic strverscmp",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic syscall_sign_extend",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic tls_get_new_dtv",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic uselocale_0",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic wcsncpy_read_overflow",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "libctest dynamic wcsstr_false_negative",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

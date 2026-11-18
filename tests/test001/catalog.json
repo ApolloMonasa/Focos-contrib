@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "kind": "test001_catalog",
+  "profiles": {
+    "regional-2025-with-ltp-v1": {
+      "path": "profiles/regional-2025-with-ltp-v1.json"
+    }
+  },
+  "criteria": {
+    "regional-2025-log-v1": {
+      "path": "criteria/v1/regional-2025-log-v1.json"
+    },
+    "regional-2025-log-v2": {
+      "path": "criteria/v1/regional-2025-log-v2.json"
+    }
+  }
+}

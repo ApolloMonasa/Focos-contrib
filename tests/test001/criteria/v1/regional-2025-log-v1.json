@@ -1,0 +1,126 @@
+{
+  "acceptance": {
+    "external_log_acceptance": "BLOCKED",
+    "forbid_extras": true,
+    "forbid_judge_errors": true,
+    "ltp_summary_required": false,
+    "require_all_judgments": "PASS",
+    "require_capture_exit_code": 0,
+    "require_capture_status": "EXITED",
+    "require_input_integrity": "VERIFIED",
+    "require_origin": "recorded_capture",
+    "require_protocol": "VALID",
+    "require_sections": "COMPLETE"
+  },
+  "adapters": {
+    "basic": {
+      "entry": "adapters/official/judge_basic.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "9425db752d00a0f2c8843ea2983fb605c352576309bdec5127a6bb62cbad2664",
+      "timeout_seconds": 30
+    },
+    "busybox": {
+      "entry": "adapters/official/judge_busybox.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d",
+      "timeout_seconds": 30
+    },
+    "cyclictest": {
+      "entry": "adapters/team/judge_cyclictest.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "7b9cb4df7d3668005b8a84ae5e7bbd7a95cb4d6763363127f131a6c0fab01373",
+      "timeout_seconds": 30
+    },
+    "iozone": {
+      "entry": "adapters/official/judge_iozone.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "967cb9085fb44c08668f538e5367c70fad307d521c16d3df177ab4d124d45022",
+      "timeout_seconds": 30
+    },
+    "iperf": {
+      "entry": "adapters/team/judge_iperf.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "e428516090b086101e092a5577da443b67cc9a0207d2a3ac061c4a66d972ab78",
+      "timeout_seconds": 30
+    },
+    "libcbench": {
+      "entry": "adapters/team/judge_libcbench.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "c0953579800c05096fd90b50ac0023efb9deb8078bdd2f51648794508121d708",
+      "timeout_seconds": 30
+    },
+    "libctest": {
+      "entry": "adapters/official/judge_libctest.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "587804e2210784f17f6a4febe744dcca1b48fdb50a4dc7fb9378d62e7c711a34",
+      "timeout_seconds": 60
+    },
+    "lmbench": {
+      "entry": "adapters/team/judge_lmbench.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "20f2332bc0bc3d285fb8ff579aab78939623468d88d3d7d1cd402c50f419e368",
+      "timeout_seconds": 30
+    },
+    "ltp": {
+      "entry": "ltp_native",
+      "kind": "builtin",
+      "version": 1
+    },
+    "lua": {
+      "entry": "adapters/official/judge_lua.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "b07d38ab9bb12c67d1ef5c9adfcd9012671cdcb1c44f21498c9449f8e1b1634f",
+      "timeout_seconds": 30
+    },
+    "netperf": {
+      "entry": "adapters/team/judge_netperf.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "6b4e67a30f974c9903cdd5b8cfdc2e51bc73b0577d64aba1d10ee692f6bdb89b",
+      "timeout_seconds": 30
+    },
+    "unixbench": {
+      "entry": "adapters/team/judge_unixbench.py",
+      "kind": "subprocess",
+      "max_output_bytes": 8388608,
+      "sha256": "df675d3669216f81cfab908e28000d012d41d89b9289388e10460d45c8d8605e",
+      "timeout_seconds": 30
+    }
+  },
+  "criteria_hash": "9675b8d8a451045bb9bf36c487127ebb1759332f92cb92e462f003c795ae3a70",
+  "criteria_id": "regional-2025-log-v1",
+  "frozen_at": "2026-11-18",
+  "implementation": {
+    "manifest": "implementation.sha256",
+    "roots": [
+      "scripts/test001.py",
+      "scripts/test001",
+      "tests/test001/criteria/v1/adapters"
+    ],
+    "sha256": "f1f615c53473f10a1f54ed0e49bfcaebe8b66d33dcca6e936b1ad58f716ebe96"
+  },
+  "kind": "test001_criteria",
+  "mapping": {
+    "mode": "identity",
+    "notes": "适配器输出名与 PROFILE 的 invocation.name 逐项相同；不从运行后输出增删分母。",
+    "profile_hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d"
+  },
+  "revision": 1,
+  "schema_version": 2,
+  "supported_profiles": [
+    {
+      "profile_hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d",
+      "profile_id": "regional-2025-with-ltp-v1",
+      "revision": 1
+    }
+  ]
+}

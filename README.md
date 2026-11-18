@@ -26,7 +26,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 内核分页的下一阶段约定见 [MM-003 草案](specs/MM-003.md)，页表、映射和异常验收细节见[参考页](docs/reference/sv39-paging.md)。内核分页与 `make vm-smoke` 均待实现。
 
-测试接入的重设计见 [TEST-001 草案](specs/TEST-001.md)：将构建、采集和日志分析拆开，先审接口与验收，再分期实现。当前未交付新 runner；参考 Linux 与外部日志都不能计为 FocOS 成绩。
+测试接入按 [TEST-001](specs/TEST-001.md) 分 A–D 实现。A 阶段已交付冻结清单、`analyze` 与独立报告：原 11 组和比赛 LTP 共 6514 个调用，24 个单组单 libc shard；15 份历史参考结果（7 份日志）逐项对照通过。B 构建、C 真实采集、D 全套批次仍未实现；参考 Linux 与外部日志都不能计为 FocOS 成绩。用法见[参考页](docs/reference/test001-phase-a.md)。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -94,7 +94,7 @@ Focos/
 │   ├── PLAT-002.md                    # QEMU 板级配置与启动内存迁移
 │   ├── DRV-001.md                     # 设备接入、DMA/IRQ 与错误（草案）
 │   ├── HAL-001.md                     # 块设备接口与内存盘
-│   ├── TEST-001.md                    # 采集证据与日志判分的阶段边界（重设计草案）
+│   ├── TEST-001.md                    # 采集证据与日志判分的阶段边界（A 已实现）
 │   ├── TEST-002.md                    # 独立镜像模型的共享块接口检查（草案）
 │   ├── BOOT-001.md                    # QEMU 启动验收
 │   ├── MM-001.md                      # 页分配与回收
@@ -106,11 +106,22 @@ Focos/
 │   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
-│   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
+│   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
+│   ├── test001.py                     # TEST-001 analyze 入口
+│   ├── test001/                       # 清单读取、LTP/官方判据适配与报告
+│   ├── test_test001_analyze.py        # 历史回放、运行包和 LTP 负例
+│   ├── test_test001_config.py         # PROFILE/CRITERIA/夹具身份检查
+│   ├── test_test001_ltp.py            # LTP 原生结果正反例
+│   └── update_test001_manifest.py     # 生成分析实现清单
 ├── tests/                             # 往届测例清单与来源
 │   ├── catalog.json                   # 2024 起步用 basic 清单
-│   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
-│   └── sources.lock.json              # 测例仓库和分支的固定提交
+│   ├── regional-plan.json             # 2025 区域赛组清单与冻结状态
+│   ├── sources.lock.json              # 测例仓库和分支的固定提交
+│   └── test001/                       # A 阶段冻结输入、判据与历史夹具
+│       ├── catalog.json               # PROFILE/CRITERIA ID 注册表
+│       ├── profiles/                  # 6514 条调用清单及身份
+│       ├── criteria/v1/               # 冻结判据、适配器和实现清单
+│       └── fixtures/                  # 15 份历史结果与真实 LTP 短样本
 ├── docs/                              # 上手、设计与验证指南
 │   ├── getting-started.md             # 配环境、运行和首次提交
 │   ├── architecture.md                # 内核分层与跨平台扩展图
@@ -127,6 +138,7 @@ Focos/
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── test001-redesign.md         # TEST-001 接口、历史教训与分期验收
+│       ├── test001-phase-a.md          # A 阶段清单、analyze 用法与已知边界
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置
 │   └── config.toml                    # RISC-V 裸机目标的链接选项
@@ -137,6 +149,7 @@ Focos/
 │   ├── main-protection.json           # main 分支保护的可复用配置
 │   └── workflows/                     # GitHub Actions 工作流
 │       └── ci.yml                     # PR 与 main 的构建、启动、内存与中断检查
+├── .gitattributes                     # 冻结文件的空白检查例外
 ├── .gitignore                         # Git 忽略规则
 ├── Cargo.toml                         # Rust 工作区与构建配置
 ├── Cargo.lock                         # 锁定 Cargo 依赖版本

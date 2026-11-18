@@ -1,0 +1,2968 @@
+
+OpenSBI v1.5.1
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : uart8250
+Platform HSM Device       : ---
+Platform PMU Device       : ---
+Platform Reboot Device    : syscon-reboot
+Platform Shutdown Device  : syscon-poweroff
+Platform Suspend Device   : ---
+Platform CPPC Device      : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 327 KB
+Firmware RW Offset        : 0x40000
+Firmware RW Size          : 71 KB
+Firmware Heap Offset      : 0x49000
+Firmware Heap Size        : 35 KB (total), 2 KB (reserved), 11 KB (used), 21 KB (free)
+Firmware Scratch Size     : 4096 B (total), 416 B (used), 3680 B (free)
+Runtime SBI Version       : 2.0
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000000100000-0x0000000000100fff M: (I,R,W) S/U: (R,W)
+Domain0 Region01          : 0x0000000010000000-0x0000000010000fff M: (I,R,W) S/U: (R,W)
+Domain0 Region02          : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region03          : 0x0000000080040000-0x000000008005ffff M: (R,W) S/U: ()
+Domain0 Region04          : 0x0000000080000000-0x000000008003ffff M: (R,X) S/U: ()
+Domain0 Region05          : 0x000000000c400000-0x000000000c5fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region06          : 0x000000000c000000-0x000000000c3fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region07          : 0x0000000000000000-0xffffffffffffffff M: () S/U: (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x00000000bfe00000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+Domain0 SysSuspend        : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART Priv Version    : v1.12
+Boot HART Base ISA        : rv64imafdch
+Boot HART ISA Extensions  : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 2 bits
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Info       : 16 (0x0007fff8)
+Boot HART Debug Triggers  : 2 triggers
+Boot HART MIDELEG         : 0x0000000000001666
+Boot HART MEDELEG         : 0x0000000000f0b509
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.60-0-lts (buildozer@build-edge-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10005
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfff10c0-0xbfff2f7f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50904 r8192 d31016 u90112
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bcd00000-0x00000000bce00000] (1MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000041] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000114] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.006736] Console: colour dummy device 80x25
+[    0.008896] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.009002] pid_max: default: 32768 minimum: 301
+[    0.010438] LSM: initializing lsm=capability
+[    0.011955] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.011986] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.040068] riscv: ELF compat mode supported
+[    0.040271] ASID allocator using 16 bits (65536 entries)
+[    0.041033] rcu: Hierarchical SRCU implementation.
+[    0.041058] rcu: 	Max phase no-delay instances is 400.
+[    0.043399] EFI services will not be available.
+[    0.043727] smp: Bringing up secondary CPUs ...
+[    0.044242] smp: Brought up 1 node, 1 CPU
+[    0.050471] Memory: 969144K/1048576K available (9115K kernel code, 5214K rwdata, 4096K rodata, 2311K init, 504K bss, 59644K reserved, 16384K cma-reserved)
+[    0.057514] devtmpfs: initialized
+[    0.066441] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.066671] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.069748] pinctrl core: initialized pinctrl subsystem
+[    0.076390] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.082859] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.083360] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.087309] thermal_sys: Registered thermal governor 'step_wise'
+[    0.087348] thermal_sys: Registered thermal governor 'user_space'
+[    0.087625] cpuidle: using governor menu
+[    0.100590] cpu0: Ratio of byte access time to unaligned word access is 7.50, unaligned accesses are fast
+[    0.116233] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.116266] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.116279] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.116282] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.121740] iommu: Default domain type: Translated
+[    0.121770] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.122572] SCSI subsystem initialized
+[    0.123538] usbcore: registered new interface driver usbfs
+[    0.123793] usbcore: registered new interface driver hub
+[    0.123961] usbcore: registered new device driver usb
+[    0.124340] pps_core: LinuxPPS API ver. 1 registered
+[    0.124350] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.134694] vgaarb: loaded
+[    0.135737] clocksource: Switched to clocksource riscv_clocksource
+[    0.138250] VFS: Disk quotas dquot_6.6.0
+[    0.138351] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.153318] NET: Registered PF_INET protocol family
+[    0.154173] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.158862] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.158917] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.158969] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.159661] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.159850] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.161040] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.161268] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.161430] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.162772] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.163222] PCI: CLS 0 bytes, default 64
+[    0.167574] Initialise system trusted keyrings
+[    0.171664] Unpacking initramfs...
+[    0.172889] workingset: timestamp_bits=44 max_order=18 bucket_order=0
+[    0.243244] Freeing initrd memory: 1208K
+[    0.259640] NET: Registered PF_ALG protocol family
+[    0.259917] Key type asymmetric registered
+[    0.259972] Asymmetric key parser 'x509' registered
+[    0.260622] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.264225] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.267889] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.268616] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.270697] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.270985] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.271408] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.271711] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.273389] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.273556] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.273602] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.273630] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.273635] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.274622] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.278434] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.278467] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.278473] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.286247] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.299829] printk: legacy console [ttyS0] disabled
+[    0.304068] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.305494] printk: legacy console [ttyS0] enabled
+[    0.371797] usbcore: registered new interface driver uas
+[    0.372429] usbcore: registered new interface driver usb-storage
+[    0.376541] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.377259] goldfish_rtc 101000.rtc: setting system clock to 2026-11-08T14:38:23 UTC (1794148703)
+[    0.378776] i2c_dev: i2c /dev entries driver
+[    0.383747] riscv-pmu-sbi: SBI PMU extension is available
+[    0.384690] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.385146] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.388934] NET: Registered PF_INET6 protocol family
+[    0.394903] Segment Routing with IPv6
+[    0.395426] In-situ OAM (IOAM) with IPv6
+[    0.425999] registered taskstats version 1
+[    0.428754] Loading compiled-in X.509 certificates
+[    0.440285] Loaded X.509 cert 'alpinelinux.org: Build time autogenerated kernel key: 349db16f407a8214eee0c67a7bd6e906f71d99d1'
+[    0.451262] Demotion targets for Node 0: null
+[    0.452342] Key type .fscrypt registered
+[    0.452663] Key type fscrypt-provisioning registered
+[    0.455737] clk: Disabling unused clocks
+[    0.456115] PM: genpd: Disabling unused power domains
+[    0.492602] Freeing unused kernel image (initmem) memory: 2308K
+[    0.493676] Run /init as init process
+[    0.578629] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.584709] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+REF_MODULES_OK[    0.682628] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+
+REF_MOUNT_OK
+REF_RUN_glibc
+#### OS COMP TEST GROUP START basic-glibc ####
+Testing brk :
+========== START test_brk ==========
+Before alloc,heap pos: -1934512128
+After alloc,heap pos: -1934512128
+Alloc again,heap pos: -1934512128
+========== END test_brk ==========
+Testing chdir :
+========== START test_chdir ==========
+chdir ret: 0
+  current working dir : /basic/test_chdir
+========== END test_chdir ==========
+Testing clone :
+========== START test_clone ==========
+  Child says successfully!
+clone process successfully.
+pid:462
+========== END test_clone ==========
+Testing close :
+========== START test_close ==========
+  close 3 success.
+========== END test_close ==========
+Testing dup2 :
+========== START test_dup2 ==========
+  from fd 100
+========== END test_dup2 ==========
+Testing dup :
+========== START test_dup ==========
+  new fd is 3.
+========== END test_dup ==========
+Testing execve :
+========== START test_execve ==========
+  I am test_echo.
+execve success.
+========== END main ==========
+Testing exit :
+========== START test_exit ==========
+exit OK.
+========== END test_exit ==========
+Testing fork :
+========== START test_fork ==========
+  child process.
+  parent process. wstatus:0
+========== END test_fork ==========
+Testing fstat :
+========== START test_fstat ==========
+fstat ret: 0
+fstat: dev: 65024, inode: 131106, mode: 33188, nlink: 1, size: 52, atime: 1749913917, mtime: 1749913917, ctime: 1749913917
+========== END test_fstat ==========
+Testing getcwd :
+========== START test_getcwd ==========
+getcwd: /basic successfully!
+========== END test_getcwd ==========
+Testing getdents :
+========== START test_getdents ==========
+open fd:3
+getdents fd:512
+getdents success.
+dup
+
+========== END test_getdents ==========
+Testing getpid :
+========== START test_getpid ==========
+getpid success.
+pid = 474
+========== END test_getpid ==========
+Testing getppid :
+========== START test_getppid ==========
+  getppid success. ppid : 458
+========== END test_getppid ==========
+Testing gettimeofday :
+========== START test_gettimeofday ==========
+gettimeofday success.
+start:35168022, end:35168044
+interval: 22
+========== END test_gettimeofday ==========
+Testing mkdir_ :
+========== START test_mkdir ==========
+mkdir ret: 0
+  mkdir success.
+========== END test_mkdir ==========
+Testing mmap :
+========== START test_mmap ==========
+file len: 27
+mmap content:   Hello, mmap successfully!
+========== END test_mmap ==========
+Testing mount :
+========== START test_mount ==========
+Mounting dev:/dev/vda2 to ./mnt
+mount return: -19
+
+ --- Assert Fatal ! ---
+Testing munmap :
+========== START test_munmap ==========
+file len: 27
+munmap return: 0
+munmap successfully!
+========== END test_munmap ==========
+Testing openat :
+========== START test_openat ==========
+open dir fd: 3
+openat fd: 4
+openat success.
+========== END test_openat ==========
+Testing open :
+========== START test_open ==========
+Hi, this is a text file.
+syscalls testing success!
+
+========== END test_open ==========
+Testing pipe :
+========== START test_pipe ==========
+cpid: 0
+cpid: 485
+  Write to pipe successfully.
+
+========== END test_pipe ==========
+Testing read :
+========== START test_read ==========
+Hi, this is a text file.
+syscalls testing success!
+
+========== END test_read ==========
+Testing sleep :
+========== START test_sleep ==========
+sleep success.
+========== END test_sleep ==========
+Testing times :
+========== START test_times ==========
+mytimes success
+{tms_utime:0, tms_stime:0, tms_cutime:0, tms_cstime:0}
+========== END test_times ==========
+Testing umount :
+========== START test_umount ==========
+Mounting dev:/dev/vda2 to ./mnt
+mount return: -19
+========== END test_umount ==========
+Testing uname :
+========== START test_uname ==========
+Uname: Linux (none) 6.18.60-0-lts #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20 riscv64 (none)
+========== END test_uname ==========
+Testing unlink :
+========== START test_unlink ==========
+  unlink success!
+========== END test_unlink ==========
+Testing wait :
+========== START test_wait ==========
+This is child process
+wait child success.
+wstatus: 0
+========== END test_wait ==========
+Testing waitpid :
+========== START test_waitpid ==========
+This is child process
+waitpid successfully.
+wstatus: 3
+========== END test_waitpid ==========
+Testing write :
+========== START test_write ==========
+Hello operating system contest.
+========== END test_write ==========
+Testing yield :
+========== START test_yield ==========
+  I am child process: 499. iteration 0.
+  I am child process: 500. iteration   I am child process: 501. iteration 2.
+  I am child process: 499. iteration 0.
+1.
+  I am child process: 501. iteration 2.
+  I am child process: 500. iteration 1.
+  I am child process: 499. iteration 0.
+  I am child process: 500. iteration 1.
+  I am child process: 501. iteration 2.
+  I am child process: 499. iteration 0.
+  I am child process: 501. iteration 2.
+  I am child process: 500. iteration 1.
+  I am child process: 499. iteration 0.
+  I am child process: 500  I am child process: 501. iteration 2.
+. iteration 1.
+========== END test_yield ==========
+#### OS COMP TEST GROUP END basic-glibc ####
+#### OS COMP TEST GROUP START lua-glibc ####
+testcase lua date.lua success
+testcase lua file_io.lua success
+testcase lua max_min.lua success
+testcase lua random.lua success
+testcase lua remove.lua success
+testcase lua round_num.lua success
+testcase lua sin30.lua success
+testcase lua sort.lua success
+testcase lua strings.lua success
+#### OS COMP TEST GROUP END lua-glibc ####
+#### OS COMP TEST GROUP START busybox-glibc ####
+#### independent command test
+testcase busybox echo "#### independent command test" success
+testcase busybox ash -c exit success
+testcase busybox sh -c exit success
+bbb
+testcase busybox basename /aaa/bbb success
+   November 2026
+Su Mo Tu We Th Fr Sa
+ 1  2  3  4  5  6  7
+ 8  9 10 11 12 13 14
+15 16 17 18 19 20 21
+22 23 24 25 26 27 28
+29 30
+                     
+testcase busybox cal success
+[H[Jtestcase busybox clear success
+Sun Nov  8 14:38:25 UTC 2026
+testcase busybox date success
+Filesystem           1K-blocks      Used Available Use% Mounted on
+devtmpfs                486272         0    486272   0% /dev
+testcase busybox df success
+/aaa
+testcase busybox dirname /aaa/bbb success
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.60-0-lts (buildozer@build-edge-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10005
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfff10c0-0xbfff2f7f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50904 r8192 d31016 u90112
+[    0.000000] pcpu-alloc: s50904 r8192 d31016 u90112 alloc=22*4096
+[    0.000000] pcpu-alloc: [0] 0 
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bcd00000-0x00000000bce00000] (1MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000041] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000114] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.006736] Console: colour dummy device 80x25
+[    0.008896] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.009002] pid_max: default: 32768 minimum: 301
+[    0.010438] LSM: initializing lsm=capability
+[    0.011955] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.011986] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.040068] riscv: ELF compat mode supported
+[    0.040271] ASID allocator using 16 bits (65536 entries)
+[    0.041033] rcu: Hierarchical SRCU implementation.
+[    0.041058] rcu: 	Max phase no-delay instances is 400.
+[    0.043399] EFI services will not be available.
+[    0.043727] smp: Bringing up secondary CPUs ...
+[    0.044242] smp: Brought up 1 node, 1 CPU
+[    0.050471] Memory: 969144K/1048576K available (9115K kernel code, 5214K rwdata, 4096K rodata, 2311K init, 504K bss, 59644K reserved, 16384K cma-reserved)
+[    0.057514] devtmpfs: initialized
+[    0.066441] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.066671] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.069748] pinctrl core: initialized pinctrl subsystem
+[    0.076390] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.082859] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.083360] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.087309] thermal_sys: Registered thermal governor 'step_wise'
+[    0.087348] thermal_sys: Registered thermal governor 'user_space'
+[    0.087625] cpuidle: using governor menu
+[    0.100590] cpu0: Ratio of byte access time to unaligned word access is 7.50, unaligned accesses are fast
+[    0.116233] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.116266] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.116279] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.116282] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.121740] iommu: Default domain type: Translated
+[    0.121770] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.122572] SCSI subsystem initialized
+[    0.123538] usbcore: registered new interface driver usbfs
+[    0.123793] usbcore: registered new interface driver hub
+[    0.123961] usbcore: registered new device driver usb
+[    0.124340] pps_core: LinuxPPS API ver. 1 registered
+[    0.124350] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.134694] vgaarb: loaded
+[    0.135737] clocksource: Switched to clocksource riscv_clocksource
+[    0.138250] VFS: Disk quotas dquot_6.6.0
+[    0.138351] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.153318] NET: Registered PF_INET protocol family
+[    0.154173] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.158862] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.158917] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.158969] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.159661] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.159850] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.161040] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.161268] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.161430] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.162772] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.163222] PCI: CLS 0 bytes, default 64
+[    0.167574] Initialise system trusted keyrings
+[    0.171664] Unpacking initramfs...
+[    0.172889] workingset: timestamp_bits=44 max_order=18 bucket_order=0
+[    0.243244] Freeing initrd memory: 1208K
+[    0.259640] NET: Registered PF_ALG protocol family
+[    0.259917] Key type asymmetric registered
+[    0.259972] Asymmetric key parser 'x509' registered
+[    0.260622] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.264225] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.267889] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.268616] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.270697] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.270985] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.271408] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.271711] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.273389] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.273556] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.273602] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.273630] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.273635] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.274622] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.278434] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.278467] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.278473] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.286247] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.299829] printk: legacy console [ttyS0] disabled
+[    0.304068] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.305494] printk: legacy console [ttyS0] enabled
+[    0.371797] usbcore: registered new interface driver uas
+[    0.372429] usbcore: registered new interface driver usb-storage
+[    0.376541] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.377259] goldfish_rtc 101000.rtc: setting system clock to 2026-11-08T14:38:23 UTC (1794148703)
+[    0.378776] i2c_dev: i2c /dev entries driver
+[    0.383747] riscv-pmu-sbi: SBI PMU extension is available
+[    0.384690] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.385146] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.388934] NET: Registered PF_INET6 protocol family
+[    0.394903] Segment Routing with IPv6
+[    0.395426] In-situ OAM (IOAM) with IPv6
+[    0.425999] registered taskstats version 1
+[    0.428754] Loading compiled-in X.509 certificates
+[    0.440285] Loaded X.509 cert 'alpinelinux.org: Build time autogenerated kernel key: 349db16f407a8214eee0c67a7bd6e906f71d99d1'
+[    0.451262] Demotion targets for Node 0: null
+[    0.452342] Key type .fscrypt registered
+[    0.452663] Key type fscrypt-provisioning registered
+[    0.455737] clk: Disabling unused clocks
+[    0.456115] PM: genpd: Disabling unused power domains
+[    0.492602] Freeing unused kernel image (initmem) memory: 2308K
+[    0.493676] Run /init as init process
+[    0.493905]   with arguments:
+[    0.493920]     /init
+[    0.493935]   with environment:
+[    0.493946]     HOME=/
+[    0.493958]     TERM=linux
+[    0.578629] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.584709] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+[    0.682628] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+testcase busybox dmesg success
+4	./bin
+4	./basic/mnt
+4	./basic/test_mkdir
+4	./basic/test_chdir
+1972	./basic
+4	./tmp
+240	./ltp/bin
+528	./ltp/metadata
+208	./ltp/libkirk
+2652	./ltp/testcases/bin/datafiles
+76	./ltp/testcases/bin/ftrace_stress
+1620580	./ltp/testcases/bin
+12	./ltp/testcases/data/unzip01
+12	./ltp/testcases/data/ima_keys
+12	./ltp/testcases/data/binfmt_misc02
+64	./ltp/testcases/data/nm01
+76	./ltp/testcases/data/ldd01
+8	./ltp/testcases/data/ima_selinux
+96	./ltp/testcases/data/file01
+12	./ltp/testcases/data/mc_member
+24	./ltp/testcases/data/ld01
+24	./ltp/testcases/data/ar01
+12	./ltp/testcases/data/ima_policy
+12	./ltp/testcases/data/lvm
+8	./ltp/testcases/data/ima_kexec
+376	./ltp/testcases/data
+1620960	./ltp/testcases
+392	./ltp/runtest
+40	./ltp/testscripts
+12	./ltp/scenario_groups
+1622580	./ltp
+0	./dev/dma_heap
+0	./dev
+3436	./lib
+0	./proc/fs/ext4/vda
+0	./proc/fs/ext4
+0	./proc/fs/f2fs
+0	./proc/fs/jbd2/vda-8
+0	./proc/fs/jbd2
+0	./proc/fs/nfsd
+0	./proc/fs
+0	./proc/bus/pci/0000:00
+0	./proc/bus/pci
+0	./proc/bus/input
+0	./proc/bus
+0	./proc/irq/1
+0	./proc/irq/2
+0	./proc/irq/3
+0	./proc/irq/4
+0	./proc/irq/5
+0	./proc/irq/6
+0	./proc/irq/7
+0	./proc/irq/8
+0	./proc/irq/9
+0	./proc/irq/10
+0	./proc/irq/12/ttyS0
+0	./proc/irq/12
+0	./proc/irq/13/101000.rtc
+0	./proc/irq/13
+0	./proc/irq/14/virtio0
+0	./proc/irq/14
+0	./proc/irq
+0	./proc/sys/debug
+0	./proc/sys/dev/scsi
+0	./proc/sys/dev/tty
+0	./proc/sys/dev
+0	./proc/sys/fs/binfmt_misc
+0	./proc/sys/fs/epoll
+0	./proc/sys/fs/fanotify
+0	./proc/sys/fs/inotify
+0	./proc/sys/fs/mqueue
+0	./proc/sys/fs/quota
+0	./proc/sys/fs/verity
+0	./proc/sys/fs
+0	./proc/sys/kernel/keys
+0	./proc/sys/kernel/pty
+0	./proc/sys/kernel/random
+0	./proc/sys/kernel/seccomp
+0	./proc/sys/kernel/usermodehelper
+0	./proc/sys/kernel
+0	./proc/sys/net/core
+0	./proc/sys/net/ipv4/conf/all
+0	./proc/sys/net/ipv4/conf/default
+0	./proc/sys/net/ipv4/conf/lo
+0	./proc/sys/net/ipv4/conf
+0	./proc/sys/net/ipv4/neigh/default
+0	./proc/sys/net/ipv4/neigh/lo
+0	./proc/sys/net/ipv4/neigh
+0	./proc/sys/net/ipv4/route
+0	./proc/sys/net/ipv4
+0	./proc/sys/net/ipv6/conf/all
+0	./proc/sys/net/ipv6/conf/default
+0	./proc/sys/net/ipv6/conf/lo
+0	./proc/sys/net/ipv6/conf
+0	./proc/sys/net/ipv6/icmp
+0	./proc/sys/net/ipv6/neigh/default
+0	./proc/sys/net/ipv6/neigh/lo
+0	./proc/sys/net/ipv6/neigh
+0	./proc/sys/net/ipv6/route
+0	./proc/sys/net/ipv6
+0	./proc/sys/net/mptcp
+0	./proc/sys/net/netfilter/nf_log
+0	./proc/sys/net/netfilter
+0	./proc/sys/net/unix
+0	./proc/sys/net
+0	./proc/sys/user
+0	./proc/sys/vm
+0	./proc/sys
+0	./proc/tty/ldisc
+0	./proc/tty/driver
+0	./proc/tty
+0	./proc/scsi
+0	./proc/driver
+0	./proc/sysvipc
+0	./proc/1/task/1/fd
+0	./proc/1/task/1/fdinfo
+0	./proc/1/task/1/ns
+0	./proc/1/task/1/net/stat
+0	./proc/1/task/1/net/dev_snmp6
+0	./proc/1/task/1/net/netfilter
+0	./proc/1/task/1/net
+0	./proc/1/task/1/attr
+0	./proc/1/task/1
+0	./proc/1/task
+0	./proc/1/fd
+0	./proc/1/map_files
+0	./proc/1/fdinfo
+0	./proc/1/ns
+0	./proc/1/net
+0	./proc/1/attr
+0	./proc/1
+0	./proc/2/task/2/fd
+0	./proc/2/task/2/fdinfo
+0	./proc/2/task/2/ns
+0	./proc/2/task/2/net
+0	./proc/2/task/2/attr
+0	./proc/2/task/2
+0	./proc/2/task
+0	./proc/2/fd
+0	./proc/2/map_files
+0	./proc/2/fdinfo
+0	./proc/2/ns
+0	./proc/2/net
+0	./proc/2/attr
+0	./proc/2
+0	./proc/3/task/3/fd
+0	./proc/3/task/3/fdinfo
+0	./proc/3/task/3/ns
+0	./proc/3/task/3/net
+0	./proc/3/task/3/attr
+0	./proc/3/task/3
+0	./proc/3/task
+0	./proc/3/fd
+0	./proc/3/map_files
+0	./proc/3/fdinfo
+0	./proc/3/ns
+0	./proc/3/net
+0	./proc/3/attr
+0	./proc/3
+0	./proc/4/task/4/fd
+0	./proc/4/task/4/fdinfo
+0	./proc/4/task/4/ns
+0	./proc/4/task/4/net
+0	./proc/4/task/4/attr
+0	./proc/4/task/4
+0	./proc/4/task
+0	./proc/4/fd
+0	./proc/4/map_files
+0	./proc/4/fdinfo
+0	./proc/4/ns
+0	./proc/4/net
+0	./proc/4/attr
+0	./proc/4
+0	./proc/5/task/5/fd
+0	./proc/5/task/5/fdinfo
+0	./proc/5/task/5/ns
+0	./proc/5/task/5/net
+0	./proc/5/task/5/attr
+0	./proc/5/task/5
+0	./proc/5/task
+0	./proc/5/fd
+0	./proc/5/map_files
+0	./proc/5/fdinfo
+0	./proc/5/ns
+0	./proc/5/net
+0	./proc/5/attr
+0	./proc/5
+0	./proc/6/task/6/fd
+0	./proc/6/task/6/fdinfo
+0	./proc/6/task/6/ns
+0	./proc/6/task/6/net
+0	./proc/6/task/6/attr
+0	./proc/6/task/6
+0	./proc/6/task
+0	./proc/6/fd
+0	./proc/6/map_files
+0	./proc/6/fdinfo
+0	./proc/6/ns
+0	./proc/6/net
+0	./proc/6/attr
+0	./proc/6
+0	./proc/7/task/7/fd
+0	./proc/7/task/7/fdinfo
+0	./proc/7/task/7/ns
+0	./proc/7/task/7/net
+0	./proc/7/task/7/attr
+0	./proc/7/task/7
+0	./proc/7/task
+0	./proc/7/fd
+0	./proc/7/map_files
+0	./proc/7/fdinfo
+0	./proc/7/ns
+0	./proc/7/net
+0	./proc/7/attr
+0	./proc/7
+0	./proc/8/task/8/fd
+0	./proc/8/task/8/fdinfo
+0	./proc/8/task/8/ns
+0	./proc/8/task/8/net
+0	./proc/8/task/8/attr
+0	./proc/8/task/8
+0	./proc/8/task
+0	./proc/8/fd
+0	./proc/8/map_files
+0	./proc/8/fdinfo
+0	./proc/8/ns
+0	./proc/8/net
+0	./proc/8/attr
+0	./proc/8
+0	./proc/9/task/9/fd
+0	./proc/9/task/9/fdinfo
+0	./proc/9/task/9/ns
+0	./proc/9/task/9/net
+0	./proc/9/task/9/attr
+0	./proc/9/task/9
+0	./proc/9/task
+0	./proc/9/fd
+0	./proc/9/map_files
+0	./proc/9/fdinfo
+0	./proc/9/ns
+0	./proc/9/net
+0	./proc/9/attr
+0	./proc/9
+0	./proc/10/task/10/fd
+0	./proc/10/task/10/fdinfo
+0	./proc/10/task/10/ns
+0	./proc/10/task/10/net
+0	./proc/10/task/10/attr
+0	./proc/10/task/10
+0	./proc/10/task
+0	./proc/10/fd
+0	./proc/10/map_files
+0	./proc/10/fdinfo
+0	./proc/10/ns
+0	./proc/10/net
+0	./proc/10/attr
+0	./proc/10
+0	./proc/11/task/11/fd
+0	./proc/11/task/11/fdinfo
+0	./proc/11/task/11/ns
+0	./proc/11/task/11/net
+0	./proc/11/task/11/attr
+0	./proc/11/task/11
+0	./proc/11/task
+0	./proc/11/fd
+0	./proc/11/map_files
+0	./proc/11/fdinfo
+0	./proc/11/ns
+0	./proc/11/net
+0	./proc/11/attr
+0	./proc/11
+0	./proc/12/task/12/fd
+0	./proc/12/task/12/fdinfo
+0	./proc/12/task/12/ns
+0	./proc/12/task/12/net
+0	./proc/12/task/12/attr
+0	./proc/12/task/12
+0	./proc/12/task
+0	./proc/12/fd
+0	./proc/12/map_files
+0	./proc/12/fdinfo
+0	./proc/12/ns
+0	./proc/12/net
+0	./proc/12/attr
+0	./proc/12
+0	./proc/13/task/13/fd
+0	./proc/13/task/13/fdinfo
+0	./proc/13/task/13/ns
+0	./proc/13/task/13/net
+0	./proc/13/task/13/attr
+0	./proc/13/task/13
+0	./proc/13/task
+0	./proc/13/fd
+0	./proc/13/map_files
+0	./proc/13/fdinfo
+0	./proc/13/ns
+0	./proc/13/net
+0	./proc/13/attr
+0	./proc/13
+0	./proc/14/task/14/fd
+0	./proc/14/task/14/fdinfo
+0	./proc/14/task/14/ns
+0	./proc/14/task/14/net
+0	./proc/14/task/14/attr
+0	./proc/14/task/14
+0	./proc/14/task
+0	./proc/14/fd
+0	./proc/14/map_files
+0	./proc/14/fdinfo
+0	./proc/14/ns
+0	./proc/14/net
+0	./proc/14/attr
+0	./proc/14
+0	./proc/15/task/15/fd
+0	./proc/15/task/15/fdinfo
+0	./proc/15/task/15/ns
+0	./proc/15/task/15/net
+0	./proc/15/task/15/attr
+0	./proc/15/task/15
+0	./proc/15/task
+0	./proc/15/fd
+0	./proc/15/map_files
+0	./proc/15/fdinfo
+0	./proc/15/ns
+0	./proc/15/net
+0	./proc/15/attr
+0	./proc/15
+0	./proc/16/task/16/fd
+0	./proc/16/task/16/fdinfo
+0	./proc/16/task/16/ns
+0	./proc/16/task/16/net
+0	./proc/16/task/16/attr
+0	./proc/16/task/16
+0	./proc/16/task
+0	./proc/16/fd
+0	./proc/16/map_files
+0	./proc/16/fdinfo
+0	./proc/16/ns
+0	./proc/16/net
+0	./proc/16/attr
+0	./proc/16
+0	./proc/17/task/17/fd
+0	./proc/17/task/17/fdinfo
+0	./proc/17/task/17/ns
+0	./proc/17/task/17/net
+0	./proc/17/task/17/attr
+0	./proc/17/task/17
+0	./proc/17/task
+0	./proc/17/fd
+0	./proc/17/map_files
+0	./proc/17/fdinfo
+0	./proc/17/ns
+0	./proc/17/net
+0	./proc/17/attr
+0	./proc/17
+0	./proc/18/task/18/fd
+0	./proc/18/task/18/fdinfo
+0	./proc/18/task/18/ns
+0	./proc/18/task/18/net
+0	./proc/18/task/18/attr
+0	./proc/18/task/18
+0	./proc/18/task
+0	./proc/18/fd
+0	./proc/18/map_files
+0	./proc/18/fdinfo
+0	./proc/18/ns
+0	./proc/18/net
+0	./proc/18/attr
+0	./proc/18
+0	./proc/19/task/19/fd
+0	./proc/19/task/19/fdinfo
+0	./proc/19/task/19/ns
+0	./proc/19/task/19/net
+0	./proc/19/task/19/attr
+0	./proc/19/task/19
+0	./proc/19/task
+0	./proc/19/fd
+0	./proc/19/map_files
+0	./proc/19/fdinfo
+0	./proc/19/ns
+0	./proc/19/net
+0	./proc/19/attr
+0	./proc/19
+0	./proc/20/task/20/fd
+0	./proc/20/task/20/fdinfo
+0	./proc/20/task/20/ns
+0	./proc/20/task/20/net
+0	./proc/20/task/20/attr
+0	./proc/20/task/20
+0	./proc/20/task
+0	./proc/20/fd
+0	./proc/20/map_files
+0	./proc/20/fdinfo
+0	./proc/20/ns
+0	./proc/20/net
+0	./proc/20/attr
+0	./proc/20
+0	./proc/21/task/21/fd
+0	./proc/21/task/21/fdinfo
+0	./proc/21/task/21/ns
+0	./proc/21/task/21/net
+0	./proc/21/task/21/attr
+0	./proc/21/task/21
+0	./proc/21/task
+0	./proc/21/fd
+0	./proc/21/map_files
+0	./proc/21/fdinfo
+0	./proc/21/ns
+0	./proc/21/net
+0	./proc/21/attr
+0	./proc/21
+0	./proc/22/task/22/fd
+0	./proc/22/task/22/fdinfo
+0	./proc/22/task/22/ns
+0	./proc/22/task/22/net
+0	./proc/22/task/22/attr
+0	./proc/22/task/22
+0	./proc/22/task
+0	./proc/22/fd
+0	./proc/22/map_files
+0	./proc/22/fdinfo
+0	./proc/22/ns
+0	./proc/22/net
+0	./proc/22/attr
+0	./proc/22
+0	./proc/23/task/23/fd
+0	./proc/23/task/23/fdinfo
+0	./proc/23/task/23/ns
+0	./proc/23/task/23/net
+0	./proc/23/task/23/attr
+0	./proc/23/task/23
+0	./proc/23/task
+0	./proc/23/fd
+0	./proc/23/map_files
+0	./proc/23/fdinfo
+0	./proc/23/ns
+0	./proc/23/net
+0	./proc/23/attr
+0	./proc/23
+0	./proc/24/task/24/fd
+0	./proc/24/task/24/fdinfo
+0	./proc/24/task/24/ns
+0	./proc/24/task/24/net
+0	./proc/24/task/24/attr
+0	./proc/24/task/24
+0	./proc/24/task
+0	./proc/24/fd
+0	./proc/24/map_files
+0	./proc/24/fdinfo
+0	./proc/24/ns
+0	./proc/24/net
+0	./proc/24/attr
+0	./proc/24
+0	./proc/25/task/25/fd
+0	./proc/25/task/25/fdinfo
+0	./proc/25/task/25/ns
+0	./proc/25/task/25/net
+0	./proc/25/task/25/attr
+0	./proc/25/task/25
+0	./proc/25/task
+0	./proc/25/fd
+0	./proc/25/map_files
+0	./proc/25/fdinfo
+0	./proc/25/ns
+0	./proc/25/net
+0	./proc/25/attr
+0	./proc/25
+0	./proc/26/task/26/fd
+0	./proc/26/task/26/fdinfo
+0	./proc/26/task/26/ns
+0	./proc/26/task/26/net
+0	./proc/26/task/26/attr
+0	./proc/26/task/26
+0	./proc/26/task
+0	./proc/26/fd
+0	./proc/26/map_files
+0	./proc/26/fdinfo
+0	./proc/26/ns
+0	./proc/26/net
+0	./proc/26/attr
+0	./proc/26
+0	./proc/27/task/27/fd
+0	./proc/27/task/27/fdinfo
+0	./proc/27/task/27/ns
+0	./proc/27/task/27/net
+0	./proc/27/task/27/attr
+0	./proc/27/task/27
+0	./proc/27/task
+0	./proc/27/fd
+0	./proc/27/map_files
+0	./proc/27/fdinfo
+0	./proc/27/ns
+0	./proc/27/net
+0	./proc/27/attr
+0	./proc/27
+0	./proc/28/task/28/fd
+0	./proc/28/task/28/fdinfo
+0	./proc/28/task/28/ns
+0	./proc/28/task/28/net
+0	./proc/28/task/28/attr
+0	./proc/28/task/28
+0	./proc/28/task
+0	./proc/28/fd
+0	./proc/28/map_files
+0	./proc/28/fdinfo
+0	./proc/28/ns
+0	./proc/28/net
+0	./proc/28/attr
+0	./proc/28
+0	./proc/29/task/29/fd
+0	./proc/29/task/29/fdinfo
+0	./proc/29/task/29/ns
+0	./proc/29/task/29/net
+0	./proc/29/task/29/attr
+0	./proc/29/task/29
+0	./proc/29/task
+0	./proc/29/fd
+0	./proc/29/map_files
+0	./proc/29/fdinfo
+0	./proc/29/ns
+0	./proc/29/net
+0	./proc/29/attr
+0	./proc/29
+0	./proc/30/task/30/fd
+0	./proc/30/task/30/fdinfo
+0	./proc/30/task/30/ns
+0	./proc/30/task/30/net
+0	./proc/30/task/30/attr
+0	./proc/30/task/30
+0	./proc/30/task
+0	./proc/30/fd
+0	./proc/30/map_files
+0	./proc/30/fdinfo
+0	./proc/30/ns
+0	./proc/30/net
+0	./proc/30/attr
+0	./proc/30
+0	./proc/31/task/31/fd
+0	./proc/31/task/31/fdinfo
+0	./proc/31/task/31/ns
+0	./proc/31/task/31/net
+0	./proc/31/task/31/attr
+0	./proc/31/task/31
+0	./proc/31/task
+0	./proc/31/fd
+0	./proc/31/map_files
+0	./proc/31/fdinfo
+0	./proc/31/ns
+0	./proc/31/net
+0	./proc/31/attr
+0	./proc/31
+0	./proc/32/task/32/fd
+0	./proc/32/task/32/fdinfo
+0	./proc/32/task/32/ns
+0	./proc/32/task/32/net
+0	./proc/32/task/32/attr
+0	./proc/32/task/32
+0	./proc/32/task
+0	./proc/32/fd
+0	./proc/32/map_files
+0	./proc/32/fdinfo
+0	./proc/32/ns
+0	./proc/32/net
+0	./proc/32/attr
+0	./proc/32
+0	./proc/33/task/33/fd
+0	./proc/33/task/33/fdinfo
+0	./proc/33/task/33/ns
+0	./proc/33/task/33/net
+0	./proc/33/task/33/attr
+0	./proc/33/task/33
+0	./proc/33/task
+0	./proc/33/fd
+0	./proc/33/map_files
+0	./proc/33/fdinfo
+0	./proc/33/ns
+0	./proc/33/net
+0	./proc/33/attr
+0	./proc/33
+0	./proc/34/task/34/fd
+0	./proc/34/task/34/fdinfo
+0	./proc/34/task/34/ns
+0	./proc/34/task/34/net
+0	./proc/34/task/34/attr
+0	./proc/34/task/34
+0	./proc/34/task
+0	./proc/34/fd
+0	./proc/34/map_files
+0	./proc/34/fdinfo
+0	./proc/34/ns
+0	./proc/34/net
+0	./proc/34/attr
+0	./proc/34
+0	./proc/35/task/35/fd
+0	./proc/35/task/35/fdinfo
+0	./proc/35/task/35/ns
+0	./proc/35/task/35/net
+0	./proc/35/task/35/attr
+0	./proc/35/task/35
+0	./proc/35/task
+0	./proc/35/fd
+0	./proc/35/map_files
+0	./proc/35/fdinfo
+0	./proc/35/ns
+0	./proc/35/net
+0	./proc/35/attr
+0	./proc/35
+0	./proc/36/task/36/fd
+0	./proc/36/task/36/fdinfo
+0	./proc/36/task/36/ns
+0	./proc/36/task/36/net
+0	./proc/36/task/36/attr
+0	./proc/36/task/36
+0	./proc/36/task
+0	./proc/36/fd
+0	./proc/36/map_files
+0	./proc/36/fdinfo
+0	./proc/36/ns
+0	./proc/36/net
+0	./proc/36/attr
+0	./proc/36
+0	./proc/45/task/45/fd
+0	./proc/45/task/45/fdinfo
+0	./proc/45/task/45/ns
+0	./proc/45/task/45/net
+0	./proc/45/task/45/attr
+0	./proc/45/task/45
+0	./proc/45/task
+0	./proc/45/fd
+0	./proc/45/map_files
+0	./proc/45/fdinfo
+0	./proc/45/ns
+0	./proc/45/net
+0	./proc/45/attr
+0	./proc/45
+0	./proc/47/task/47/fd
+0	./proc/47/task/47/fdinfo
+0	./proc/47/task/47/ns
+0	./proc/47/task/47/net
+0	./proc/47/task/47/attr
+0	./proc/47/task/47
+0	./proc/47/task
+0	./proc/47/fd
+0	./proc/47/map_files
+0	./proc/47/fdinfo
+0	./proc/47/ns
+0	./proc/47/net
+0	./proc/47/attr
+0	./proc/47
+0	./proc/148/task/148/fd
+0	./proc/148/task/148/fdinfo
+0	./proc/148/task/148/ns
+0	./proc/148/task/148/net
+0	./proc/148/task/148/attr
+0	./proc/148/task/148
+0	./proc/148/task
+0	./proc/148/fd
+0	./proc/148/map_files
+0	./proc/148/fdinfo
+0	./proc/148/ns
+0	./proc/148/net
+0	./proc/148/attr
+0	./proc/148
+0	./proc/150/task/150/fd
+0	./proc/150/task/150/fdinfo
+0	./proc/150/task/150/ns
+0	./proc/150/task/150/net
+0	./proc/150/task/150/attr
+0	./proc/150/task/150
+0	./proc/150/task
+0	./proc/150/fd
+0	./proc/150/map_files
+0	./proc/150/fdinfo
+0	./proc/150/ns
+0	./proc/150/net
+0	./proc/150/attr
+0	./proc/150
+0	./proc/152/task/152/fd
+0	./proc/152/task/152/fdinfo
+0	./proc/152/task/152/ns
+0	./proc/152/task/152/net
+0	./proc/152/task/152/attr
+0	./proc/152/task/152
+0	./proc/152/task
+0	./proc/152/fd
+0	./proc/152/map_files
+0	./proc/152/fdinfo
+0	./proc/152/ns
+0	./proc/152/net
+0	./proc/152/attr
+0	./proc/152
+0	./proc/165/task/165/fd
+0	./proc/165/task/165/fdinfo
+0	./proc/165/task/165/ns
+0	./proc/165/task/165/net
+0	./proc/165/task/165/attr
+0	./proc/165/task/165
+0	./proc/165/task
+0	./proc/165/fd
+0	./proc/165/map_files
+0	./proc/165/fdinfo
+0	./proc/165/ns
+0	./proc/165/net
+0	./proc/165/attr
+0	./proc/165
+0	./proc/178/task/178/fd
+0	./proc/178/task/178/fdinfo
+0	./proc/178/task/178/ns
+0	./proc/178/task/178/net
+0	./proc/178/task/178/attr
+0	./proc/178/task/178
+0	./proc/178/task
+0	./proc/178/fd
+0	./proc/178/map_files
+0	./proc/178/fdinfo
+0	./proc/178/ns
+0	./proc/178/net
+0	./proc/178/attr
+0	./proc/178
+0	./proc/210/task/210/fd
+0	./proc/210/task/210/fdinfo
+0	./proc/210/task/210/ns
+0	./proc/210/task/210/net
+0	./proc/210/task/210/attr
+0	./proc/210/task/210
+0	./proc/210/task
+0	./proc/210/fd
+0	./proc/210/map_files
+0	./proc/210/fdinfo
+0	./proc/210/ns
+0	./proc/210/net
+0	./proc/210/attr
+0	./proc/210
+0	./proc/211/task/211/fd
+0	./proc/211/task/211/fdinfo
+0	./proc/211/task/211/ns
+0	./proc/211/task/211/net
+0	./proc/211/task/211/attr
+0	./proc/211/task/211
+0	./proc/211/task
+0	./proc/211/fd
+0	./proc/211/map_files
+0	./proc/211/fdinfo
+0	./proc/211/ns
+0	./proc/211/net
+0	./proc/211/attr
+0	./proc/211
+0	./proc/212/task/212/fd
+0	./proc/212/task/212/fdinfo
+0	./proc/212/task/212/ns
+0	./proc/212/task/212/net
+0	./proc/212/task/212/attr
+0	./proc/212/task/212
+0	./proc/212/task
+0	./proc/212/fd
+0	./proc/212/map_files
+0	./proc/212/fdinfo
+0	./proc/212/ns
+0	./proc/212/net
+0	./proc/212/attr
+0	./proc/212
+0	./proc/405/task/405/fd
+0	./proc/405/task/405/fdinfo
+0	./proc/405/task/405/ns
+0	./proc/405/task/405/net
+0	./proc/405/task/405/attr
+0	./proc/405/task/405
+0	./proc/405/task
+0	./proc/405/fd
+0	./proc/405/map_files
+0	./proc/405/fdinfo
+0	./proc/405/ns
+0	./proc/405/net
+0	./proc/405/attr
+0	./proc/405
+0	./proc/437/task/437/fd
+0	./proc/437/task/437/fdinfo
+0	./proc/437/task/437/ns
+0	./proc/437/task/437/net
+0	./proc/437/task/437/attr
+0	./proc/437/task/437
+0	./proc/437/task
+0	./proc/437/fd
+0	./proc/437/map_files
+0	./proc/437/fdinfo
+0	./proc/437/ns
+0	./proc/437/net
+0	./proc/437/attr
+0	./proc/437
+0	./proc/438/task/438/fd
+0	./proc/438/task/438/fdinfo
+0	./proc/438/task/438/ns
+0	./proc/438/task/438/net
+0	./proc/438/task/438/attr
+0	./proc/438/task/438
+0	./proc/438/task
+0	./proc/438/fd
+0	./proc/438/map_files
+0	./proc/438/fdinfo
+0	./proc/438/ns
+0	./proc/438/net
+0	./proc/438/attr
+0	./proc/438
+du: ./proc/439: No such file or directory
+0	./proc/524/task/524/fd
+0	./proc/524/task/524/fdinfo
+0	./proc/524/task/524/ns
+0	./proc/524/task/524/net
+0	./proc/524/task/524/attr
+0	./proc/524/task/524
+0	./proc/524/task
+0	./proc/524/fd
+0	./proc/524/map_files
+0	./proc/524/fdinfo
+0	./proc/524/ns
+0	./proc/524/net
+0	./proc/524/attr
+0	./proc/524
+0	./proc/527/task/527/fd
+0	./proc/527/task/527/fdinfo
+0	./proc/527/task/527/ns
+0	./proc/527/task/527/net
+0	./proc/527/task/527/attr
+0	./proc/527/task/527
+0	./proc/527/task
+0	./proc/527/fd
+0	./proc/527/map_files
+0	./proc/527/fdinfo
+0	./proc/527/ns
+0	./proc/527/net
+0	./proc/527/attr
+0	./proc/527
+0	./proc/538/task/538/fd
+0	./proc/538/task/538/fdinfo
+0	./proc/538/task/538/ns
+0	./proc/538/task/538/net
+0	./proc/538/task/538/attr
+0	./proc/538/task/538
+0	./proc/538/task
+0	./proc/538/fd
+0	./proc/538/map_files
+0	./proc/538/fdinfo
+0	./proc/538/ns
+0	./proc/538/net
+0	./proc/538/attr
+0	./proc/538
+0	./proc
+1638556	.
+testcase busybox du fail
+2
+testcase busybox expr 1 + 1 success
+testcase busybox false success
+testcase busybox true success
+/bin/ls
+testcase busybox which ls success
+Linux
+testcase busybox uname success
+ 14:38:26 up 0 min,  0 users,  load average: 0.00, 0.00, 0.00
+testcase busybox uptime success
+abcntestcase busybox printf "abcn" success
+PID   USER     TIME  COMMAND
+    1 0         0:00 {init} /busybox sh /init
+    2 0         0:00 [kthreadd]
+    3 0         0:00 [pool_workqueue_]
+    4 0         0:00 [kworker/R-rcu_g]
+    5 0         0:00 [kworker/R-sync_]
+    6 0         0:00 [kworker/R-kvfre]
+    7 0         0:00 [kworker/R-slub_]
+    8 0         0:00 [kworker/R-netns]
+    9 0         0:00 [kworker/0:0-eve]
+   10 0         0:00 [kworker/0:1-eve]
+   11 0         0:00 [kworker/0:0H-ev]
+   12 0         0:00 [kworker/u4:0-ev]
+   13 0         0:00 [kworker/R-mm_pe]
+   14 0         0:00 [ksoftirqd/0]
+   15 0         0:00 [rcu_preempt]
+   16 0         0:00 [rcu_exp_par_gp_]
+   17 0         0:00 [rcu_exp_gp_kthr]
+   18 0         0:00 [migration/0]
+   19 0         0:00 [cpuhp/0]
+   20 0         0:00 [kdevtmpfs]
+   21 0         0:00 [kworker/R-inet_]
+   22 0         0:00 [rcu_tasks_kthre]
+   23 0         0:00 [rcu_tasks_trace]
+   24 0         0:00 [oom_reaper]
+   25 0         0:00 [kworker/R-write]
+   26 0         0:00 [kcompactd0]
+   27 0         0:00 [ksmd]
+   28 0         0:00 [khugepaged]
+   29 0         0:00 [kworker/R-kbloc]
+   30 0         0:00 [kworker/R-blkcg]
+   31 0         0:00 [kworker/R-kinte]
+   32 0         0:00 [kworker/R-devfr]
+   33 0         0:00 [kworker/R-quota]
+   34 0         0:00 [kworker/0:1H-kb]
+   35 0         0:00 [kworker/u4:1-ev]
+   36 0         0:00 [kworker/u4:2-ev]
+   45 0         0:00 [kswapd0]
+   47 0         0:00 [kworker/R-kthro]
+  148 0         0:00 [kworker/R-nvme-]
+  150 0         0:00 [kworker/R-nvme-]
+  152 0         0:00 [kworker/R-nvme-]
+  165 0         0:00 [kworker/R-uas]
+  178 0         0:00 [kworker/u4:3-ev]
+  210 0         0:00 [kworker/R-mld]
+  211 0         0:00 [kworker/R-ipv6_]
+  212 0         0:00 [kworker/R-kstrp]
+  405 0         0:00 [kworker/u5:0]
+  437 0         0:00 [jbd2/vda-8]
+  438 0         0:00 [kworker/R-ext4-]
+  524 0         0:00 /busybox sh /busybox_testcode.sh
+  527 0         0:00 /busybox sh /busybox_testcode.sh
+  546 0         0:00 ./busybox ps
+testcase busybox ps success
+/
+testcase busybox pwd success
+              total        used        free      shared  buff/cache   available
+Mem:         992448       15376      956380        2704       20692      931584
+Swap:             0           0           0
+testcase busybox free success
+Sun Nov  8 14:38:26 2026  0.000000 seconds
+testcase busybox hwclock success
+testcase busybox sh -c 'sleep 5' & ./busybox kill $! success
+[1;32marithoh[m                 [1;32miozone_testcode.sh[m      [1;34mltp[m
+[1;34mbasic[m                   [1;32miperf3[m                  [1;32mltp_testcode.sh[m
+[1;32mbasic_testcode.sh[m       [1;32miperf_testcode.sh[m       [1;32mlua[m
+[1;34mbin[m                     [1;32mlat_cmd[m                 [1;32mlua_testcode.sh[m
+[1;32mbusy[m                    [1;32mlat_connect[m             [1;32mmax_min.lua[m
+[1;32mbusybox[m                 [1;32mlat_ctx[m                 [1;32mmemsize[m
+[0;0mbusybox_cmd.txt[m         [1;32mlat_dram_page[m           [1;32mmhz[m
+[1;32mbusybox_testcode.sh[m     [1;32mlat_fcntl[m               [1;32mmsleep[m
+[1;32mbw_file_rd[m              [1;32mlat_fifo[m                [0;0mmulti.sh[m
+[1;32mbw_mem[m                  [1;32mlat_fs[m                  [1;32mnetperf[m
+[1;32mbw_mmap_rd[m              [1;32mlat_http[m                [1;32mnetperf_testcode.sh[m
+[1;32mbw_pipe[m                 [1;32mlat_mem_rd[m              [1;32mnetserver[m
+[1;32mbw_tcp[m                  [1;32mlat_mmap[m                [1;32mpar_mem[m
+[1;32mbw_unix[m                 [1;32mlat_ops[m                 [1;32mpar_ops[m
+[1;32mcache[m                   [1;32mlat_pagefault[m           [1;32mpipe[m
+[1;32mclock[m                   [1;32mlat_pipe[m                [1;34mproc[m
+[1;32mcontext1[m                [1;32mlat_pmake[m               [1;32mrandom.lua[m
+[1;32mcyclictest[m              [1;32mlat_proc[m                [1;32mregister[m
+[1;32mcyclictest_testcode.sh[m  [1;32mlat_rand[m                [1;32mremove.lua[m
+[1;32mdate.lua[m                [1;32mlat_rpc[m                 [1;32mrhttp[m
+[1;34mdev[m                     [1;32mlat_select[m              [1;32mround_num.lua[m
+[1;32mdhry2[m                   [1;32mlat_sem[m                 [1;32mrun-dynamic.sh[m
+[1;32mdhry2reg[m                [1;32mlat_sig[m                 [1;32mrun-static.sh[m
+[1;32mdisk[m                    [1;32mlat_syscall[m             [1;32mruntest.exe[m
+[1;32mdlopen_dso.so[m           [1;32mlat_tcp[m                 [1;32mseek[m
+[1;32mdouble[m                  [1;32mlat_udp[m                 [1;32mshort[m
+[1;32menough[m                  [1;32mlat_unix[m                [1;32msin30.lua[m
+[1;32mentry-dynamic.exe[m       [1;32mlat_unix_connect[m        [1;32msort.lua[m
+[1;32mentry-static.exe[m        [1;32mlat_usleep[m              [1;32mspawn[m
+[1;32mexecl[m                   [1;34mlib[m                     [1;32mstream[m
+[1;32mfile_io.lua[m             [1;32mlibc-bench[m              [1;32mstrings.lua[m
+[1;32mfloat[m                   [1;32mlibcbench_testcode.sh[m   [1;32msyscall[m
+[1;32mflushdisk[m               [1;32mlibctest_testcode.sh[m    [1;32mtest.sh[m
+[1;32mfstime[m                  [1;32mline[m                    [1;32mtiming_o[m
+[1;32mgetopt[m                  [1;32mlmbench[m                 [1;32mtlb[m
+[0;0mgfx-x11[m                 [1;32mlmbench_all[m             [1;32mtls_get_new-dtv_dso.so[m
+[1;32mhackbench[m               [1;32mlmbench_testcode.sh[m     [1;34mtmp[m
+[1;32mhanoi[m                   [1;32mlmdd[m                    [0;0mtst.sh[m
+[1;32mhello[m                   [1;32mlmhttp[m                  [0;0munixbench.logo[m
+[0;0mindex.base[m              [1;32mlong[m                    [1;32munixbench_testcode.sh[m
+[1;32mint[m                     [1;32mloop_o[m                  [1;32mwhetstone-double[m
+[1;32miozone[m                  [1;32mlooper[m
+testcase busybox ls success
+testcase busybox sleep 1 success
+#### file opration test
+testcase busybox echo "#### file opration test" success
+testcase busybox touch test.txt success
+testcase busybox echo "hello world" > test.txt success
+hello world
+testcase busybox cat test.txt success
+l
+testcase busybox cut -c 3 test.txt success
+0000000 062550 066154 020157 067567 066162 005144
+0000014
+testcase busybox od test.txt success
+hello world
+testcase busybox head test.txt success
+hello world
+testcase busybox tail test.txt success
+00000000  68 65 6c 6c 6f 20 77 6f  72 6c 64 0a              |hello world.|
+0000000c
+testcase busybox hexdump -C test.txt success
+6f5902ac237024bdd0c176cb93063dc4  test.txt
+testcase busybox md5sum test.txt success
+testcase busybox echo "ccccccc" >> test.txt success
+testcase busybox echo "bbbbbbb" >> test.txt success
+testcase busybox echo "aaaaaaa" >> test.txt success
+testcase busybox echo "2222222" >> test.txt success
+testcase busybox echo "1111111" >> test.txt success
+testcase busybox echo "bbbbbbb" >> test.txt success
+1111111
+2222222
+aaaaaaa
+bbbbbbb
+ccccccc
+hello world
+testcase busybox sort test.txt | ./busybox uniq success
+  File: test.txt
+  Size: 60        	Blocks: 8          IO Block: 4096   regular file
+Device: fe00h/65024d	Inode: 134310      Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/ UNKNOWN)   Gid: (    0/ UNKNOWN)
+Access: 2026-11-08 14:38:27.335000000 +0000
+Modify: 2026-11-08 14:38:27.329000000 +0000
+Change: 2026-11-08 14:38:27.329000000 +0000
+testcase busybox stat test.txt success
+hello world
+ccccccc
+bbbbbbb
+aaaaaaa
+2222222
+1111111
+bbbbbbb
+testcase busybox strings test.txt success
+        7         8        60 test.txt
+testcase busybox wc test.txt success
+testcase busybox [ -f test.txt ] success
+hello world
+ccccccc
+bbbbbbb
+aaaaaaa
+2222222
+1111111
+bbbbbbb
+testcase busybox more test.txt success
+testcase busybox rm test.txt success
+testcase busybox mkdir test_dir success
+testcase busybox mv test_dir test success
+testcase busybox rmdir test success
+echo "hello world" > test.txt
+grep hello busybox_cmd.txt
+testcase busybox grep hello busybox_cmd.txt success
+testcase busybox cp busybox_cmd.txt busybox_cmd.bak success
+testcase busybox rm busybox_cmd.bak success
+./busybox_cmd.txt
+testcase busybox find -name "busybox_cmd.txt" success
+#### OS COMP TEST GROUP END busybox-glibc ####
+REF_DONE_glibc
+REF_RUN_musl
+#### OS COMP TEST GROUP START basic-musl ####
+Testing brk :
+./run-all.sh: line 40: ./brk: not found
+Testing chdir :
+./run-all.sh: line 40: ./chdir: not found
+Testing clone :
+./run-all.sh: line 40: ./clone: not found
+Testing close :
+./run-all.sh: line 40: ./close: not found
+Testing dup2 :
+./run-all.sh: line 40: ./dup2: not found
+Testing dup :
+./run-all.sh: line 40: ./dup: not found
+Testing execve :
+./run-all.sh: line 40: ./execve: not found
+Testing exit :
+./run-all.sh: line 40: ./exit: not found
+Testing fork :
+./run-all.sh: line 40: ./fork: not found
+Testing fstat :
+./run-all.sh: line 40: ./fstat: not found
+Testing getcwd :
+./run-all.sh: line 40: ./getcwd: not found
+Testing getdents :
+./run-all.sh: line 40: ./getdents: not found
+Testing getpid :
+./run-all.sh: line 40: ./getpid: not found
+Testing getppid :
+./run-all.sh: line 40: ./getppid: not found
+Testing gettimeofday :
+./run-all.sh: line 40: ./gettimeofday: not found
+Testing mkdir_ :
+./run-all.sh: line 40: ./mkdir_: not found
+Testing mmap :
+./run-all.sh: line 40: ./mmap: not found
+Testing mount :
+./run-all.sh: line 40: ./mount: not found
+Testing munmap :
+./run-all.sh: line 40: ./munmap: not found
+Testing openat :
+./run-all.sh: line 40: ./openat: not found
+Testing open :
+./run-all.sh: line 40: ./open: not found
+Testing pipe :
+./run-all.sh: line 40: ./pipe: not found
+Testing read :
+./run-all.sh: line 40: ./read: not found
+Testing sleep :
+./run-all.sh: line 40: ./sleep: not found
+Testing times :
+./run-all.sh: line 40: ./times: not found
+Testing umount :
+./run-all.sh: line 40: ./umount: not found
+Testing uname :
+./run-all.sh: line 40: ./uname: not found
+Testing unlink :
+./run-all.sh: line 40: ./unlink: not found
+Testing wait :
+./run-all.sh: line 40: ./wait: not found
+Testing waitpid :
+./run-all.sh: line 40: ./waitpid: not found
+Testing write :
+./run-all.sh: line 40: ./write: not found
+Testing yield :
+./run-all.sh: line 40: ./yield: not found
+#### OS COMP TEST GROUP END basic-musl ####
+#### OS COMP TEST GROUP START lua-musl ####
+testcase lua date.lua success
+testcase lua file_io.lua success
+testcase lua max_min.lua success
+testcase lua random.lua success
+testcase lua remove.lua success
+testcase lua round_num.lua success
+testcase lua sin30.lua success
+testcase lua sort.lua success
+testcase lua strings.lua success
+#### OS COMP TEST GROUP END lua-musl ####
+#### OS COMP TEST GROUP START busybox-musl ####
+#### independent command test
+testcase busybox echo "#### independent command test" success
+testcase busybox ash -c exit success
+testcase busybox sh -c exit success
+bbb
+testcase busybox basename /aaa/bbb success
+   November 2026
+Su Mo Tu We Th Fr Sa
+ 1  2  3  4  5  6  7
+ 8  9 10 11 12 13 14
+15 16 17 18 19 20 21
+22 23 24 25 26 27 28
+29 30
+                     
+testcase busybox cal success
+[H[Jtestcase busybox clear success
+Sun Nov  8 14:38:28 UTC 2026
+testcase busybox date success
+Filesystem           1K-blocks      Used Available Use% Mounted on
+devtmpfs                486272         0    486272   0% /dev
+testcase busybox df success
+/aaa
+testcase busybox dirname /aaa/bbb success
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.60-0-lts (buildozer@build-edge-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10005
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfff10c0-0xbfff2f7f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50904 r8192 d31016 u90112
+[    0.000000] pcpu-alloc: s50904 r8192 d31016 u90112 alloc=22*4096
+[    0.000000] pcpu-alloc: [0] 0 
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bcd00000-0x00000000bce00000] (1MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000041] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000114] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.006736] Console: colour dummy device 80x25
+[    0.008896] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.009002] pid_max: default: 32768 minimum: 301
+[    0.010438] LSM: initializing lsm=capability
+[    0.011955] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.011986] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.040068] riscv: ELF compat mode supported
+[    0.040271] ASID allocator using 16 bits (65536 entries)
+[    0.041033] rcu: Hierarchical SRCU implementation.
+[    0.041058] rcu: 	Max phase no-delay instances is 400.
+[    0.043399] EFI services will not be available.
+[    0.043727] smp: Bringing up secondary CPUs ...
+[    0.044242] smp: Brought up 1 node, 1 CPU
+[    0.050471] Memory: 969144K/1048576K available (9115K kernel code, 5214K rwdata, 4096K rodata, 2311K init, 504K bss, 59644K reserved, 16384K cma-reserved)
+[    0.057514] devtmpfs: initialized
+[    0.066441] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.066671] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.069748] pinctrl core: initialized pinctrl subsystem
+[    0.076390] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.082859] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.083360] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.087309] thermal_sys: Registered thermal governor 'step_wise'
+[    0.087348] thermal_sys: Registered thermal governor 'user_space'
+[    0.087625] cpuidle: using governor menu
+[    0.100590] cpu0: Ratio of byte access time to unaligned word access is 7.50, unaligned accesses are fast
+[    0.116233] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.116266] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.116279] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.116282] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.121740] iommu: Default domain type: Translated
+[    0.121770] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.122572] SCSI subsystem initialized
+[    0.123538] usbcore: registered new interface driver usbfs
+[    0.123793] usbcore: registered new interface driver hub
+[    0.123961] usbcore: registered new device driver usb
+[    0.124340] pps_core: LinuxPPS API ver. 1 registered
+[    0.124350] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.134694] vgaarb: loaded
+[    0.135737] clocksource: Switched to clocksource riscv_clocksource
+[    0.138250] VFS: Disk quotas dquot_6.6.0
+[    0.138351] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.153318] NET: Registered PF_INET protocol family
+[    0.154173] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.158862] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.158917] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.158969] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.159661] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.159850] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.161040] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.161268] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.161430] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.162772] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.163222] PCI: CLS 0 bytes, default 64
+[    0.167574] Initialise system trusted keyrings
+[    0.171664] Unpacking initramfs...
+[    0.172889] workingset: timestamp_bits=44 max_order=18 bucket_order=0
+[    0.243244] Freeing initrd memory: 1208K
+[    0.259640] NET: Registered PF_ALG protocol family
+[    0.259917] Key type asymmetric registered
+[    0.259972] Asymmetric key parser 'x509' registered
+[    0.260622] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.264225] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.267889] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.268616] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.270697] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.270985] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.271408] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.271711] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.273389] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.273556] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.273602] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.273630] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.273635] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.274622] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.278434] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.278467] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.278473] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.286247] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.299829] printk: legacy console [ttyS0] disabled
+[    0.304068] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.305494] printk: legacy console [ttyS0] enabled
+[    0.371797] usbcore: registered new interface driver uas
+[    0.372429] usbcore: registered new interface driver usb-storage
+[    0.376541] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.377259] goldfish_rtc 101000.rtc: setting system clock to 2026-11-08T14:38:23 UTC (1794148703)
+[    0.378776] i2c_dev: i2c /dev entries driver
+[    0.383747] riscv-pmu-sbi: SBI PMU extension is available
+[    0.384690] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.385146] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.388934] NET: Registered PF_INET6 protocol family
+[    0.394903] Segment Routing with IPv6
+[    0.395426] In-situ OAM (IOAM) with IPv6
+[    0.425999] registered taskstats version 1
+[    0.428754] Loading compiled-in X.509 certificates
+[    0.440285] Loaded X.509 cert 'alpinelinux.org: Build time autogenerated kernel key: 349db16f407a8214eee0c67a7bd6e906f71d99d1'
+[    0.451262] Demotion targets for Node 0: null
+[    0.452342] Key type .fscrypt registered
+[    0.452663] Key type fscrypt-provisioning registered
+[    0.455737] clk: Disabling unused clocks
+[    0.456115] PM: genpd: Disabling unused power domains
+[    0.492602] Freeing unused kernel image (initmem) memory: 2308K
+[    0.493676] Run /init as init process
+[    0.493905]   with arguments:
+[    0.493920]     /init
+[    0.493935]   with environment:
+[    0.493946]     HOME=/
+[    0.493958]     TERM=linux
+[    0.578629] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.584709] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+[    0.682628] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+testcase busybox dmesg success
+4	./bin
+4	./basic/mnt
+1956	./basic
+4	./tmp
+200	./ltp/bin
+528	./ltp/metadata
+208	./ltp/libkirk
+2652	./ltp/testcases/bin/datafiles
+76	./ltp/testcases/bin/ftrace_stress
+1453044	./ltp/testcases/bin
+12	./ltp/testcases/data/unzip01
+12	./ltp/testcases/data/ima_keys
+12	./ltp/testcases/data/binfmt_misc02
+60	./ltp/testcases/data/nm01
+76	./ltp/testcases/data/ldd01
+8	./ltp/testcases/data/ima_selinux
+96	./ltp/testcases/data/file01
+12	./ltp/testcases/data/mc_member
+24	./ltp/testcases/data/ld01
+24	./ltp/testcases/data/ar01
+12	./ltp/testcases/data/ima_policy
+12	./ltp/testcases/data/lvm
+8	./ltp/testcases/data/ima_kexec
+372	./ltp/testcases/data
+1453420	./ltp/testcases
+392	./ltp/runtest
+40	./ltp/testscripts
+12	./ltp/scenario_groups
+1454984	./ltp
+0	./dev/dma_heap
+0	./dev
+952	./lib
+0	./proc/fs/ext4/vda
+0	./proc/fs/ext4
+0	./proc/fs/f2fs
+0	./proc/fs/jbd2/vda-8
+0	./proc/fs/jbd2
+0	./proc/fs/nfsd
+0	./proc/fs
+0	./proc/bus/pci/0000:00
+0	./proc/bus/pci
+0	./proc/bus/input
+0	./proc/bus
+0	./proc/irq/1
+0	./proc/irq/2
+0	./proc/irq/3
+0	./proc/irq/4
+0	./proc/irq/5
+0	./proc/irq/6
+0	./proc/irq/7
+0	./proc/irq/8
+0	./proc/irq/9
+0	./proc/irq/10
+0	./proc/irq/12/ttyS0
+0	./proc/irq/12
+0	./proc/irq/13/101000.rtc
+0	./proc/irq/13
+0	./proc/irq/14/virtio0
+0	./proc/irq/14
+0	./proc/irq
+0	./proc/sys/debug
+0	./proc/sys/dev/scsi
+0	./proc/sys/dev/tty
+0	./proc/sys/dev
+0	./proc/sys/fs/binfmt_misc
+0	./proc/sys/fs/epoll
+0	./proc/sys/fs/fanotify
+0	./proc/sys/fs/inotify
+0	./proc/sys/fs/mqueue
+0	./proc/sys/fs/quota
+0	./proc/sys/fs/verity
+0	./proc/sys/fs
+0	./proc/sys/kernel/keys
+0	./proc/sys/kernel/pty
+0	./proc/sys/kernel/random
+0	./proc/sys/kernel/seccomp
+0	./proc/sys/kernel/usermodehelper
+0	./proc/sys/kernel
+0	./proc/sys/net/core
+0	./proc/sys/net/ipv4/conf/all
+0	./proc/sys/net/ipv4/conf/default
+0	./proc/sys/net/ipv4/conf/lo
+0	./proc/sys/net/ipv4/conf
+0	./proc/sys/net/ipv4/neigh/default
+0	./proc/sys/net/ipv4/neigh/lo
+0	./proc/sys/net/ipv4/neigh
+0	./proc/sys/net/ipv4/route
+0	./proc/sys/net/ipv4
+0	./proc/sys/net/ipv6/conf/all
+0	./proc/sys/net/ipv6/conf/default
+0	./proc/sys/net/ipv6/conf/lo
+0	./proc/sys/net/ipv6/conf
+0	./proc/sys/net/ipv6/icmp
+0	./proc/sys/net/ipv6/neigh/default
+0	./proc/sys/net/ipv6/neigh/lo
+0	./proc/sys/net/ipv6/neigh
+0	./proc/sys/net/ipv6/route
+0	./proc/sys/net/ipv6
+0	./proc/sys/net/mptcp
+0	./proc/sys/net/netfilter/nf_log
+0	./proc/sys/net/netfilter
+0	./proc/sys/net/unix
+0	./proc/sys/net
+0	./proc/sys/user
+0	./proc/sys/vm
+0	./proc/sys
+0	./proc/tty/ldisc
+0	./proc/tty/driver
+0	./proc/tty
+0	./proc/scsi
+0	./proc/driver
+0	./proc/sysvipc
+0	./proc/1/task/1/fd
+0	./proc/1/task/1/fdinfo
+0	./proc/1/task/1/ns
+0	./proc/1/task/1/net/stat
+0	./proc/1/task/1/net/dev_snmp6
+0	./proc/1/task/1/net/netfilter
+0	./proc/1/task/1/net
+0	./proc/1/task/1/attr
+0	./proc/1/task/1
+0	./proc/1/task
+0	./proc/1/fd
+0	./proc/1/map_files
+0	./proc/1/fdinfo
+0	./proc/1/ns
+0	./proc/1/net
+0	./proc/1/attr
+0	./proc/1
+0	./proc/2/task/2/fd
+0	./proc/2/task/2/fdinfo
+0	./proc/2/task/2/ns
+0	./proc/2/task/2/net
+0	./proc/2/task/2/attr
+0	./proc/2/task/2
+0	./proc/2/task
+0	./proc/2/fd
+0	./proc/2/map_files
+0	./proc/2/fdinfo
+0	./proc/2/ns
+0	./proc/2/net
+0	./proc/2/attr
+0	./proc/2
+0	./proc/3/task/3/fd
+0	./proc/3/task/3/fdinfo
+0	./proc/3/task/3/ns
+0	./proc/3/task/3/net
+0	./proc/3/task/3/attr
+0	./proc/3/task/3
+0	./proc/3/task
+0	./proc/3/fd
+0	./proc/3/map_files
+0	./proc/3/fdinfo
+0	./proc/3/ns
+0	./proc/3/net
+0	./proc/3/attr
+0	./proc/3
+0	./proc/4/task/4/fd
+0	./proc/4/task/4/fdinfo
+0	./proc/4/task/4/ns
+0	./proc/4/task/4/net
+0	./proc/4/task/4/attr
+0	./proc/4/task/4
+0	./proc/4/task
+0	./proc/4/fd
+0	./proc/4/map_files
+0	./proc/4/fdinfo
+0	./proc/4/ns
+0	./proc/4/net
+0	./proc/4/attr
+0	./proc/4
+0	./proc/5/task/5/fd
+0	./proc/5/task/5/fdinfo
+0	./proc/5/task/5/ns
+0	./proc/5/task/5/net
+0	./proc/5/task/5/attr
+0	./proc/5/task/5
+0	./proc/5/task
+0	./proc/5/fd
+0	./proc/5/map_files
+0	./proc/5/fdinfo
+0	./proc/5/ns
+0	./proc/5/net
+0	./proc/5/attr
+0	./proc/5
+0	./proc/6/task/6/fd
+0	./proc/6/task/6/fdinfo
+0	./proc/6/task/6/ns
+0	./proc/6/task/6/net
+0	./proc/6/task/6/attr
+0	./proc/6/task/6
+0	./proc/6/task
+0	./proc/6/fd
+0	./proc/6/map_files
+0	./proc/6/fdinfo
+0	./proc/6/ns
+0	./proc/6/net
+0	./proc/6/attr
+0	./proc/6
+0	./proc/7/task/7/fd
+0	./proc/7/task/7/fdinfo
+0	./proc/7/task/7/ns
+0	./proc/7/task/7/net
+0	./proc/7/task/7/attr
+0	./proc/7/task/7
+0	./proc/7/task
+0	./proc/7/fd
+0	./proc/7/map_files
+0	./proc/7/fdinfo
+0	./proc/7/ns
+0	./proc/7/net
+0	./proc/7/attr
+0	./proc/7
+0	./proc/8/task/8/fd
+0	./proc/8/task/8/fdinfo
+0	./proc/8/task/8/ns
+0	./proc/8/task/8/net
+0	./proc/8/task/8/attr
+0	./proc/8/task/8
+0	./proc/8/task
+0	./proc/8/fd
+0	./proc/8/map_files
+0	./proc/8/fdinfo
+0	./proc/8/ns
+0	./proc/8/net
+0	./proc/8/attr
+0	./proc/8
+0	./proc/9/task/9/fd
+0	./proc/9/task/9/fdinfo
+0	./proc/9/task/9/ns
+0	./proc/9/task/9/net
+0	./proc/9/task/9/attr
+0	./proc/9/task/9
+0	./proc/9/task
+0	./proc/9/fd
+0	./proc/9/map_files
+0	./proc/9/fdinfo
+0	./proc/9/ns
+0	./proc/9/net
+0	./proc/9/attr
+0	./proc/9
+0	./proc/10/task/10/fd
+0	./proc/10/task/10/fdinfo
+0	./proc/10/task/10/ns
+0	./proc/10/task/10/net
+0	./proc/10/task/10/attr
+0	./proc/10/task/10
+0	./proc/10/task
+0	./proc/10/fd
+0	./proc/10/map_files
+0	./proc/10/fdinfo
+0	./proc/10/ns
+0	./proc/10/net
+0	./proc/10/attr
+0	./proc/10
+0	./proc/11/task/11/fd
+0	./proc/11/task/11/fdinfo
+0	./proc/11/task/11/ns
+0	./proc/11/task/11/net
+0	./proc/11/task/11/attr
+0	./proc/11/task/11
+0	./proc/11/task
+0	./proc/11/fd
+0	./proc/11/map_files
+0	./proc/11/fdinfo
+0	./proc/11/ns
+0	./proc/11/net
+0	./proc/11/attr
+0	./proc/11
+0	./proc/12/task/12/fd
+0	./proc/12/task/12/fdinfo
+0	./proc/12/task/12/ns
+0	./proc/12/task/12/net
+0	./proc/12/task/12/attr
+0	./proc/12/task/12
+0	./proc/12/task
+0	./proc/12/fd
+0	./proc/12/map_files
+0	./proc/12/fdinfo
+0	./proc/12/ns
+0	./proc/12/net
+0	./proc/12/attr
+0	./proc/12
+0	./proc/13/task/13/fd
+0	./proc/13/task/13/fdinfo
+0	./proc/13/task/13/ns
+0	./proc/13/task/13/net
+0	./proc/13/task/13/attr
+0	./proc/13/task/13
+0	./proc/13/task
+0	./proc/13/fd
+0	./proc/13/map_files
+0	./proc/13/fdinfo
+0	./proc/13/ns
+0	./proc/13/net
+0	./proc/13/attr
+0	./proc/13
+0	./proc/14/task/14/fd
+0	./proc/14/task/14/fdinfo
+0	./proc/14/task/14/ns
+0	./proc/14/task/14/net
+0	./proc/14/task/14/attr
+0	./proc/14/task/14
+0	./proc/14/task
+0	./proc/14/fd
+0	./proc/14/map_files
+0	./proc/14/fdinfo
+0	./proc/14/ns
+0	./proc/14/net
+0	./proc/14/attr
+0	./proc/14
+0	./proc/15/task/15/fd
+0	./proc/15/task/15/fdinfo
+0	./proc/15/task/15/ns
+0	./proc/15/task/15/net
+0	./proc/15/task/15/attr
+0	./proc/15/task/15
+0	./proc/15/task
+0	./proc/15/fd
+0	./proc/15/map_files
+0	./proc/15/fdinfo
+0	./proc/15/ns
+0	./proc/15/net
+0	./proc/15/attr
+0	./proc/15
+0	./proc/16/task/16/fd
+0	./proc/16/task/16/fdinfo
+0	./proc/16/task/16/ns
+0	./proc/16/task/16/net
+0	./proc/16/task/16/attr
+0	./proc/16/task/16
+0	./proc/16/task
+0	./proc/16/fd
+0	./proc/16/map_files
+0	./proc/16/fdinfo
+0	./proc/16/ns
+0	./proc/16/net
+0	./proc/16/attr
+0	./proc/16
+0	./proc/17/task/17/fd
+0	./proc/17/task/17/fdinfo
+0	./proc/17/task/17/ns
+0	./proc/17/task/17/net
+0	./proc/17/task/17/attr
+0	./proc/17/task/17
+0	./proc/17/task
+0	./proc/17/fd
+0	./proc/17/map_files
+0	./proc/17/fdinfo
+0	./proc/17/ns
+0	./proc/17/net
+0	./proc/17/attr
+0	./proc/17
+0	./proc/18/task/18/fd
+0	./proc/18/task/18/fdinfo
+0	./proc/18/task/18/ns
+0	./proc/18/task/18/net
+0	./proc/18/task/18/attr
+0	./proc/18/task/18
+0	./proc/18/task
+0	./proc/18/fd
+0	./proc/18/map_files
+0	./proc/18/fdinfo
+0	./proc/18/ns
+0	./proc/18/net
+0	./proc/18/attr
+0	./proc/18
+0	./proc/19/task/19/fd
+0	./proc/19/task/19/fdinfo
+0	./proc/19/task/19/ns
+0	./proc/19/task/19/net
+0	./proc/19/task/19/attr
+0	./proc/19/task/19
+0	./proc/19/task
+0	./proc/19/fd
+0	./proc/19/map_files
+0	./proc/19/fdinfo
+0	./proc/19/ns
+0	./proc/19/net
+0	./proc/19/attr
+0	./proc/19
+0	./proc/20/task/20/fd
+0	./proc/20/task/20/fdinfo
+0	./proc/20/task/20/ns
+0	./proc/20/task/20/net
+0	./proc/20/task/20/attr
+0	./proc/20/task/20
+0	./proc/20/task
+0	./proc/20/fd
+0	./proc/20/map_files
+0	./proc/20/fdinfo
+0	./proc/20/ns
+0	./proc/20/net
+0	./proc/20/attr
+0	./proc/20
+0	./proc/21/task/21/fd
+0	./proc/21/task/21/fdinfo
+0	./proc/21/task/21/ns
+0	./proc/21/task/21/net
+0	./proc/21/task/21/attr
+0	./proc/21/task/21
+0	./proc/21/task
+0	./proc/21/fd
+0	./proc/21/map_files
+0	./proc/21/fdinfo
+0	./proc/21/ns
+0	./proc/21/net
+0	./proc/21/attr
+0	./proc/21
+0	./proc/22/task/22/fd
+0	./proc/22/task/22/fdinfo
+0	./proc/22/task/22/ns
+0	./proc/22/task/22/net
+0	./proc/22/task/22/attr
+0	./proc/22/task/22
+0	./proc/22/task
+0	./proc/22/fd
+0	./proc/22/map_files
+0	./proc/22/fdinfo
+0	./proc/22/ns
+0	./proc/22/net
+0	./proc/22/attr
+0	./proc/22
+0	./proc/23/task/23/fd
+0	./proc/23/task/23/fdinfo
+0	./proc/23/task/23/ns
+0	./proc/23/task/23/net
+0	./proc/23/task/23/attr
+0	./proc/23/task/23
+0	./proc/23/task
+0	./proc/23/fd
+0	./proc/23/map_files
+0	./proc/23/fdinfo
+0	./proc/23/ns
+0	./proc/23/net
+0	./proc/23/attr
+0	./proc/23
+0	./proc/24/task/24/fd
+0	./proc/24/task/24/fdinfo
+0	./proc/24/task/24/ns
+0	./proc/24/task/24/net
+0	./proc/24/task/24/attr
+0	./proc/24/task/24
+0	./proc/24/task
+0	./proc/24/fd
+0	./proc/24/map_files
+0	./proc/24/fdinfo
+0	./proc/24/ns
+0	./proc/24/net
+0	./proc/24/attr
+0	./proc/24
+0	./proc/25/task/25/fd
+0	./proc/25/task/25/fdinfo
+0	./proc/25/task/25/ns
+0	./proc/25/task/25/net
+0	./proc/25/task/25/attr
+0	./proc/25/task/25
+0	./proc/25/task
+0	./proc/25/fd
+0	./proc/25/map_files
+0	./proc/25/fdinfo
+0	./proc/25/ns
+0	./proc/25/net
+0	./proc/25/attr
+0	./proc/25
+0	./proc/26/task/26/fd
+0	./proc/26/task/26/fdinfo
+0	./proc/26/task/26/ns
+0	./proc/26/task/26/net
+0	./proc/26/task/26/attr
+0	./proc/26/task/26
+0	./proc/26/task
+0	./proc/26/fd
+0	./proc/26/map_files
+0	./proc/26/fdinfo
+0	./proc/26/ns
+0	./proc/26/net
+0	./proc/26/attr
+0	./proc/26
+0	./proc/27/task/27/fd
+0	./proc/27/task/27/fdinfo
+0	./proc/27/task/27/ns
+0	./proc/27/task/27/net
+0	./proc/27/task/27/attr
+0	./proc/27/task/27
+0	./proc/27/task
+0	./proc/27/fd
+0	./proc/27/map_files
+0	./proc/27/fdinfo
+0	./proc/27/ns
+0	./proc/27/net
+0	./proc/27/attr
+0	./proc/27
+0	./proc/28/task/28/fd
+0	./proc/28/task/28/fdinfo
+0	./proc/28/task/28/ns
+0	./proc/28/task/28/net
+0	./proc/28/task/28/attr
+0	./proc/28/task/28
+0	./proc/28/task
+0	./proc/28/fd
+0	./proc/28/map_files
+0	./proc/28/fdinfo
+0	./proc/28/ns
+0	./proc/28/net
+0	./proc/28/attr
+0	./proc/28
+0	./proc/29/task/29/fd
+0	./proc/29/task/29/fdinfo
+0	./proc/29/task/29/ns
+0	./proc/29/task/29/net
+0	./proc/29/task/29/attr
+0	./proc/29/task/29
+0	./proc/29/task
+0	./proc/29/fd
+0	./proc/29/map_files
+0	./proc/29/fdinfo
+0	./proc/29/ns
+0	./proc/29/net
+0	./proc/29/attr
+0	./proc/29
+0	./proc/30/task/30/fd
+0	./proc/30/task/30/fdinfo
+0	./proc/30/task/30/ns
+0	./proc/30/task/30/net
+0	./proc/30/task/30/attr
+0	./proc/30/task/30
+0	./proc/30/task
+0	./proc/30/fd
+0	./proc/30/map_files
+0	./proc/30/fdinfo
+0	./proc/30/ns
+0	./proc/30/net
+0	./proc/30/attr
+0	./proc/30
+0	./proc/31/task/31/fd
+0	./proc/31/task/31/fdinfo
+0	./proc/31/task/31/ns
+0	./proc/31/task/31/net
+0	./proc/31/task/31/attr
+0	./proc/31/task/31
+0	./proc/31/task
+0	./proc/31/fd
+0	./proc/31/map_files
+0	./proc/31/fdinfo
+0	./proc/31/ns
+0	./proc/31/net
+0	./proc/31/attr
+0	./proc/31
+0	./proc/32/task/32/fd
+0	./proc/32/task/32/fdinfo
+0	./proc/32/task/32/ns
+0	./proc/32/task/32/net
+0	./proc/32/task/32/attr
+0	./proc/32/task/32
+0	./proc/32/task
+0	./proc/32/fd
+0	./proc/32/map_files
+0	./proc/32/fdinfo
+0	./proc/32/ns
+0	./proc/32/net
+0	./proc/32/attr
+0	./proc/32
+0	./proc/33/task/33/fd
+0	./proc/33/task/33/fdinfo
+0	./proc/33/task/33/ns
+0	./proc/33/task/33/net
+0	./proc/33/task/33/attr
+0	./proc/33/task/33
+0	./proc/33/task
+0	./proc/33/fd
+0	./proc/33/map_files
+0	./proc/33/fdinfo
+0	./proc/33/ns
+0	./proc/33/net
+0	./proc/33/attr
+0	./proc/33
+0	./proc/34/task/34/fd
+0	./proc/34/task/34/fdinfo
+0	./proc/34/task/34/ns
+0	./proc/34/task/34/net
+0	./proc/34/task/34/attr
+0	./proc/34/task/34
+0	./proc/34/task
+0	./proc/34/fd
+0	./proc/34/map_files
+0	./proc/34/fdinfo
+0	./proc/34/ns
+0	./proc/34/net
+0	./proc/34/attr
+0	./proc/34
+0	./proc/35/task/35/fd
+0	./proc/35/task/35/fdinfo
+0	./proc/35/task/35/ns
+0	./proc/35/task/35/net
+0	./proc/35/task/35/attr
+0	./proc/35/task/35
+0	./proc/35/task
+0	./proc/35/fd
+0	./proc/35/map_files
+0	./proc/35/fdinfo
+0	./proc/35/ns
+0	./proc/35/net
+0	./proc/35/attr
+0	./proc/35
+0	./proc/36/task/36/fd
+0	./proc/36/task/36/fdinfo
+0	./proc/36/task/36/ns
+0	./proc/36/task/36/net
+0	./proc/36/task/36/attr
+0	./proc/36/task/36
+0	./proc/36/task
+0	./proc/36/fd
+0	./proc/36/map_files
+0	./proc/36/fdinfo
+0	./proc/36/ns
+0	./proc/36/net
+0	./proc/36/attr
+0	./proc/36
+0	./proc/45/task/45/fd
+0	./proc/45/task/45/fdinfo
+0	./proc/45/task/45/ns
+0	./proc/45/task/45/net
+0	./proc/45/task/45/attr
+0	./proc/45/task/45
+0	./proc/45/task
+0	./proc/45/fd
+0	./proc/45/map_files
+0	./proc/45/fdinfo
+0	./proc/45/ns
+0	./proc/45/net
+0	./proc/45/attr
+0	./proc/45
+0	./proc/47/task/47/fd
+0	./proc/47/task/47/fdinfo
+0	./proc/47/task/47/ns
+0	./proc/47/task/47/net
+0	./proc/47/task/47/attr
+0	./proc/47/task/47
+0	./proc/47/task
+0	./proc/47/fd
+0	./proc/47/map_files
+0	./proc/47/fdinfo
+0	./proc/47/ns
+0	./proc/47/net
+0	./proc/47/attr
+0	./proc/47
+0	./proc/148/task/148/fd
+0	./proc/148/task/148/fdinfo
+0	./proc/148/task/148/ns
+0	./proc/148/task/148/net
+0	./proc/148/task/148/attr
+0	./proc/148/task/148
+0	./proc/148/task
+0	./proc/148/fd
+0	./proc/148/map_files
+0	./proc/148/fdinfo
+0	./proc/148/ns
+0	./proc/148/net
+0	./proc/148/attr
+0	./proc/148
+0	./proc/150/task/150/fd
+0	./proc/150/task/150/fdinfo
+0	./proc/150/task/150/ns
+0	./proc/150/task/150/net
+0	./proc/150/task/150/attr
+0	./proc/150/task/150
+0	./proc/150/task
+0	./proc/150/fd
+0	./proc/150/map_files
+0	./proc/150/fdinfo
+0	./proc/150/ns
+0	./proc/150/net
+0	./proc/150/attr
+0	./proc/150
+0	./proc/152/task/152/fd
+0	./proc/152/task/152/fdinfo
+0	./proc/152/task/152/ns
+0	./proc/152/task/152/net
+0	./proc/152/task/152/attr
+0	./proc/152/task/152
+0	./proc/152/task
+0	./proc/152/fd
+0	./proc/152/map_files
+0	./proc/152/fdinfo
+0	./proc/152/ns
+0	./proc/152/net
+0	./proc/152/attr
+0	./proc/152
+0	./proc/165/task/165/fd
+0	./proc/165/task/165/fdinfo
+0	./proc/165/task/165/ns
+0	./proc/165/task/165/net
+0	./proc/165/task/165/attr
+0	./proc/165/task/165
+0	./proc/165/task
+0	./proc/165/fd
+0	./proc/165/map_files
+0	./proc/165/fdinfo
+0	./proc/165/ns
+0	./proc/165/net
+0	./proc/165/attr
+0	./proc/165
+0	./proc/178/task/178/fd
+0	./proc/178/task/178/fdinfo
+0	./proc/178/task/178/ns
+0	./proc/178/task/178/net
+0	./proc/178/task/178/attr
+0	./proc/178/task/178
+0	./proc/178/task
+0	./proc/178/fd
+0	./proc/178/map_files
+0	./proc/178/fdinfo
+0	./proc/178/ns
+0	./proc/178/net
+0	./proc/178/attr
+0	./proc/178
+0	./proc/210/task/210/fd
+0	./proc/210/task/210/fdinfo
+0	./proc/210/task/210/ns
+0	./proc/210/task/210/net
+0	./proc/210/task/210/attr
+0	./proc/210/task/210
+0	./proc/210/task
+0	./proc/210/fd
+0	./proc/210/map_files
+0	./proc/210/fdinfo
+0	./proc/210/ns
+0	./proc/210/net
+0	./proc/210/attr
+0	./proc/210
+0	./proc/211/task/211/fd
+0	./proc/211/task/211/fdinfo
+0	./proc/211/task/211/ns
+0	./proc/211/task/211/net
+0	./proc/211/task/211/attr
+0	./proc/211/task/211
+0	./proc/211/task
+0	./proc/211/fd
+0	./proc/211/map_files
+0	./proc/211/fdinfo
+0	./proc/211/ns
+0	./proc/211/net
+0	./proc/211/attr
+0	./proc/211
+0	./proc/212/task/212/fd
+0	./proc/212/task/212/fdinfo
+0	./proc/212/task/212/ns
+0	./proc/212/task/212/net
+0	./proc/212/task/212/attr
+0	./proc/212/task/212
+0	./proc/212/task
+0	./proc/212/fd
+0	./proc/212/map_files
+0	./proc/212/fdinfo
+0	./proc/212/ns
+0	./proc/212/net
+0	./proc/212/attr
+0	./proc/212
+0	./proc/405/task/405/fd
+0	./proc/405/task/405/fdinfo
+0	./proc/405/task/405/ns
+0	./proc/405/task/405/net
+0	./proc/405/task/405/attr
+0	./proc/405/task/405
+0	./proc/405/task
+0	./proc/405/fd
+0	./proc/405/map_files
+0	./proc/405/fdinfo
+0	./proc/405/ns
+0	./proc/405/net
+0	./proc/405/attr
+0	./proc/405
+0	./proc/437/task/437/fd
+0	./proc/437/task/437/fdinfo
+0	./proc/437/task/437/ns
+0	./proc/437/task/437/net
+0	./proc/437/task/437/attr
+0	./proc/437/task/437
+0	./proc/437/task
+0	./proc/437/fd
+0	./proc/437/map_files
+0	./proc/437/fdinfo
+0	./proc/437/ns
+0	./proc/437/net
+0	./proc/437/attr
+0	./proc/437
+0	./proc/438/task/438/fd
+0	./proc/438/task/438/fdinfo
+0	./proc/438/task/438/ns
+0	./proc/438/task/438/net
+0	./proc/438/task/438/attr
+0	./proc/438/task/438
+0	./proc/438/task
+0	./proc/438/fd
+0	./proc/438/map_files
+0	./proc/438/fdinfo
+0	./proc/438/ns
+0	./proc/438/net
+0	./proc/438/attr
+0	./proc/438
+0	./proc/645/task/645/fd
+0	./proc/645/task/645/fdinfo
+0	./proc/645/task/645/ns
+0	./proc/645/task/645/net
+0	./proc/645/task/645/attr
+0	./proc/645/task/645
+0	./proc/645/task
+0	./proc/645/fd
+0	./proc/645/map_files
+0	./proc/645/fdinfo
+0	./proc/645/ns
+0	./proc/645/net
+0	./proc/645/attr
+0	./proc/645
+0	./proc/648/task/648/fd
+0	./proc/648/task/648/fdinfo
+0	./proc/648/task/648/ns
+0	./proc/648/task/648/net
+0	./proc/648/task/648/attr
+0	./proc/648/task/648
+0	./proc/648/task
+0	./proc/648/fd
+0	./proc/648/map_files
+0	./proc/648/fdinfo
+0	./proc/648/ns
+0	./proc/648/net
+0	./proc/648/attr
+0	./proc/648
+0	./proc/659/task/659/fd
+0	./proc/659/task/659/fdinfo
+0	./proc/659/task/659/ns
+0	./proc/659/task/659/net
+0	./proc/659/task/659/attr
+0	./proc/659/task/659
+0	./proc/659/task
+0	./proc/659/fd
+0	./proc/659/map_files
+0	./proc/659/fdinfo
+0	./proc/659/ns
+0	./proc/659/net
+0	./proc/659/attr
+0	./proc/659
+0	./proc
+1464892	.
+testcase busybox du success
+2
+testcase busybox expr 1 + 1 success
+testcase busybox false success
+testcase busybox true success
+/bin/ls
+testcase busybox which ls success
+Linux
+testcase busybox uname success
+ 14:38:28 up 0 min,  0 users,  load average: 0.08, 0.01, 0.00
+testcase busybox uptime success
+abcntestcase busybox printf "abcn" success
+PID   USER     TIME  COMMAND
+    1 0         0:00 {init} /busybox sh /init
+    2 0         0:00 [kthreadd]
+    3 0         0:00 [pool_workqueue_]
+    4 0         0:00 [kworker/R-rcu_g]
+    5 0         0:00 [kworker/R-sync_]
+    6 0         0:00 [kworker/R-kvfre]
+    7 0         0:00 [kworker/R-slub_]
+    8 0         0:00 [kworker/R-netns]
+    9 0         0:00 [kworker/0:0-eve]
+   10 0         0:00 [kworker/0:1-eve]
+   11 0         0:00 [kworker/0:0H-ev]
+   12 0         0:00 [kworker/u4:0-ev]
+   13 0         0:00 [kworker/R-mm_pe]
+   14 0         0:00 [ksoftirqd/0]
+   15 0         0:00 [rcu_preempt]
+   16 0         0:00 [rcu_exp_par_gp_]
+   17 0         0:00 [rcu_exp_gp_kthr]
+   18 0         0:00 [migration/0]
+   19 0         0:00 [cpuhp/0]
+   20 0         0:00 [kdevtmpfs]
+   21 0         0:00 [kworker/R-inet_]
+   22 0         0:00 [rcu_tasks_kthre]
+   23 0         0:00 [rcu_tasks_trace]
+   24 0         0:00 [oom_reaper]
+   25 0         0:00 [kworker/R-write]
+   26 0         0:00 [kcompactd0]
+   27 0         0:00 [ksmd]
+   28 0         0:00 [khugepaged]
+   29 0         0:00 [kworker/R-kbloc]
+   30 0         0:00 [kworker/R-blkcg]
+   31 0         0:00 [kworker/R-kinte]
+   32 0         0:00 [kworker/R-devfr]
+   33 0         0:00 [kworker/R-quota]
+   34 0         0:00 [kworker/0:1H-kb]
+   35 0         0:00 [kworker/u4:1-ev]
+   36 0         0:00 [kworker/u4:2-ev]
+   45 0         0:00 [kswapd0]
+   47 0         0:00 [kworker/R-kthro]
+  148 0         0:00 [kworker/R-nvme-]
+  150 0         0:00 [kworker/R-nvme-]
+  152 0         0:00 [kworker/R-nvme-]
+  165 0         0:00 [kworker/R-uas]
+  178 0         0:00 [kworker/u4:3-kv]
+  210 0         0:00 [kworker/R-mld]
+  211 0         0:00 [kworker/R-ipv6_]
+  212 0         0:00 [kworker/R-kstrp]
+  405 0         0:00 [kworker/u5:0]
+  437 0         0:00 [jbd2/vda-8]
+  438 0         0:00 [kworker/R-ext4-]
+  645 0         0:00 /busybox sh /busybox_testcode.sh
+  648 0         0:00 /busybox sh /busybox_testcode.sh
+  667 0         0:00 ./busybox ps
+testcase busybox ps success
+/
+testcase busybox pwd success
+              total        used        free      shared  buff/cache   available
+Mem:         992448       12808      950116        2704       29524      929744
+Swap:             0           0           0
+testcase busybox free success
+Sun Nov  8 14:38:28 2026  0.000000 seconds
+testcase busybox hwclock success
+sh: testcase busybox sh -c 'sleep 5' & ./busybox kill $! success
+[1;32marithoh[m                 [1;32miozone_testcode.sh[m      [1;34mltp[m
+[1;34mbasic[m                   [1;32miperf3[m                  [1;32mltp_testcode.sh[m
+[1;32mbasic_testcode.sh[m       [1;32miperf_testcode.sh[m       [1;32mlua[m
+[1;34mbin[m                     [1;32mlat_cmd[m                 [1;32mlua_testcode.sh[m
+[1;32mbusy[m                    [1;32mlat_connect[m             [1;32mmax_min.lua[m
+[1;32mbusybox[m                 [1;32mlat_ctx[m                 [1;32mmemsize[m
+[0;0mbusybox_cmd.txt[m         [1;32mlat_dram_page[m           [1;32mmhz[m
+[1;32mbusybox_testcode.sh[m     [1;32mlat_fcntl[m               [1;32mmsleep[m
+[1;32mbw_file_rd[m              [1;32mlat_fifo[m                [0;0mmulti.sh[m
+[1;32mbw_mem[m                  [1;32mlat_fs[m                  [1;32mnetperf[m
+[1;32mbw_mmap_rd[m              [1;32mlat_http[m                [1;32mnetperf_testcode.sh[m
+[1;32mbw_pipe[m                 [1;32mlat_mem_rd[m              [1;32mnetserver[m
+[1;32mbw_tcp[m                  [1;32mlat_mmap[m                [1;32mpar_mem[m
+[1;32mbw_unix[m                 [1;32mlat_ops[m                 [1;32mpar_ops[m
+[1;32mcache[m                   [1;32mlat_pagefault[m           [1;32mpipe[m
+[1;32mclock[m                   [1;32mlat_pipe[m                [1;34mproc[m
+[1;32mcontext1[m                [1;32mlat_pmake[m               [1;32mrandom.lua[m
+[1;32mcyclictest[m              [1;32mlat_proc[m                [1;32mregister[m
+[1;32mcyclictest_testcode.sh[m  [1;32mlat_rand[m                [1;32mremove.lua[m
+[1;32mdate.lua[m                [1;32mlat_rpc[m                 [1;32mrhttp[m
+[1;34mdev[m                     [1;32mlat_select[m              [1;32mround_num.lua[m
+[1;32mdhry2[m                   [1;32mlat_sem[m                 [1;32mrun-dynamic.sh[m
+[1;32mdhry2reg[m                [1;32mlat_sig[m                 [1;32mrun-static.sh[m
+[1;32mdisk[m                    [1;32mlat_syscall[m             [1;32mruntest.exe[m
+[1;32mdlopen_dso.so[m           [1;32mlat_tcp[m                 [1;32mseek[m
+[1;32mdouble[m                  [1;32mlat_udp[m                 [1;32mshort[m
+[1;32menough[m                  [1;32mlat_unix[m                [1;32msin30.lua[m
+[1;32mentry-dynamic.exe[m       [1;32mlat_unix_connect[m        [1;32msort.lua[m
+[1;32mentry-static.exe[m        [1;32mlat_usleep[m              [1;32mspawn[m
+[1;32mexecl[m                   [1;34mlib[m                     [1;32mstream[m
+[1;32mfile_io.lua[m             [1;32mlibc-bench[m              [1;32mstrings.lua[m
+[1;32mfloat[m                   [1;32mlibcbench_testcode.sh[m   [1;32msyscall[m
+[1;32mflushdisk[m               [1;32mlibctest_testcode.sh[m    [1;32mtest.sh[m
+[1;32mfstime[m                  [1;32mline[m                    [1;32mtiming_o[m
+[1;32mgetopt[m                  [1;32mlmbench[m                 [1;32mtlb[m
+[0;0mgfx-x11[m                 [1;32mlmbench_all[m             [1;32mtls_get_new-dtv_dso.so[m
+[1;32mhackbench[m               [1;32mlmbench_testcode.sh[m     [1;34mtmp[m
+[1;32mhanoi[m                   [1;32mlmdd[m                    [0;0mtst.sh[m
+[1;32mhello[m                   [1;32mlmhttp[m                  [0;0munixbench.logo[m
+[0;0mindex.base[m              [1;32mlong[m                    [1;32munixbench_testcode.sh[m
+[1;32mint[m                     [1;32mloop_o[m                  [1;32mwhetstone-double[m
+[1;32miozone[m                  [1;32mlooper[m
+testcase busybox ls success
+testcase busybox sleep 1 success
+#### file opration test
+testcase busybox echo "#### file opration test" success
+testcase busybox touch test.txt success
+testcase busybox echo "hello world" > test.txt success
+hello world
+testcase busybox cat test.txt success
+l
+testcase busybox cut -c 3 test.txt success
+0000000 062550 066154 020157 067567 066162 005144
+0000014
+testcase busybox od test.txt success
+hello world
+testcase busybox head test.txt success
+hello world
+testcase busybox tail test.txt success
+00000000  68 65 6c 6c 6f 20 77 6f  72 6c 64 0a              |hello world.|
+0000000c
+testcase busybox hexdump -C test.txt success
+6f5902ac237024bdd0c176cb93063dc4  test.txt
+testcase busybox md5sum test.txt success
+testcase busybox echo "ccccccc" >> test.txt success
+testcase busybox echo "bbbbbbb" >> test.txt success
+testcase busybox echo "aaaaaaa" >> test.txt success
+testcase busybox echo "2222222" >> test.txt success
+testcase busybox echo "1111111" >> test.txt success
+testcase busybox echo "bbbbbbb" >> test.txt success
+1111111
+2222222
+aaaaaaa
+bbbbbbb
+ccccccc
+hello world
+testcase busybox sort test.txt | ./busybox uniq success
+  File: test.txt
+  Size: 60        	Blocks: 8          IO Block: 4096   regular file
+Device: fe00h/65024d	Inode: 3220        Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/ UNKNOWN)   Gid: (    0/ UNKNOWN)
+Access: 2026-11-08 14:38:29.869000000 +0000
+Modify: 2026-11-08 14:38:29.864000000 +0000
+Change: 2026-11-08 14:38:29.864000000 +0000
+testcase busybox stat test.txt success
+hello world
+ccccccc
+bbbbbbb
+aaaaaaa
+2222222
+1111111
+bbbbbbb
+testcase busybox strings test.txt success
+        7         8        60 test.txt
+testcase busybox wc test.txt success
+testcase busybox [ -f test.txt ] success
+hello world
+ccccccc
+bbbbbbb
+aaaaaaa
+2222222
+1111111
+bbbbbbb
+testcase busybox more test.txt success
+testcase busybox rm test.txt success
+testcase busybox mkdir test_dir success
+testcase busybox mv test_dir test success
+testcase busybox rmdir test success
+echo "hello world" > test.txt
+grep hello busybox_cmd.txt
+testcase busybox grep hello busybox_cmd.txt success
+testcase busybox cp busybox_cmd.txt busybox_cmd.bak success
+testcase busybox rm busybox_cmd.bak success
+./busybox_cmd.txt
+testcase busybox find -name "busybox_cmd.txt" success
+#### OS COMP TEST GROUP END busybox-musl ####
+REF_DONE_musl
+REF_ALL_DONE
+[    7.115737] reboot: Power down

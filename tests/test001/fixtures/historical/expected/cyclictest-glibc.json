@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "glibc",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_cyclic.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:51:08"
+  },
+  "totals": {
+    "subcases": 4,
+    "pass": 4,
+    "partial": 0,
+    "fail": 0,
+    "not_run": 0,
+    "score": 4.0,
+    "groups": {
+      "PASS": 1,
+      "PARTIAL": 0,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 1.0
+  },
+  "groups": [
+    {
+      "group": "cyclictest",
+      "libc": "glibc",
+      "status": "PASS",
+      "judge_source": "team",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "NO_STRESS_P1",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "NO_STRESS_P8",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "STRESS_P1",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "STRESS_P8",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

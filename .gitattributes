@@ -1,0 +1,3 @@
+# 冻结的第三方判据与历史证据按原字节保存；空白也是快照的一部分。
+tests/test001/criteria/v1/adapters/** -whitespace
+tests/test001/fixtures/** -whitespace

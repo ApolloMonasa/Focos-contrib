@@ -1,0 +1,232 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "glibc",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_unixbench.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:58:25"
+  },
+  "totals": {
+    "subcases": 27,
+    "pass": 24,
+    "partial": 0,
+    "fail": 3,
+    "not_run": 0,
+    "score": 7021065219.394,
+    "groups": {
+      "PASS": 0,
+      "PARTIAL": 1,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 0.8889
+  },
+  "groups": [
+    {
+      "group": "unixbench",
+      "libc": "glibc",
+      "status": "PARTIAL",
+      "judge_source": "team",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "Unixbench DHRY2 test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 68460508.0
+        },
+        {
+          "name": "Unixbench WHETSTONE test(MFLOPS)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1489.394
+        },
+        {
+          "name": "Unixbench SYSCALL test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 3026500.0
+        },
+        {
+          "name": "Unixbench CONTEXT test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 161707.0
+        },
+        {
+          "name": "Unixbench PIPE test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 3909973.0
+        },
+        {
+          "name": "Unixbench SPAWN test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 8884.0
+        },
+        {
+          "name": "Unixbench EXECL test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 4156.0
+        },
+        {
+          "name": "Unixbench FS_WRITE_SMALL test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 103635.0
+        },
+        {
+          "name": "Unixbench FS_READ_SMALL test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 160603.0
+        },
+        {
+          "name": "Unixbench FS_COPY_SMALL test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 54025.0
+        },
+        {
+          "name": "Unixbench FS_WRITE_MIDDLE test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 383185.0
+        },
+        {
+          "name": "Unixbench FS_READ_MIDDLE test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 583451.0
+        },
+        {
+          "name": "Unixbench FS_COPY_MIDDLE test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 196311.0
+        },
+        {
+          "name": "Unixbench FS_WRITE_BIG test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1218281.0
+        },
+        {
+          "name": "Unixbench FS_READ_BIG test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1650802.0
+        },
+        {
+          "name": "Unixbench FS_COPY_BIG test(KBps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 623031.0
+        },
+        {
+          "name": "Unixbench SHELL1 test(lpm)",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "Unixbench SHELL8 test(lpm)",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "Unixbench SHELL16 test(lpm)",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "Unixbench ARITHOH test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 6015752887.0
+        },
+        {
+          "name": "Unixbench SHORT test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 187232991.0
+        },
+        {
+          "name": "Unixbench INT test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 180450350.0
+        },
+        {
+          "name": "Unixbench LONG test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 185433442.0
+        },
+        {
+          "name": "Unixbench FLOAT test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 181571241.0
+        },
+        {
+          "name": "Unixbench DOUBLE test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 188471932.0
+        },
+        {
+          "name": "Unixbench HANOI test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1599735.0
+        },
+        {
+          "name": "Unixbench EXEC test(lps)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 6100.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

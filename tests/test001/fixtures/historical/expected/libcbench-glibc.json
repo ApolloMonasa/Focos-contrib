@@ -1,0 +1,385 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "glibc",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_perf.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:50:15"
+  },
+  "totals": {
+    "subcases": 47,
+    "pass": 47,
+    "partial": 0,
+    "fail": 0,
+    "not_run": 0,
+    "score": 65.62227565641138,
+    "groups": {
+      "PASS": 2,
+      "PARTIAL": 0,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 1.0
+  },
+  "groups": [
+    {
+      "group": "iozone",
+      "libc": "glibc",
+      "status": "PASS",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "iozone write/read 4 initial writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.945233129539895
+        },
+        {
+          "name": "iozone write/read 4 rewriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9063111884034127
+        },
+        {
+          "name": "iozone write/read 4 readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.946442248536387
+        },
+        {
+          "name": "iozone write/read 4 re-readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9475373863007195
+        },
+        {
+          "name": "iozone random-read 4 initial writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.942898340776576
+        },
+        {
+          "name": "iozone random-read 4 rewriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9251578001947725
+        },
+        {
+          "name": "iozone random-read 4 random readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.8962494492772402
+        },
+        {
+          "name": "iozone random-read 4 random writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.8956489373765903
+        },
+        {
+          "name": "iozone read-backwards 4 initial writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.946418269118646
+        },
+        {
+          "name": "iozone read-backwards 4 rewriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9596343764167112
+        },
+        {
+          "name": "iozone read-backwards 4 reverse readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.88538092628819
+        },
+        {
+          "name": "iozone stride-read 4 initial writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.942112082987887
+        },
+        {
+          "name": "iozone stride-read 4 rewriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.943170158264437
+        },
+        {
+          "name": "iozone stride-read 4 stride readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.8962936165847446
+        },
+        {
+          "name": "iozone fwrite/fread 4 fwriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9455931329084586
+        },
+        {
+          "name": "iozone fwrite/fread 4 freaders (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9679184013922242
+        },
+        {
+          "name": "iozone pwrite/pread 4 pwrite writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9306581609330238
+        },
+        {
+          "name": "iozone pwrite/pread 4 pread readers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.928040414150371
+        },
+        {
+          "name": "iozone pwritev/preadv 4 initial writers (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9392239627912742
+        },
+        {
+          "name": "iozone pwritev/preadv 4 rewriters (kb/sec)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.9323536741698035
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    },
+    {
+      "group": "libcbench",
+      "libc": "glibc",
+      "status": "PASS",
+      "judge_source": "team",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "b_malloc_sparse (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_bubble (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_tiny1 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_tiny2 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_big1 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_big2 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_thread_stress (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_malloc_thread_local (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strstr (\"abcdefghijklmnopqrstuvwxyz\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strstr (\"azbycxdwevfugthsirjqkplomn\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strstr (\"aaaaaaaaaaaaaacccccccccccc\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strstr (\"aaaaaaaaaaaaaaaaaaaaaaaaac\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strstr (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaac\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_memset (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strchr (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_string_strlen (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_pthread_createjoin_serial1 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_pthread_createjoin_serial2 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_pthread_create_serial1 (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_pthread_uselesslock (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_utf8_bigbuf (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_utf8_onebyone (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_stdio_putcgetc (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_stdio_putcgetc_unlocked (0)",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_regex_compile (\"(a|b|c)*d*b\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_regex_search (\"(a|b|c)*d*b\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "b_regex_search (\"a{25}b\")",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

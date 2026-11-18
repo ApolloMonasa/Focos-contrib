@@ -12,9 +12,9 @@
 | `on-site-final-2025`：2025 年全国赛现场题 | vim 能编辑、保存并重新打开文件；gcc 能在 FocOS 内编译、链接并运行新程序 | QEMU RISC-V 和 VisionFive2 |
 | 团队新增的 make 检查 | 构建一个含两个源文件的小工程；修改一个文件后只重编受影响目标；`make clean` 能清理产物 | QEMU RISC-V 和 VisionFive2 |
 
-LTP 是 Linux 内核测试套件，按 2026-11-18 的 #8 扩围纳入本阶段；以比赛冻结版本与镜像为准，具体调用列表仍待审计。musl 和 glibc 是两种 C 标准库；官方提供了基于它们构建的两套程序，不能只测其中一套。
+LTP 是 Linux 内核测试套件，按 2026-11-18 的 #8 扩围纳入本阶段。实际镜像审计冻结为 LTP 20240524：musl 2820 个、glibc 2840 个顶层调用，脚本按文件名循环执行，具体规则见下文。musl 和 glibc 是两种 C 标准库；官方提供了基于它们构建的两套程序，不能只测其中一套。
 
-这里的“通过”包括检查程序结果和实际文件操作，不是脚本执行到了末尾。子用例清单仍需随镜像核对后冻结。LoongArch 留到全国赛；真板文件闭环和缓存实验见 [完整交付标准](../../specs/REGION-001.md)。
+这里的“通过”包括检查程序结果和实际文件操作，不是脚本执行到了末尾。非 LTP 子用例清单沿用旧审计，LTP 清单已按镜像冻结；实际运行仍待 B/C。LoongArch 留到全国赛；真板文件闭环和缓存实验见 [完整交付标准](../../specs/REGION-001.md)。
 
 ## 其他年份的资料用来做什么
 
@@ -37,10 +37,19 @@ LTP 是 Linux 内核测试套件，按 2026-11-18 的 #8 扩围纳入本阶段�
 | libctest、libcbench | libc 语义、动态加载、TLS、mmap 与线程等，逐子项核对 |
 | iozone、unixbench、lmbench | 文件 I/O、进程/管道、映射、信号和计时 |
 | iperf、netperf | TCP/UDP、loopback、并发连接、阻塞与退出 |
-| ltp | 按冻结调用逐项审计系统调用、权限、设备及环境前提；缺能力不豁免 |
+| ltp | 2820（musl）/ 2840（glibc）个顶层文件；逐调用保存原生 TPASS/TFAIL/TBROK/TCONF/TWARN；缺能力不豁免 |
 | cyclictest | 线程、定时、调度/亲和性接口、压力子进程与信号 |
 
 组名和脚本固定在 [regional-plan.json](../../tests/regional-plan.json)。**全部**指脚本展开后的子用例全部满足判据；不是只运行组脚本或只选 musl。性能程序应完成操作、生成有效结果，不要求追平 Linux 性能或宣称历史满分。
+
+## LTP 实际镜像审计（2026-11-18）
+
+- 镜像 `pre-20250615/sdcard-rv.img.xz` 压缩 SHA256 `2b59aee4…aac087`，解压 4 GiB，SHA256 `95973543…e378b8`，本地核对通过。
+- LTP 目录 `/musl/ltp`、`/glibc/ltp`，`Version` 为 `20240524`；包装脚本 `ltp_testcode.sh` 只遍历 `ltp/testcases/bin` 顶层的普通文件，目录 `datafiles`、`ftrace_stress` 不执行。
+- 顶层文件数：musl 2820，glibc 2840。glibc 多出的 20 个都是 `cpuset_*`；两套同名文件只有 59 个 SHA256 相同。两个 libc 各有 `data`、`sched_datafile` 两个非 ELF、非脚本文件，包装脚本仍会尝试执行并记录结果。
+- 包装脚本对每个文件无条件打印 `FAIL LTP CASE <name> : <ret>`，因此 FAIL 字样不能直接当失败；判分以文件内 LTP 原生结果和边界为准。官方 judge 仓库没有 LTP 判分器，A 阶段使用冻结的结果适配器解析 TPASS/TFAIL/TBROK/TCONF/TWARN，TINFO/TDEBUG 只作信息。
+- 每个调用无参数，工作目录按 libc 根目录 `/musl` 或 `/glibc` 冻结；调用顺序取镜像文件名排序。逐文件路径、长度、权限和 SHA256 在 [PROFILE](../../tests/test001/profiles/regional-2025-with-ltp-v1.json) 的调用清单中。
+- 这是清单事实，不是运行成绩；完整参考 Linux LTP 批次仍待 C/D，FocOS/VF2 适配器另定。
 
 ## 镜像与工具：已知道什么，尚缺什么
 

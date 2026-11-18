@@ -12,8 +12,8 @@
   "branch": "pre-2025",
   "commit": "8b58dd16d26d30f7c74d48d5832d870d3051b703",
   "excluded_groups": [],
-  "case_inventory_status": "PENDING_IMAGE_AND_JUDGE_AUDIT",
-  "case_count": null,
+  "case_inventory_status": "FROZEN_IMAGE_AND_WRAPPER_AUDIT",
+  "case_count": 6514,
   "groups": [
     {
       "name": "basic",
@@ -21,6 +21,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 64,
+      "case_count_by_libc": {
+        "musl": 32,
+        "glibc": 32
       }
     },
     {
@@ -29,6 +34,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 106,
+      "case_count_by_libc": {
+        "musl": 53,
+        "glibc": 53
       }
     },
     {
@@ -37,6 +47,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 18,
+      "case_count_by_libc": {
+        "musl": 9,
+        "glibc": 9
       }
     },
     {
@@ -45,6 +60,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 440,
+      "case_count_by_libc": {
+        "musl": 220,
+        "glibc": 220
       }
     },
     {
@@ -53,6 +73,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 40,
+      "case_count_by_libc": {
+        "musl": 20,
+        "glibc": 20
       }
     },
     {
@@ -61,6 +86,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 54,
+      "case_count_by_libc": {
+        "musl": 27,
+        "glibc": 27
       }
     },
     {
@@ -69,6 +99,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 12,
+      "case_count_by_libc": {
+        "musl": 6,
+        "glibc": 6
       }
     },
     {
@@ -77,6 +112,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 54,
+      "case_count_by_libc": {
+        "musl": 27,
+        "glibc": 27
       }
     },
     {
@@ -85,6 +125,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 48,
+      "case_count_by_libc": {
+        "musl": 24,
+        "glibc": 24
       }
     },
     {
@@ -93,6 +138,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 10,
+      "case_count_by_libc": {
+        "musl": 5,
+        "glibc": 5
       }
     },
     {
@@ -101,6 +151,11 @@
       "status_by_libc": {
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
+      },
+      "case_count": 8,
+      "case_count_by_libc": {
+        "musl": 4,
+        "glibc": 4
       }
     },
     {
@@ -110,9 +165,15 @@
         "musl": "NOT_RUN",
         "glibc": "NOT_RUN"
       },
-      "invocation_inventory_status": "PENDING_IMAGE_AND_SCRIPT_AUDIT",
+      "invocation_inventory_status": "FROZEN",
       "source_directory": "ltp-full-20240524",
-      "case_count": null
+      "case_count": 5660,
+      "case_count_by_libc": {
+        "musl": 2820,
+        "glibc": 2840
+      },
+      "source_version": "20240524",
+      "wrapper": "ltp_testcode.sh"
     }
   ],
   "candidate_images": [
@@ -120,9 +181,9 @@
       "purpose": "preliminary",
       "url": "https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz",
       "published_compressed_sha256": "2b59aee4d26681b2d78a8faa615ac216f723a8ea157544e7867bbc8c77aac087",
-      "digest_source": "GitHub release metadata; not locally verified",
-      "image_sha256": null,
-      "source_match": "PENDING: release 20250615 vs source container 20250624"
+      "digest_source": "local SHA256 2026-11-18; matches compressed release digest",
+      "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+      "source_match": "LTP wrapper checked against 8b58dd1 in A 阶段；11 组脚本沿用 2026-11-08 镜像审计；image built 2025-06-14"
     },
     {
       "purpose": "tools",
@@ -134,15 +195,10 @@
   ],
   "locks_pending": [
     "container_digest",
-    "judge_revision_match",
-    "image_source_script_match",
-    "expanded_case_inventory",
     "tool_ELF_hashes",
     "make_source_version_and_hash",
-    "ltp_image_binary_list_and_hashes",
-    "ltp_invocations_arguments_data_and_dependencies",
-    "ltp_result_adapter_and_acceptance_policy",
-    "ltp_environment_resources_and_static_shards"
+    "focos_platform_adapters",
+    "ltp_full_reference_run"
   ],
   "tools": {
     "reference_branch": "on-site-final-2025",
@@ -182,5 +238,19 @@
     }
   ],
   "profile_id": "regional-2025-with-ltp-v1",
-  "execution_plan_status": "NOT_EXECUTABLE_UNTIL_INPUTS_AND_INVOCATIONS_FROZEN"
+  "execution_plan_status": "PROFILE_FROZEN_ANALYZER_READY_BUILD_AND_CAPTURE_PENDING",
+  "case_count_by_libc": {
+    "musl": 3247,
+    "glibc": 3267
+  },
+  "profile": {
+    "id": "regional-2025-with-ltp-v1",
+    "revision": 1,
+    "hash": "53206c188b1f5f49396b40b8075ffdedc362c051c5bff4509c4cdcf7ec48792d",
+    "file": "tests/test001/profiles/regional-2025-with-ltp-v1.json"
+  },
+  "criteria": [
+    "regional-2025-log-v1",
+    "regional-2025-log-v2"
+  ]
 }

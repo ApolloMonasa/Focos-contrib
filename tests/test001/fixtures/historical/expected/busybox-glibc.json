@@ -1,0 +1,493 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "glibc",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_lua3.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:38:33"
+  },
+  "totals": {
+    "subcases": 62,
+    "pass": 60,
+    "partial": 0,
+    "fail": 2,
+    "not_run": 0,
+    "score": 60.0,
+    "groups": {
+      "PASS": 1,
+      "PARTIAL": 1,
+      "FAIL": 0,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 0.9677
+  },
+  "groups": [
+    {
+      "group": "lua",
+      "libc": "glibc",
+      "status": "PASS",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "lua date.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua file_io.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua max_min.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua random.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua remove.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua round_num.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua sin30.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua sort.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "lua strings.lua",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    },
+    {
+      "group": "busybox",
+      "libc": "glibc",
+      "status": "PARTIAL",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "busybox echo \"#### independent command test\"",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox ash -c exit",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox sh -c exit",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox basename /aaa/bbb",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox cal",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox clear",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox date",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox df",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox dirname /aaa/bbb",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox dmesg",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox du",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "busybox expr 1 + 1",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox false",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox true",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox which ls",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox uname",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox uptime",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox ps",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox pwd",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox free",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox hwclock",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox kill 10",
+          "status": "FAIL",
+          "all": 1,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "busybox ls",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox sleep 1",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"#### file opration test\"",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox touch test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"hello world\" > test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox cat test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox cut -c 3 test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox od test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox head test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox tail test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox hexdump -C test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox md5sum test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"ccccccc\" >> test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"bbbbbbb\" >> test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"aaaaaaa\" >> test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"2222222\" >> test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox echo \"1111111\" >> test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox sort test.txt | ./busybox uniq",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox stat test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox strings test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox wc test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox [ -f test.txt ]",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox more test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox rm test.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox mkdir test_dir",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox mv test_dir test",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox rmdir test",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox grep hello busybox_cmd.txt",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox cp busybox_cmd.txt busybox_cmd.bak",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox rm busybox_cmd.bak",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        },
+        {
+          "name": "busybox find -name \"busybox_cmd.txt\"",
+          "status": "PASS",
+          "all": 1,
+          "pass": 1,
+          "score": 1.0
+        }
+      ],
+      "extras": [
+        "busybox printf \"abcn\"",
+        "busybox sh -c 'sleep 5' & ./busybox kill $!"
+      ],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

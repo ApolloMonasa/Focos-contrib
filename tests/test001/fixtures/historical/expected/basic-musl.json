@@ -1,0 +1,267 @@
+{
+  "meta": {
+    "platform": "qemu",
+    "libc": "musl",
+    "inventory": "tests\\inventory.json",
+    "log": "F:\\Focos\\demo\\ref_basic2.log",
+    "capture_exit_code": null,
+    "capture_truncated": false,
+    "captured_at": "2026-11-08T22:37:05"
+  },
+  "totals": {
+    "subcases": 32,
+    "pass": 0,
+    "partial": 0,
+    "fail": 32,
+    "not_run": 0,
+    "score": 0.0,
+    "groups": {
+      "PASS": 0,
+      "PARTIAL": 0,
+      "FAIL": 1,
+      "TIMEOUT": 0,
+      "NOT_RUN": 0,
+      "JUDGE_ERROR": 0
+    },
+    "pass_rate": 0.0
+  },
+  "groups": [
+    {
+      "group": "basic",
+      "libc": "musl",
+      "status": "FAIL",
+      "judge_source": "official",
+      "judge_error": null,
+      "subcases": [
+        {
+          "name": "test_brk",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_chdir",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_clone",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_close",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_dup2",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_dup",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_execve",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_exit",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_fork",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_fstat",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_getcwd",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_getdents",
+          "status": "FAIL",
+          "all": 5,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_getpid",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_getppid",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_gettimeofday",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_mkdir",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_mmap",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_mount",
+          "status": "FAIL",
+          "all": 5,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_munmap",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_open",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_openat",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_pipe",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_read",
+          "status": "FAIL",
+          "all": 3,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_sleep",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_times",
+          "status": "FAIL",
+          "all": 6,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_umount",
+          "status": "FAIL",
+          "all": 5,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_uname",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_unlink",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_wait",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_waitpid",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_write",
+          "status": "FAIL",
+          "all": 2,
+          "pass": 0,
+          "score": 0.0
+        },
+        {
+          "name": "test_yield",
+          "status": "FAIL",
+          "all": 4,
+          "pass": 0,
+          "score": 0.0
+        }
+      ],
+      "extras": [],
+      "unexpected_in_log": [],
+      "section_found": true,
+      "section_truncated": false
+    }
+  ]
+}

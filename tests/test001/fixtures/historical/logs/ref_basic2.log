@@ -1,0 +1,479 @@
+
+OpenSBI v1.5.1
+   ____                    _____ ____ _____
+  / __ \                  / ____|  _ \_   _|
+ | |  | |_ __   ___ _ __ | (___ | |_) || |
+ | |  | | '_ \ / _ \ '_ \ \___ \|  _ < | |
+ | |__| | |_) |  __/ | | |____) | |_) || |_
+  \____/| .__/ \___|_| |_|_____/|____/_____|
+        | |
+        |_|
+
+Platform Name             : riscv-virtio,qemu
+Platform Features         : medeleg
+Platform HART Count       : 1
+Platform IPI Device       : aclint-mswi
+Platform Timer Device     : aclint-mtimer @ 10000000Hz
+Platform Console Device   : uart8250
+Platform HSM Device       : ---
+Platform PMU Device       : ---
+Platform Reboot Device    : syscon-reboot
+Platform Shutdown Device  : syscon-poweroff
+Platform Suspend Device   : ---
+Platform CPPC Device      : ---
+Firmware Base             : 0x80000000
+Firmware Size             : 327 KB
+Firmware RW Offset        : 0x40000
+Firmware RW Size          : 71 KB
+Firmware Heap Offset      : 0x49000
+Firmware Heap Size        : 35 KB (total), 2 KB (reserved), 11 KB (used), 21 KB (free)
+Firmware Scratch Size     : 4096 B (total), 416 B (used), 3680 B (free)
+Runtime SBI Version       : 2.0
+
+Domain0 Name              : root
+Domain0 Boot HART         : 0
+Domain0 HARTs             : 0*
+Domain0 Region00          : 0x0000000000100000-0x0000000000100fff M: (I,R,W) S/U: (R,W)
+Domain0 Region01          : 0x0000000010000000-0x0000000010000fff M: (I,R,W) S/U: (R,W)
+Domain0 Region02          : 0x0000000002000000-0x000000000200ffff M: (I,R,W) S/U: ()
+Domain0 Region03          : 0x0000000080040000-0x000000008005ffff M: (R,W) S/U: ()
+Domain0 Region04          : 0x0000000080000000-0x000000008003ffff M: (R,X) S/U: ()
+Domain0 Region05          : 0x000000000c400000-0x000000000c5fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region06          : 0x000000000c000000-0x000000000c3fffff M: (I,R,W) S/U: (R,W)
+Domain0 Region07          : 0x0000000000000000-0xffffffffffffffff M: () S/U: (R,W,X)
+Domain0 Next Address      : 0x0000000080200000
+Domain0 Next Arg1         : 0x00000000bfe00000
+Domain0 Next Mode         : S-mode
+Domain0 SysReset          : yes
+Domain0 SysSuspend        : yes
+
+Boot HART ID              : 0
+Boot HART Domain          : root
+Boot HART Priv Version    : v1.12
+Boot HART Base ISA        : rv64imafdch
+Boot HART ISA Extensions  : sstc,zicntr,zihpm,zicboz,zicbom,sdtrig,svadu
+Boot HART PMP Count       : 16
+Boot HART PMP Granularity : 2 bits
+Boot HART PMP Address Bits: 54
+Boot HART MHPM Info       : 16 (0x0007fff8)
+Boot HART Debug Triggers  : 2 triggers
+Boot HART MIDELEG         : 0x0000000000001666
+Boot HART MEDELEG         : 0x0000000000f0b509
+[    0.000000] Booting Linux on hartid 0
+[    0.000000] Linux version 6.18.60-0-lts (buildozer@build-edge-riscv64) (cc (Alpine 15.2.0) 15.2.0, GNU ld (GNU Binutils) 2.45.1) #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20
+[    0.000000] random: crng init done
+[    0.000000] Machine model: riscv-virtio,qemu
+[    0.000000] SBI specification v2.0 detected
+[    0.000000] SBI implementation ID=0x1 Version=0x10005
+[    0.000000] SBI TIME extension detected
+[    0.000000] SBI IPI extension detected
+[    0.000000] SBI RFENCE extension detected
+[    0.000000] SBI SRST extension detected
+[    0.000000] SBI DBCN extension detected
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bee00000
+[    0.000000] OF: reserved mem: 0x0000000080000000..0x000000008003ffff (256 KiB) nomap non-reusable mmode_resv1@80000000
+[    0.000000] OF: reserved mem: 0x0000000080040000..0x000000008005ffff (128 KiB) nomap non-reusable mmode_resv0@80040000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0xbfff10c0-0xbfff2f7f]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA32    [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000]   Normal   empty
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000080000000-0x000000008005ffff]
+[    0.000000]   node   0: [mem 0x0000000080060000-0x00000000bfffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000080000000-0x00000000bfffffff]
+[    0.000000] SBI HSM extension detected
+[    0.000000] riscv: base ISA extensions acdfhim
+[    0.000000] riscv: ELF capabilities acdfim
+[    0.000000] Queued spinlock using Ziccrse: enabled
+[    0.000000] percpu: Embedded 22 pages/cpu s50904 r8192 d31016 u90112
+[    0.000000] Kernel command line: console=ttyS0 rdinit=/init
+[    0.000000] printk: log buffer data + meta data: 262144 + 917504 = 1179648 bytes
+[    0.000000] Dentry cache hash table entries: 131072 (order: 8, 1048576 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.000000] software IO TLB: SWIOTLB bounce buffer size adjusted to 1MB
+[    0.000000] software IO TLB: area num 1.
+[    0.000000] software IO TLB: mapped [mem 0x00000000bcd00000-0x00000000bce00000] (1MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 262144
+[    0.000000] Policy zone: DMA32
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Dynamic Preempt: full
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 100 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=1
+[    0.000000] RCU Tasks: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] RCU Tasks Trace: Setting shift to 0 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=1.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] riscv-intc: 64 local interrupts mapped
+[    0.000000] riscv: providing IPIs using SBI IPI extension
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 1911260446275000 ns
+[    0.000000] clocksource: riscv_clocksource: mask: 0xffffffffffffffff max_cycles: 0x24e6a1710, max_idle_ns: 440795202120 ns
+[    0.000044] sched_clock: 64 bits at 10MHz, resolution 100ns, wraps every 4398046511100ns
+[    0.000141] riscv-timer: Timer interrupt in S-mode is available via sstc extension
+[    0.006900] Console: colour dummy device 80x25
+[    0.009088] Calibrating delay loop (skipped), value calculated using timer frequency.. 20.00 BogoMIPS (lpj=10000)
+[    0.009285] pid_max: default: 32768 minimum: 301
+[    0.011403] LSM: initializing lsm=capability
+[    0.012882] Mount-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.012916] Mountpoint-cache hash table entries: 2048 (order: 2, 16384 bytes, linear)
+[    0.041169] riscv: ELF compat mode supported
+[    0.041389] ASID allocator using 16 bits (65536 entries)
+[    0.042255] rcu: Hierarchical SRCU implementation.
+[    0.042275] rcu: 	Max phase no-delay instances is 400.
+[    0.044004] EFI services will not be available.
+[    0.044489] smp: Bringing up secondary CPUs ...
+[    0.045022] smp: Brought up 1 node, 1 CPU
+[    0.051117] Memory: 969144K/1048576K available (9115K kernel code, 5214K rwdata, 4096K rodata, 2311K init, 504K bss, 59644K reserved, 16384K cma-reserved)
+[    0.057576] devtmpfs: initialized
+[    0.066233] posixtimers hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.066499] futex hash table entries: 256 (16384 bytes on 1 NUMA nodes, total 16 KiB, linear).
+[    0.069367] pinctrl core: initialized pinctrl subsystem
+[    0.077198] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.084043] DMA: preallocated 128 KiB GFP_KERNEL pool for atomic allocations
+[    0.084392] DMA: preallocated 128 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.088400] thermal_sys: Registered thermal governor 'step_wise'
+[    0.088440] thermal_sys: Registered thermal governor 'user_space'
+[    0.088917] cpuidle: using governor menu
+[    0.102280] cpu0: Ratio of byte access time to unaligned word access is 6.88, unaligned accesses are fast
+[    0.117657] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.117691] HugeTLB: 16380 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.117704] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.117707] HugeTLB: 28 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.123219] iommu: Default domain type: Translated
+[    0.123249] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.124103] SCSI subsystem initialized
+[    0.125167] usbcore: registered new interface driver usbfs
+[    0.125407] usbcore: registered new interface driver hub
+[    0.125511] usbcore: registered new device driver usb
+[    0.125866] pps_core: LinuxPPS API ver. 1 registered
+[    0.125876] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <redacted.invalid>
+[    0.136201] vgaarb: loaded
+[    0.137110] clocksource: Switched to clocksource riscv_clocksource
+[    0.139605] VFS: Disk quotas dquot_6.6.0
+[    0.139727] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.154511] NET: Registered PF_INET protocol family
+[    0.155681] IP idents hash table entries: 16384 (order: 5, 131072 bytes, linear)
+[    0.160348] tcp_listen_portaddr_hash hash table entries: 512 (order: 1, 8192 bytes, linear)
+[    0.160458] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.160527] TCP established hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.160709] TCP bind hash table entries: 8192 (order: 6, 262144 bytes, linear)
+[    0.160929] TCP: Hash tables configured (established 8192 bind 8192)
+[    0.162143] MPTCP token hash table entries: 1024 (order: 3, 24576 bytes, linear)
+[    0.162373] UDP hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.162574] UDP-Lite hash table entries: 512 (order: 3, 32768 bytes, linear)
+[    0.163725] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.164076] PCI: CLS 0 bytes, default 64
+[    0.167522] Initialise system trusted keyrings
+[    0.172690] Unpacking initramfs...
+[    0.174113] workingset: timestamp_bits=44 max_order=18 bucket_order=0
+[    0.247208] Freeing initrd memory: 1208K
+[    0.260410] NET: Registered PF_ALG protocol family
+[    0.260547] Key type asymmetric registered
+[    0.260608] Asymmetric key parser 'x509' registered
+[    0.261604] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 249)
+[    0.264714] riscv-plic: plic@c000000: mapped 95 interrupts with 1 handlers for 2 contexts.
+[    0.270942] pci-host-generic 30000000.pci: host bridge /soc/pci@30000000 ranges:
+[    0.271499] pci-host-generic 30000000.pci:       IO 0x0003000000..0x000300ffff -> 0x0000000000
+[    0.271869] pci-host-generic 30000000.pci:      MEM 0x0040000000..0x007fffffff -> 0x0040000000
+[    0.271920] pci-host-generic 30000000.pci:      MEM 0x0400000000..0x07ffffffff -> 0x0400000000
+[    0.272445] pci-host-generic 30000000.pci: Memory resource size exceeds max for 32 bits
+[    0.272876] pci-host-generic 30000000.pci: ECAM at [mem 0x30000000-0x3fffffff] for [bus 00-ff]
+[    0.274371] pci-host-generic 30000000.pci: PCI host bridge to bus 0000:00
+[    0.274542] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    0.274588] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+[    0.274616] pci_bus 0000:00: root bus resource [mem 0x40000000-0x7fffffff]
+[    0.274621] pci_bus 0000:00: root bus resource [mem 0x400000000-0x7ffffffff]
+[    0.275650] pci 0000:00:00.0: [1b36:0008] type 00 class 0x060000 conventional PCI endpoint
+[    0.279702] pci_bus 0000:00: resource 4 [io  0x0000-0xffff]
+[    0.279730] pci_bus 0000:00: resource 5 [mem 0x40000000-0x7fffffff]
+[    0.279736] pci_bus 0000:00: resource 6 [mem 0x400000000-0x7ffffffff]
+[    0.287157] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.300747] printk: legacy console [ttyS0] disabled
+[    0.306404] 10000000.serial: ttyS0 at MMIO 0x10000000 (irq = 12, base_baud = 230400) is a 16550A
+[    0.309912] printk: legacy console [ttyS0] enabled
+[    0.377526] usbcore: registered new interface driver uas
+[    0.378377] usbcore: registered new interface driver usb-storage
+[    0.382167] goldfish_rtc 101000.rtc: registered as rtc0
+[    0.382994] goldfish_rtc 101000.rtc: setting system clock to 2026-11-08T14:36:54 UTC (1794148614)
+[    0.385675] i2c_dev: i2c /dev entries driver
+[    0.390291] riscv-pmu-sbi: SBI PMU extension is available
+[    0.391152] riscv-pmu-sbi: 16 firmware and 18 hardware counters
+[    0.391537] riscv-pmu-sbi: Perf sampling/filtering is not supported as sscof extension is not available
+[    0.396736] NET: Registered PF_INET6 protocol family
+[    0.403238] Segment Routing with IPv6
+[    0.403629] In-situ OAM (IOAM) with IPv6
+[    0.434738] registered taskstats version 1
+[    0.438548] Loading compiled-in X.509 certificates
+[    0.448922] Loaded X.509 cert 'alpinelinux.org: Build time autogenerated kernel key: 349db16f407a8214eee0c67a7bd6e906f71d99d1'
+[    0.459993] Demotion targets for Node 0: null
+[    0.460941] Key type .fscrypt registered
+[    0.461219] Key type fscrypt-provisioning registered
+[    0.464675] clk: Disabling unused clocks
+[    0.465069] PM: genpd: Disabling unused power domains
+[    0.499924] Freeing unused kernel image (initmem) memory: 2308K
+[    0.500956] Run /init as init process
+[    0.586487] virtio_blk virtio0: 1/0/0 default/read/poll queues
+[    0.592416] virtio_blk virtio0: [vda] 8388608 512-byte logical blocks (4.29 GB/4.00 GiB)
+REF_MODULES_OK
+[    0.685384] EXT4-fs (vda): mounted filesystem 362039d9-0839-44c2-a906-fb38bb1e9b25 r/w with ordered data mode. Quota mode: none.
+REF_MOUNT_OK
+REF_RUN_GLIBC
+#### OS COMP TEST GROUP START basic-glibc ####
+Testing brk :
+========== START test_brk ==========
+Before alloc,heap pos: 1678700544
+After alloc,heap pos: 1678700544
+Alloc again,heap pos: 1678700544
+========== END test_brk ==========
+Testing chdir :
+========== START test_chdir ==========
+chdir ret: 0
+  current working dir : /basic/test_chdir
+========== END test_chdir ==========
+Testing clone :
+========== START test_clone ==========
+  Child says successfully!
+clone process successfully.
+pid:457
+========== END test_clone ==========
+Testing close :
+========== START test_close ==========
+  close 3 success.
+========== END test_close ==========
+Testing dup2 :
+========== START test_dup2 ==========
+  from fd 100
+========== END test_dup2 ==========
+Testing dup :
+========== START test_dup ==========
+  new fd is 3.
+========== END test_dup ==========
+Testing execve :
+========== START test_execve ==========
+  I am test_echo.
+execve success.
+========== END main ==========
+Testing exit :
+========== START test_exit ==========
+exit OK.
+========== END test_exit ==========
+Testing fork :
+========== START test_fork ==========
+  child process.
+  parent process. wstatus:0
+========== END test_fork ==========
+Testing fstat :
+========== START test_fstat ==========
+fstat ret: 0
+fstat: dev: 65024, inode: 131106, mode: 33188, nlink: 1, size: 52, atime: 1749913917, mtime: 1749913917, ctime: 1749913917
+========== END test_fstat ==========
+Testing getcwd :
+========== START test_getcwd ==========
+getcwd: /basic successfully!
+========== END test_getcwd ==========
+Testing getdents :
+========== START test_getdents ==========
+open fd:3
+getdents fd:512
+getdents success.
+dup
+
+========== END test_getdents ==========
+Testing getpid :
+========== START test_getpid ==========
+getpid success.
+pid = 469
+========== END test_getpid ==========
+Testing getppid :
+========== START test_getppid ==========
+  getppid success. ppid : 453
+========== END test_getppid ==========
+Testing gettimeofday :
+========== START test_gettimeofday ==========
+gettimeofday success.
+start:35079007, end:35079029
+interval: 22
+========== END test_gettimeofday ==========
+Testing mkdir_ :
+========== START test_mkdir ==========
+mkdir ret: 0
+  mkdir success.
+========== END test_mkdir ==========
+Testing mmap :
+========== START test_mmap ==========
+file len: 27
+mmap content:   Hello, mmap successfully!
+========== END test_mmap ==========
+Testing mount :
+========== START test_mount ==========
+Mounting dev:/dev/vda2 to ./mnt
+mount return: -19
+
+ --- Assert Fatal ! ---
+Testing munmap :
+========== START test_munmap ==========
+file len: 27
+munmap return: 0
+munmap successfully!
+========== END test_munmap ==========
+Testing openat :
+========== START test_openat ==========
+open dir fd: 3
+openat fd: 4
+openat success.
+========== END test_openat ==========
+Testing open :
+========== START test_open ==========
+Hi, this is a text file.
+syscalls testing success!
+
+========== END test_open ==========
+Testing pipe :
+========== START test_pipe ==========
+cpid: cpid: 0
+480
+  Write to pipe successfully.
+
+========== END test_pipe ==========
+Testing read :
+========== START test_read ==========
+Hi, this is a text file.
+syscalls testing success!
+
+========== END test_read ==========
+Testing sleep :
+========== START test_sleep ==========
+sleep success.
+========== END test_sleep ==========
+Testing times :
+========== START test_times ==========
+mytimes success
+{tms_utime:0, tms_stime:0, tms_cutime:0, tms_cstime:0}
+========== END test_times ==========
+Testing umount :
+========== START test_umount ==========
+Mounting dev:/dev/vda2 to ./mnt
+mount return: -19
+========== END test_umount ==========
+Testing uname :
+========== START test_uname ==========
+Uname: Linux (none) 6.18.60-0-lts #1-Alpine SMP PREEMPT_DYNAMIC 2026-10-30 19:05:20 riscv64 (none)
+========== END test_uname ==========
+Testing unlink :
+========== START test_unlink ==========
+  unlink success!
+========== END test_unlink ==========
+Testing wait :
+========== START test_wait ==========
+This is child process
+wait child success.
+wstatus: 0
+========== END test_wait ==========
+Testing waitpid :
+========== START test_waitpid ==========
+This is child process
+waitpid successfully.
+wstatus: 3
+========== END test_waitpid ==========
+Testing write :
+========== START test_write ==========
+Hello operating system contest.
+========== END test_write ==========
+Testing yield :
+========== START test_yield ==========
+  I am child process: 494. iteration 0.
+  I am child process: 494. iteration 0.
+  I am child process: 494. iteration 0.
+  I am child process: 495. iteration 1.
+  I am child process: 496. iteration 2.
+  I am child process: 495. iteration 1.
+  I am child process: 494. iteration 0.
+  I am child process: 496. iteration 2.
+  I am child process: 494. iteration 0.
+  I am child process: 495. iteration 1.
+  I am child process: 496. iteration 2.
+  I am child process: 495. iteration 1.
+  I am child process: 495. iteration 1.
+  I am child process: 496. iteration 2.
+  I am child process: 496. iteration 2.
+========== END test_yield ==========
+#### OS COMP TEST GROUP END basic-glibc ####
+REF_GLIBC_DONE
+REF_RUN_MUSL
+#### OS COMP TEST GROUP START basic-musl ####
+Testing brk :
+./run-all.sh: line 40: ./brk: not found
+Testing chdir :
+./run-all.sh: line 40: ./chdir: not found
+Testing clone :
+./run-all.sh: line 40: ./clone: not found
+Testing close :
+./run-all.sh: line 40: ./close: not found
+Testing dup2 :
+./run-all.sh: line 40: ./dup2: not found
+Testing dup :
+./run-all.sh: line 40: ./dup: not found
+Testing execve :
+./run-all.sh: line 40: ./execve: not found
+Testing exit :
+./run-all.sh: line 40: ./exit: not found
+Testing fork :
+./run-all.sh: line 40: ./fork: not found
+Testing fstat :
+./run-all.sh: line 40: ./fstat: not found
+Testing getcwd :
+./run-all.sh: line 40: ./getcwd: not found
+Testing getdents :
+./run-all.sh: line 40: ./getdents: not found
+Testing getpid :
+./run-all.sh: line 40: ./getpid: not found
+Testing getppid :
+./run-all.sh: line 40: ./getppid: not found
+Testing gettimeofday :
+./run-all.sh: line 40: ./gettimeofday: not found
+Testing mkdir_ :
+./run-all.sh: line 40: ./mkdir_: not found
+Testing mmap :
+./run-all.sh: line 40: ./mmap: not found
+Testing mount :
+./run-all.sh: line 40: ./mount: not found
+Testing munmap :
+./run-all.sh: line 40: ./munmap: not found
+Testing openat :
+./run-all.sh: line 40: ./openat: not found
+Testing open :
+./run-all.sh: line 40: ./open: not found
+Testing pipe :
+./run-all.sh: line 40: ./pipe: not found
+Testing read :
+./run-all.sh: line 40: ./read: not found
+Testing sleep :
+./run-all.sh: line 40: ./sleep: not found
+Testing times :
+./run-all.sh: line 40: ./times: not found
+Testing umount :
+./run-all.sh: line 40: ./umount: not found
+Testing uname :
+./run-all.sh: line 40: ./uname: not found
+Testing unlink :
+./run-all.sh: line 40: ./unlink: not found
+Testing wait :
+./run-all.sh: line 40: ./wait: not found
+Testing waitpid :
+./run-all.sh: line 40: ./waitpid: not found
+Testing write :
+./run-all.sh: line 40: ./write: not found
+Testing yield :
+./run-all.sh: line 40: ./yield: not found
+#### OS COMP TEST GROUP END basic-musl ####
+REF_MUSL_DONE
+REF_ALL_DONE
+[    2.188724] reboot: Power down

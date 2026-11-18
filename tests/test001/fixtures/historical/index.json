@@ -1,0 +1,192 @@
+{
+  "cases": [
+    {
+      "expected": "expected/basic-glibc.json",
+      "expected_sha256": "35c2d802a74a425abd5d03447a900ab19d87884bbd54ab42acd884cc85e6e6cb",
+      "group": "basic",
+      "libc": "glibc",
+      "log": "logs/ref_basic2.log",
+      "log_sha256": "b2033f0b33f3e7a5a56091041ca8937a80d0641e706d06eefdca208cd2ed825b",
+      "sample": "basic-glibc"
+    },
+    {
+      "expected": "expected/basic-musl.json",
+      "expected_sha256": "2541044b47e34ef8804c81bd2234adee0b76d31f8dcce1c3a294281f5675f839",
+      "group": "basic",
+      "libc": "musl",
+      "log": "logs/ref_basic2.log",
+      "log_sha256": "b2033f0b33f3e7a5a56091041ca8937a80d0641e706d06eefdca208cd2ed825b",
+      "sample": "basic-musl"
+    },
+    {
+      "expected": "expected/busybox-glibc.json",
+      "expected_sha256": "f7cc8400601f3e62eddd643790827619f1d74280f74ff1148cb494b464c4441f",
+      "group": "busybox",
+      "libc": "glibc",
+      "log": "logs/ref_lua3.log",
+      "log_sha256": "97dfe70b2064a480b9911889e784a1db60418d14f06ee38d9b802fc49b45572e",
+      "sample": "busybox-glibc"
+    },
+    {
+      "expected": "expected/busybox-musl.json",
+      "expected_sha256": "cb96a7d8a406f396123cfdfd1517a9bc441ff7cda090e8a59ab68b71fd893599",
+      "group": "busybox",
+      "libc": "musl",
+      "log": "logs/ref_lua3.log",
+      "log_sha256": "97dfe70b2064a480b9911889e784a1db60418d14f06ee38d9b802fc49b45572e",
+      "sample": "busybox-musl"
+    },
+    {
+      "expected": "expected/lua-glibc.json",
+      "expected_sha256": "f7cc8400601f3e62eddd643790827619f1d74280f74ff1148cb494b464c4441f",
+      "group": "lua",
+      "libc": "glibc",
+      "log": "logs/ref_lua3.log",
+      "log_sha256": "97dfe70b2064a480b9911889e784a1db60418d14f06ee38d9b802fc49b45572e",
+      "sample": "lua-glibc"
+    },
+    {
+      "expected": "expected/lua-musl.json",
+      "expected_sha256": "cb96a7d8a406f396123cfdfd1517a9bc441ff7cda090e8a59ab68b71fd893599",
+      "group": "lua",
+      "libc": "musl",
+      "log": "logs/ref_lua3.log",
+      "log_sha256": "97dfe70b2064a480b9911889e784a1db60418d14f06ee38d9b802fc49b45572e",
+      "sample": "lua-musl"
+    },
+    {
+      "expected": "expected/libctest-glibc.json",
+      "expected_sha256": "822bff977e18b07fc35306a16797ee467e7198e74ab8c1a5532727aa24ebac0f",
+      "group": "libctest",
+      "libc": "glibc",
+      "log": "logs/ref_libctest.log",
+      "log_sha256": "d30bf06cd57c041b66cea75e15a3246c8f8ac2ba02bb3d98c0fc7b87b7ae4dc4",
+      "sample": "libctest-glibc"
+    },
+    {
+      "expected": "expected/libctest-musl.json",
+      "expected_sha256": "ac337d59200bdc19a5af8c20f01e53a3139b8de172263bc2392eb3c0d1578361",
+      "group": "libctest",
+      "libc": "musl",
+      "log": "logs/ref_libctest.log",
+      "log_sha256": "d30bf06cd57c041b66cea75e15a3246c8f8ac2ba02bb3d98c0fc7b87b7ae4dc4",
+      "sample": "libctest-musl"
+    },
+    {
+      "expected": "expected/iozone-glibc.json",
+      "expected_sha256": "92bc606a9dff0b69db697aba80c7fd04d7c714ccfea7f7c698b01edffce928f1",
+      "group": "iozone",
+      "libc": "glibc",
+      "log": "logs/ref_perf.log",
+      "log_sha256": "52d21d33e1bf1557ff1481fda589692fccbe93341c3f8cd89200b8fe70d98665",
+      "sample": "iozone-glibc"
+    },
+    {
+      "expected": "expected/libcbench-glibc.json",
+      "expected_sha256": "92bc606a9dff0b69db697aba80c7fd04d7c714ccfea7f7c698b01edffce928f1",
+      "group": "libcbench",
+      "libc": "glibc",
+      "log": "logs/ref_perf.log",
+      "log_sha256": "52d21d33e1bf1557ff1481fda589692fccbe93341c3f8cd89200b8fe70d98665",
+      "sample": "libcbench-glibc"
+    },
+    {
+      "expected": "expected/lmbench-glibc.json",
+      "expected_sha256": "6d655995d3ba46c0a09c2bd677716e0db0901eb99340611f7d18b96eedb3a72a",
+      "group": "lmbench",
+      "libc": "glibc",
+      "log": "logs/ref_perf.log",
+      "log_sha256": "52d21d33e1bf1557ff1481fda589692fccbe93341c3f8cd89200b8fe70d98665",
+      "sample": "lmbench-glibc"
+    },
+    {
+      "expected": "expected/cyclictest-glibc.json",
+      "expected_sha256": "55c087bda5a2ad14afeec360d85e9f1f164080ef5b5bc286650d502d9becb83f",
+      "group": "cyclictest",
+      "libc": "glibc",
+      "log": "logs/ref_cyclic.log",
+      "log_sha256": "6006a0a965f568d7a715ad7b57f4e7fa40b28e174e3f2b63293cc4b9b8693ac4",
+      "sample": "cyclictest-glibc"
+    },
+    {
+      "expected": "expected/unixbench-glibc.json",
+      "expected_sha256": "4224715dcfe91b509027815f1e1b4fdc985e5902e0ee33131ce6511460f9849c",
+      "group": "unixbench",
+      "libc": "glibc",
+      "log": "logs/ref_unixbench.log",
+      "log_sha256": "54bf98c2017cd4cc06801ca0bb2ba197a8542ed1ecfc0c4e2d6d169ec492bee3",
+      "sample": "unixbench-glibc"
+    },
+    {
+      "expected": "expected/iperf-glibc.json",
+      "expected_sha256": "5d4981f0f93117280f5da123b4329bba691bb62133da2c6ce818a7b36395016f",
+      "group": "iperf",
+      "libc": "glibc",
+      "log": "logs/ref_net4.log",
+      "log_sha256": "a176fb1e2e876334781fe27a70409ca7449f2e6747d22108ffc773ed9e5c354f",
+      "sample": "iperf-glibc"
+    },
+    {
+      "expected": "expected/netperf-glibc.json",
+      "expected_sha256": "5d4981f0f93117280f5da123b4329bba691bb62133da2c6ce818a7b36395016f",
+      "group": "netperf",
+      "libc": "glibc",
+      "log": "logs/ref_net4.log",
+      "log_sha256": "a176fb1e2e876334781fe27a70409ca7449f2e6747d22108ffc773ed9e5c354f",
+      "sample": "netperf-glibc"
+    }
+  ],
+  "kind": "test001_historical_replay_fixtures",
+  "redactions": [
+    {
+      "file": "logs/ref_basic2.log",
+      "fixture_sha256": "b2033f0b33f3e7a5a56091041ca8937a80d0641e706d06eefdca208cd2ed825b",
+      "original_sha256": "009dc11bd6fd5ed96ae81ae443665987cf67e8b6372ea6700252fd865990e736",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_cyclic.log",
+      "fixture_sha256": "6006a0a965f568d7a715ad7b57f4e7fa40b28e174e3f2b63293cc4b9b8693ac4",
+      "original_sha256": "7322b7dcb8e8c2655e36591e401d608ccc47d27fb7b8dc1f388ff8a2e06337ba",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_libctest.log",
+      "fixture_sha256": "d30bf06cd57c041b66cea75e15a3246c8f8ac2ba02bb3d98c0fc7b87b7ae4dc4",
+      "original_sha256": "f9b7c6bc6d0c9d6744913002a056a7761f05aeb40d41aea447c826048d79cb45",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_lua3.log",
+      "fixture_sha256": "97dfe70b2064a480b9911889e784a1db60418d14f06ee38d9b802fc49b45572e",
+      "original_sha256": "fd954fdb480553d6b2a94e295556a46a899dfcc33cfecf971f979f1fb8013bcc",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_net4.log",
+      "fixture_sha256": "a176fb1e2e876334781fe27a70409ca7449f2e6747d22108ffc773ed9e5c354f",
+      "original_sha256": "bbe040fdd1eeb492a49277368d4db09511d509d361e33ef2a464ac763924d174",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_perf.log",
+      "fixture_sha256": "52d21d33e1bf1557ff1481fda589692fccbe93341c3f8cd89200b8fe70d98665",
+      "original_sha256": "94a77443f7225477d01dab38734c1c18a6106fe5b9ba323220d2c6a142c1da83",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    },
+    {
+      "file": "logs/ref_unixbench.log",
+      "fixture_sha256": "54bf98c2017cd4cc06801ca0bb2ba197a8542ed1ecfc0c4e2d6d169ec492bee3",
+      "original_sha256": "3c43ea667eb9d8a31125a6a77db567e940f2d77a47b925421539fbe90cba9be9",
+      "redaction": "upstream boot-line email -> redacted.invalid"
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "archive_sha256": "8e55f993507a9cd7eb4ad9d01dd6f4f0c2b243db5e470604c3b9836bb703c8fd",
+    "captured_at": "2026-11-08",
+    "note": "参考 Linux/QEMU 历史日志的脱敏测试副本；不是 FocOS 成绩，也不是新的采集。",
+    "repository": "Weibo-Hd/Focos",
+    "tag": "test-001-evidence-2026-11-08"
+  }
+}

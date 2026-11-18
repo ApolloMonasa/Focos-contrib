@@ -1,0 +1,38 @@
+{
+  "artifacts": {
+    "initramfs_note": "参考 Linux 验证用 initramfs 的临时副本：只增加 busybox applet 链接并运行未修改的 ltp_testcode.sh；不在仓库内。",
+    "initramfs_sha256": "b0e02dcba160bdbbb06845400fb1d394c444bf28249de59d7a3f664d233701e1",
+    "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+    "qemu": "qemu-system-riscv64 -machine virt -m 1G -smp 1 -nographic -no-reboot -snapshot -bios default -kernel Image -initrd initramfs -append \"console=ttyS0 rdinit=/init\" -drive file=sdcard-rv.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0"
+  },
+  "environment_note": "initramfs 由已冻结的参考 Linux 构件临时组装；cwd 为 /glibc，LTP 包装脚本未改动。shell 辅助项和 cwd 与比赛平台可能不同，结果只用于解析器正反例。",
+  "kind": "test001_ltp_reference_sample",
+  "log": {
+    "file": "reference-ltp-sample-2026-11-18.log",
+    "fixture_sha256": "79da59a03db9fda1cbfe29bbfad4c180a1f1400ff6f620b0799f82a9c853f251",
+    "original_sha256": "8f1c38d87607ef51a5636a82317c6757ecb376b373f532ebdeee18394e0db0cc",
+    "redaction": "upstream boot-line email -> redacted.invalid",
+    "size": 57376
+  },
+  "observed": {
+    "complete_cases": 106,
+    "fail_lines": 106,
+    "note": "主机 120 秒超时后终止，保留已发生的真实输出；不是完整批次，不是 Focos 成绩。",
+    "run_lines": 107,
+    "tpass_lines": 129,
+    "truncated_at": "cgroup_fj_proc"
+  },
+  "schema_version": 1,
+  "source": {
+    "branch": "pre-2025",
+    "captured_at": "2026-11-18",
+    "commit": "8b58dd16d26d30f7c74d48d5832d870d3051b703",
+    "image": "pre-20250615/sdcard-rv.img.xz",
+    "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+    "kernel": "Alpine linux-lts 6.18.63-r0 (validation artifact)",
+    "libc": "glibc",
+    "ltp_version": "20240524",
+    "qemu": "QEMU 10.2.2 / OpenSBI 1.7 local run",
+    "repository": "https://github.com/oscomp/testsuits-for-oskernel"
+  }
+}
