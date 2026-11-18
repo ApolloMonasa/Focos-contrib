@@ -151,6 +151,19 @@ def audit(data, lock):
     }
 
 
+def run_debugfs(arguments, context, timeout):
+    try:
+        return subprocess.run(['debugfs', *arguments], capture_output=True,
+                              timeout=timeout, check=True)
+    except (OSError, subprocess.SubprocessError) as error:
+        diagnostic = getattr(error, 'stderr', None) or b''
+        if isinstance(diagnostic, bytes):
+            diagnostic = diagnostic.decode('utf-8', errors='replace')
+        raise subprocess.SubprocessError(
+            f'debugfs {context} failed: {error}; {diagnostic}'
+        ) from error
+
+
 def verify_image(image, lock):
     # 整盘先复制到私有目录再核对实际消费字节；debugfs 不带 -w，不运行来宾代码。
     with tempfile.TemporaryDirectory(prefix='test001-audit-') as tmp:
@@ -158,7 +171,10 @@ def verify_image(image, lock):
         shutil.copyfile(image, snapshot)
         expected = lock['image']
         with snapshot.open('rb') as stream:
-            actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+            image_hash = hashlib.sha256()
+            for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                image_hash.update(chunk)
+            actual = image_hash.hexdigest()
         if snapshot.stat().st_size != expected['uncompressed_size'] or actual != expected['uncompressed_sha256']:
             raise ValueError('image identity mismatch')
         if shutil.which('debugfs') is None:
@@ -169,13 +185,20 @@ def verify_image(image, lock):
             # 路径来自仓库锁，不接受调用者的 debugfs 命令。
             if not re.fullmatch(r'/[a-z0-9_./]+', meta['path']) or '..' in meta['path']:
                 raise ValueError('invalid locked image path')
-            result = subprocess.run(['debugfs', '-R', 'cat ' + meta['path'], str(snapshot)],
-                                    capture_output=True, timeout=30, check=True)
+            result = run_debugfs(['-R', 'cat ' + meta['path'], str(snapshot)],
+                                 f'member read: {name}', 30)
             # debugfs 某些读取错误仍退出 0，长度和哈希必须同时符合。
-            check_bytes(result.stdout, meta, name)
+            try:
+                check_bytes(result.stdout, meta, name)
+            except ValueError as error:
+                # 整盘已通过身份校验：此时错误属于提取工具，不是调用者输入。
+                diagnostic = result.stderr.decode('utf-8', errors='replace').strip()
+                raise subprocess.SubprocessError(
+                    f'debugfs member verification failed: {name}; {diagnostic}'
+                ) from error
         return {'status': 'VERIFIED', 'sha256': actual, 'members': len(members),
-                'tool': subprocess.run(['debugfs', '-V'], capture_output=True,
-                                       check=True, timeout=10).stderr.decode().strip()}
+                'tool': run_debugfs(['-V'], 'version query', 10).stderr.decode(
+                    'utf-8', errors='replace').strip()}
 
 
 def main():

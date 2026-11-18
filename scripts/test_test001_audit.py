@@ -106,6 +106,68 @@ class AuditTests(unittest.TestCase):
                     verify_image(image, lock)
                 run.assert_not_called()
 
+    def test_image_hash_without_python311_api(self):
+        import hashlib
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / 'image'
+            image.write_bytes(b'not the frozen image')
+            _, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+            # 模拟 Python 3.10 不提供 file_digest；仍须正常识别坏镜像。
+            with patch.dict(hashlib.__dict__):
+                hashlib.__dict__.pop('file_digest', None)
+                with self.assertRaisesRegex(ValueError, 'image identity mismatch'):
+                    verify_image(image, lock)
+
+    def test_debugfs_member_errors_are_execution_errors(self):
+        import contextlib
+        import hashlib
+        import io
+        from unittest.mock import patch
+        from test001_audit import main
+        data, _ = load_inputs(ROOT / 'tests/test001/audit-inputs')
+        # 合成镜像用于 host 控制流测试，不是 ext4 或真实采集证据。
+        image_bytes = b'synthetic image'
+        member_bytes = b'abc'
+        lock = {
+            'image': {'uncompressed_size': len(image_bytes),
+                      'uncompressed_sha256': hashlib.sha256(image_bytes).hexdigest()},
+            'files': {'musl/member': {'path': '/musl/member', 'source': 'image',
+                                    'size': 3, 'sha256': hashlib.sha256(member_bytes).hexdigest()}},
+            'executables': {},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / 'image'
+            image.write_bytes(image_bytes)
+            for stdout, stderr, failure in [
+                (b'', b'File not found by ext2_lookup', None),
+                (b'ab', b'short read', None),
+                (b'xyz', b'wrong bytes', None),
+                (b'', b'read error', subprocess.CalledProcessError(1, 'debugfs', stderr=b'read error')),
+                (b'', b'timed out', subprocess.TimeoutExpired('debugfs', 30, stderr=b'timed out')),
+                (b'', b'tool vanished', FileNotFoundError('tool vanished')),
+            ]:
+                with self.subTest(stdout=stdout, failure=failure):
+                    out, err = io.StringIO(), io.StringIO()
+                    response = subprocess.CompletedProcess(['debugfs'], 0, stdout, stderr)
+                    with patch('test001_audit.load_inputs', return_value=(data, lock)), \
+                         patch('test001_audit.shutil.which', return_value='/usr/bin/debugfs'), \
+                         patch('test001_audit.subprocess.run', return_value=response, side_effect=failure), \
+                         patch.object(sys, 'argv', ['audit', '--verify-image', str(image)]), \
+                         contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                        code = main()
+                    self.assertEqual(code, 1)
+                    self.assertEqual(out.getvalue(), '')
+                    self.assertIn('musl/member', err.getvalue())
+                    self.assertIn(stderr.decode(), err.getvalue())
+
+    def test_debugfs_version_start_failure_is_execution_error(self):
+        from unittest.mock import patch
+        from test001_audit import run_debugfs
+        with patch('test001_audit.subprocess.run', side_effect=FileNotFoundError('missing')):
+            with self.assertRaisesRegex(subprocess.SubprocessError, 'version query'):
+                run_debugfs(['-V'], 'version query', 10)
+
     def test_cli_bad_input_has_no_json(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/test001_audit.py'),
