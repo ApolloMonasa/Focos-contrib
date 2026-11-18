@@ -1,12 +1,11 @@
 """A0 审计负例：不执行镜像命令或官方 judge。"""
-import copy
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-from test001_audit import audit, read_command_lines, judge_commands, load_inputs
+from test001_audit import audit, read_command_lines, judge_commands, load_inputs, verify_image
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -20,7 +19,7 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(rows[0]['raw'], ' date ')
 
     def test_read_matches_real_shell_without_eval(self):
-        raw = b' date \nprintf "abc\\n"\necho a\\ b\n'
+        raw = (ROOT / 'tests/test001/audit-inputs/musl/busybox_cmd.txt').read_bytes()
         result = subprocess.run(['/bin/sh', '-c',
                                  'while read line; do printf "%s\\n" "$line"; done'],
                                 input=raw, capture_output=True, check=True)
@@ -28,7 +27,7 @@ class AuditTests(unittest.TestCase):
                          result.stdout.decode().splitlines())
 
     def test_unsupported_command_records_reject(self):
-        for raw in [b'date', b'\n', b'date\r\n', b'echo a\\\nb\n', b'date\x00\n']:
+        for raw in [b'date', b'\n', b'date\r\n', b'echo a\\\nb\n', b'date\x00\n', b'echo a\\ \n', b'echo a\\ b\n']:
             with self.subTest(raw=raw), self.assertRaises(ValueError):
                 read_command_lines(raw)
 
@@ -85,6 +84,34 @@ class AuditTests(unittest.TestCase):
             source.symlink_to(ROOT / 'tests/test001/audit-inputs/musl/busybox_cmd.txt')
             with self.assertRaises(ValueError):
                 load_inputs(root)
+
+    def test_checked_in_candidate_table(self):
+        import json
+        data, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+        result = audit(data, lock)
+        rows = [dict(group_libc=key, **call)
+                for key, group in sorted(result['groups'].items()) for call in group['calls']]
+        actual = [json.loads(line) for line in
+                  (ROOT / 'tests/test001/audit-calls.jsonl').read_text().splitlines()]
+        self.assertEqual(actual, rows)
+
+    def test_bad_image_rejected_before_debugfs(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / 'image'
+            image.write_bytes(b'bad image')
+            _, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+            with patch('test001_audit.subprocess.run') as run:
+                with self.assertRaises(ValueError):
+                    verify_image(image, lock)
+                run.assert_not_called()
+
+    def test_cli_bad_input_has_no_json(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/test001_audit.py'),
+                                     '--inputs', tmp], capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, b'')
 
     def test_cli_deterministic_no_execution_claim(self):
         cmd = [sys.executable, '-B', str(ROOT / 'scripts/test001_audit.py')]
