@@ -110,7 +110,7 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 | judgment | `PASS / PARTIAL / FAIL / MISSING / JUDGE_ERROR / NOT_RUN` | 固定判据与规范化 |
 | acceptance | `PASS / BLOCKED`，附全部原因 | 分析器的单一纯函数 |
 
-`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、input_integrity 为 VERIFIED、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、没有判据错误或未知用例。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
+`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、input_integrity 为 VERIFIED、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、没有判据错误、未知用例或 selection 外的已观察调用。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
 
 例如 `capture=EXITED(exit=7)`、`section=TRUNCATED` 与 `judgment=PASS` 可以同时存在，报告保留三项事实，验收为 BLOCKED，原因包含非零退出与截断；不挑一个状态覆盖其他信息。`observed_pass` 统计规范 judgment 为 PASS 的调用（旧 judge 对照计数另列），`accepted_pass` 只有本运行范围验收通过时才等于该范围的 `selected_total`，否则为 0；始终并列显示 origin 和 subject。性能指标保留单位与原值，不合成总分。
 
@@ -118,7 +118,7 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 
 ## 范围、汇总与退出码
 
-构建清单的 `selection` 是已审配置中显式 `(group, libc, invocation_id)` 集合，非 LTP 冻结项也映射为稳定调用身份；`selected_total` 为该集合大小。组/libc 参数只能选择配置内集合，build 与外部日志 analyze 可用 `--shard SHARD_ID` 选择已审 LTP 分片（须恰好单 libc、group=ltp，缺省选择该组全部调用；未知或冲突参数退出 2）；LTP 分片只能通过已审 shard_id 选择，不能传任意命令或临时过滤器。分析器核对完整集合，不得以旧 427 项代替本次范围，也不得在分析时删掉失败组。范围外项不生成 MISSING/NOT_RUN；范围内缺组为 NOT_RUN、缺项为 MISSING。运行包中出现范围外组/libc 是协议错误，不能悄悄扩展范围。
+构建清单的 `selection` 是已审配置中显式 `(group, libc, invocation_id)` 集合，非 LTP 冻结项也映射为稳定调用身份；`selected_total` 为该集合大小。组/libc 参数只能选择配置内集合，build 与外部日志 analyze 可用 `--shard SHARD_ID` 选择已审 LTP 分片（须恰好单 libc、group=ltp，缺省选择该组全部调用；未知或冲突参数退出 2）；LTP 分片只能通过已审 shard_id 选择，不能传任意命令或临时过滤器。分析器核对完整集合，不得以旧 427 项代替本次范围，也不得在分析时删掉失败组。PROFILE 内未选择的项不因未出现而生成 MISSING/NOT_RUN；但实际观察到未选择的调用（即使是 PROFILE 已知的同组同 libc 调用）必须按[解析契约](test001-analysis-contract.md)记 OUT_OF_SELECTION、协议 ERROR 并阻断验收，不计入范围内通过数或改变分母。范围内缺组为 NOT_RUN、缺项为 MISSING。运行包中出现范围外组/libc 是协议错误，不能悄悄扩展范围。
 
 按候选旧清单，Lua 每套 libc 为 9 项：示例的双 libc Lua 包分母为 18，全部条件满足时 `accepted_pass=18`、`--require-pass` 退出 0；报告必须标明只覆盖 Lua。旧非 LTP 候选全清单为每套 libc 427 项、双 libc 共 854 项；这些数值不适用于含 LTP 配置，不能将 18/18 展示成全套通过。
 
