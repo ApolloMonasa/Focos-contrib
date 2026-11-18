@@ -103,11 +103,19 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
+│   ├── test001_audit.py               # A0 BusyBox/Lua 只读调用审计
+│   ├── test_test001_audit.py          # 审计顺序、重复、read 语义及输入校验
 │   ├── smoke.py                       # 检查 QEMU 启动、真实页读写与中断状态
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
+│   ├── test001/                      # A0 审计输入（非可执行 PROFILE）
+│   │   ├── audit-inputs.lock.json    # 镜像/提取文件/可执行文件身份
+│   │   └── audit-inputs/             # 原样文本证据，不执行
+│   │       ├── musl/                # 四份 shell/命令表与九份 Lua 输入
+│   │       ├── glibc/               # 对应 glibc 文本输入
+│   │       └── judge/               # 两份固定上游 judge，仅静态对照
 │   ├── catalog.json                   # 2024 起步用 basic 清单
 │   ├── regional-plan.json             # 2025 区域赛组清单与待锁定输入
 │   └── sources.lock.json              # 测例仓库和分支的固定提交

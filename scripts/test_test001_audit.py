@@ -1,0 +1,101 @@
+"""A0 审计负例：不执行镜像命令或官方 judge。"""
+import copy
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from test001_audit import audit, read_command_lines, judge_commands, load_inputs
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class AuditTests(unittest.TestCase):
+    def test_read_semantics_preserves_raw_and_duplicate(self):
+        rows = read_command_lines(b' date \n echo "x"\necho "x"\nprintf "abc\\n"\n')
+        self.assertEqual([r['line'] for r in rows], [1, 2, 3, 4])
+        self.assertEqual([r['command'] for r in rows],
+                         ['date', 'echo "x"', 'echo "x"', 'printf "abcn"'])
+        self.assertEqual(rows[0]['raw'], ' date ')
+
+    def test_read_matches_real_shell_without_eval(self):
+        raw = b' date \nprintf "abc\\n"\necho a\\ b\n'
+        result = subprocess.run(['/bin/sh', '-c',
+                                 'while read line; do printf "%s\\n" "$line"; done'],
+                                input=raw, capture_output=True, check=True)
+        self.assertEqual([r['command'] for r in read_command_lines(raw)],
+                         result.stdout.decode().splitlines())
+
+    def test_unsupported_command_records_reject(self):
+        for raw in [b'date', b'\n', b'date\r\n', b'echo a\\\nb\n', b'date\x00\n']:
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                read_command_lines(raw)
+
+    def test_judge_is_parsed_never_executed(self):
+        raw = b'raise RuntimeError("must not execute")\ncmds="a\\nb\\na"\n'
+        self.assertEqual(judge_commands(raw), ['a', 'b', 'a'])
+        for raw in [b'cmds = get_commands()', b'cmds="a"\ncmds="b"']:
+            with self.assertRaises(ValueError):
+                judge_commands(raw)
+
+    def test_real_inventory_counts_and_busybox_differences(self):
+        data, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+        result = audit(data, lock)
+        self.assertEqual(result['status'], 'AUDIT_CANDIDATE')
+        for libc in ['musl', 'glibc']:
+            busy = result['groups'][f'busybox-{libc}']
+            self.assertEqual(len(busy['calls']), 55)
+            self.assertEqual(busy['unique_commands'], 54)
+            self.assertEqual(busy['judge_unique'], 53)
+            self.assertEqual(busy['judge_only'], ['kill 10'])
+            self.assertEqual(busy['image_only_raw'],
+                             ['printf "abc\\n"', "sh -c 'sleep 5' & ./busybox kill $!"])
+            duplicates = [c for c in busy['calls'] if c['command'] == 'echo "bbbbbbb" >> test.txt']
+            self.assertEqual(len(duplicates), 2)
+            self.assertNotEqual(duplicates[0]['candidate_id'], duplicates[1]['candidate_id'])
+            lua = result['groups'][f'lua-{libc}']
+            self.assertEqual(len(lua['calls']), 9)
+            self.assertEqual(lua['image_only_raw'], [])
+            self.assertEqual(lua['judge_only'], [])
+            self.assertEqual(lua['calls'][0]['argv'], ['./test.sh', 'date.lua'])
+
+    def test_hash_mismatch_and_extra_input_rejected(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'inputs'
+            shutil.copytree(ROOT / 'tests/test001/audit-inputs', root)
+            (root / 'musl/busybox_cmd.txt').write_bytes(b'true\n')
+            with self.assertRaises(ValueError):
+                load_inputs(root)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'inputs'
+            shutil.copytree(ROOT / 'tests/test001/audit-inputs', root)
+            (root / 'extra').write_bytes(b'')
+            with self.assertRaises(ValueError):
+                load_inputs(root)
+
+    def test_symlink_input_rejected(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'inputs'
+            shutil.copytree(ROOT / 'tests/test001/audit-inputs', root)
+            source = root / 'musl/busybox_cmd.txt'
+            source.unlink()
+            source.symlink_to(ROOT / 'tests/test001/audit-inputs/musl/busybox_cmd.txt')
+            with self.assertRaises(ValueError):
+                load_inputs(root)
+
+    def test_cli_deterministic_no_execution_claim(self):
+        cmd = [sys.executable, '-B', str(ROOT / 'scripts/test001_audit.py')]
+        first = subprocess.run(cmd, capture_output=True, check=True)
+        second = subprocess.run(cmd, capture_output=True, check=True)
+        self.assertEqual(first.stdout, second.stdout)
+        import json
+        result = json.loads(first.stdout)
+        self.assertEqual(result['image_verification'], 'NOT_RUN')
+        self.assertFalse(result['runtime_ready'])
+
+
+if __name__ == '__main__':
+    unittest.main()
