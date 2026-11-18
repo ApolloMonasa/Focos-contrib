@@ -1,4 +1,5 @@
 """核对冻结配置、实现清单和历史回放夹具的身份。"""
+import copy
 import json
 import shutil
 import subprocess
@@ -10,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
-from test001.config import (actual_implementation_files, load_catalog,
+from test001.config import (Criteria, actual_implementation_files, load_catalog,
                             load_criteria, load_profile)
 from test001.errors import InputError
 from test001.strictjson import StrictJSONError, loads
@@ -120,6 +121,19 @@ class CriteriaTests(unittest.TestCase):
         self.assertNotIn('version', self.v1.data['adapters']['ltp'])
         self.assertFalse(self.v1.data['acceptance']['ltp_summary_required'])
         self.assertTrue(self.v2.data['acceptance']['ltp_summary_required'])
+
+    def test_criteria_adapter_can_advance_without_profile_change(self):
+        """CRITERIA 修 adapter 不应强迫修改 PROFILE 或旧运行包哈希。"""
+        data = copy.deepcopy(self.v1.data)
+        data['adapters']['lua']['sha256'] = 'f' * 64
+        changed = Criteria(
+            root=self.v1.root, path=self.v1.path, base_dir=self.v1.base_dir,
+            file_sha256=self.v1.file_sha256, data=data,
+            implementation_files=self.v1.implementation_files,
+        )
+        changed.check_profile(self.profile)
+        self.assertEqual(self.profile.profile_hash,
+                         self.v1.data['mapping']['profile_hash'])
 
     def test_implementation_manifest_is_current(self):
         """改动分析器或适配器后必须重新生成清单和 CRITERIA 身份。"""

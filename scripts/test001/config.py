@@ -203,8 +203,10 @@ class Criteria:
             name = Path(meta['judge_file']).name
             source = official if meta.get('judge_source') == 'official' else team
             expected = source.get(name)
-            if expected is None or meta.get('judge_sha256') != expected or adapter['sha256'] != expected:
-                raise InputError(f'criteria judge identity does not match profile: {group}')
+            # PROFILE 只证明采集时使用的 judge 来源；CRITERIA 的 adapter
+            # 可独立版本化，否则旧运行包无法按修复后的判据重判。
+            if expected is None or meta.get('judge_sha256') != expected:
+                raise InputError(f'profile judge identity does not match frozen inputs: {group}')
 
 
 def _load_json_file(path: Path, *, label: str) -> tuple[bytes, dict]:

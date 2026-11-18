@@ -60,6 +60,8 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 ## 分析边界
 
+- PROFILE 的 `judge_sha256` 只证明采集时使用的 judge 来源；CRITERIA 的 adapter 可独立版本化，`check_profile()` 不要求两者哈希相等，因此旧运行包的 `profile_hash` 不变也能按修复后的判据重判。
+
 - 来源分 `external_log` 与 `recorded_capture`。外部日志的 subject/platform 固定 `unknown`、capture 为 `NOT_RECORDED`、input_integrity 为 `UNVERIFIED`，即使逐项全 PASS 也不能验收通过。
 - 采集状态、完整性、协议、段和判分分字段保存。截断段保留已观察值，但 acceptance 仍 BLOCKED，`accepted_pass=0`。
 - 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。Lua/BusyBox 的 `testcase` 行按官方判据的非锚定 `success|fail` 语法解析，尾随诊断文本仍可识别；同一名称的 fail+success 记为重复/失败，含 `testcase` 但无法唯一解析结果的行记 `MALFORMED_OBSERVATION` 并阻断。basic/libctest 逐用例校验 START/END 配对和名称一致；嵌套 START、END 无 START、END 名称错配、缺 END 都保留已见观察值并记 `MALFORMED_OBSERVATION` 阻断。官方判据能识别的非规范边界（START/END 带尾随文本、缺 `=` 等）也先报错；libctest 的 `Pass!` 必须位于当前 START/END 内，END 后的 `Pass!` 记 case 外结果，adapter 报 PASS 但没有尝试内成功证据时记 `NO_IN_ATTEMPT_PASS` 并阻断。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
