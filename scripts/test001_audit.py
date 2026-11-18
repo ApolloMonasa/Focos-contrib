@@ -6,10 +6,12 @@ import ast
 from collections import Counter
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import stat
 import sys
 import tempfile
 
@@ -164,12 +166,36 @@ def run_debugfs(arguments, context, timeout):
         ) from error
 
 
+def copy_image_snapshot(image, snapshot, expected_size):
+    # 非阻塞打开避免 FIFO 在 fstat 之前等待写端；普通文件不受此标志影响。
+    descriptor = os.open(image, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode):
+            raise ValueError('image source must be a regular file')
+        if info.st_size != expected_size:
+            raise ValueError('image identity mismatch: unexpected source size')
+        # 只使用上述句柄，不按可能被替换的原路径重开。增长最多多读一字节，绝不多写。
+        with os.fdopen(descriptor, 'rb', buffering=0, closefd=False) as source, snapshot.open('xb') as target:
+            remaining = expected_size
+            while remaining:
+                chunk = source.read(min(1024 * 1024, remaining))
+                if not chunk:
+                    raise ValueError('image source truncated during copy')
+                target.write(chunk)
+                remaining -= len(chunk)
+            if source.read(1):
+                raise ValueError('image source grew during copy')
+    finally:
+        os.close(descriptor)
+
+
 def verify_image(image, lock):
     # 整盘先复制到私有目录再核对实际消费字节；debugfs 不带 -w，不运行来宾代码。
     with tempfile.TemporaryDirectory(prefix='test001-audit-') as tmp:
         snapshot = Path(tmp) / 'image'
-        shutil.copyfile(image, snapshot)
         expected = lock['image']
+        copy_image_snapshot(image, snapshot, expected['uncompressed_size'])
         with snapshot.open('rb') as stream:
             image_hash = hashlib.sha256()
             for chunk in iter(lambda: stream.read(1024 * 1024), b''):

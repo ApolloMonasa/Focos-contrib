@@ -106,6 +106,83 @@ class AuditTests(unittest.TestCase):
                     verify_image(image, lock)
                 run.assert_not_called()
 
+    def test_invalid_image_rejected_before_copy(self):
+        from unittest.mock import patch
+        from test001_audit import copy_image_snapshot
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / 'image'
+            _, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+            with image.open('wb') as stream:
+                stream.truncate(lock['image']['uncompressed_size'] + 1)
+            for source in [image, Path('/dev/zero'), Path(tmp)]:
+                with self.subTest(source=source), \
+                     patch('test001_audit.shutil.copyfile', side_effect=AssertionError('unbounded copy')), \
+                     patch('test001_audit.subprocess.run') as run:
+                    with self.assertRaises(ValueError):
+                        verify_image(source, lock)
+                    run.assert_not_called()
+                    snapshot = Path(tmp) / 'rejected-snapshot'
+                    with self.assertRaises(ValueError):
+                        copy_image_snapshot(source, snapshot, lock['image']['uncompressed_size'])
+                    self.assertFalse(snapshot.exists())
+
+    def test_snapshot_growth_and_truncation_bounded(self):
+        import os
+        from unittest.mock import patch
+        from test001_audit import copy_image_snapshot
+        real_fstat = os.fstat
+        with tempfile.TemporaryDirectory() as tmp:
+            image, snapshot = Path(tmp) / 'image', Path(tmp) / 'snapshot'
+            for replacement, message in [(b'goodEXTRA', 'grew'), (b'go', 'truncated')]:
+                image.write_bytes(b'good')
+                snapshot.unlink(missing_ok=True)
+                opened = []
+
+                def change_after_stat(fd):
+                    opened.append(fd)
+                    info = real_fstat(fd)
+                    image.write_bytes(replacement)
+                    return info
+
+                with self.subTest(replacement=replacement), \
+                     patch('test001_audit.os.fstat', side_effect=change_after_stat):
+                    with self.assertRaisesRegex(ValueError, message):
+                        copy_image_snapshot(image, snapshot, 4)
+                self.assertLessEqual(snapshot.stat().st_size, 4)
+                with self.assertRaises(OSError):
+                    real_fstat(opened[0])
+
+    def test_snapshot_reads_open_file_after_path_replacement(self):
+        import os
+        from unittest.mock import patch
+        from test001_audit import copy_image_snapshot
+        real_fstat = os.fstat
+        with tempfile.TemporaryDirectory() as tmp:
+            image, snapshot = Path(tmp) / 'image', Path(tmp) / 'snapshot'
+            image.write_bytes(b'good')
+
+            def replace_after_stat(fd):
+                info = real_fstat(fd)
+                image.rename(Path(tmp) / 'original')
+                image.write_bytes(b'evil')
+                return info
+
+            with patch('test001_audit.os.fstat', side_effect=replace_after_stat):
+                copy_image_snapshot(image, snapshot, 4)
+            self.assertEqual(snapshot.read_bytes(), b'good')
+            self.assertEqual(image.read_bytes(), b'evil')
+
+    def test_cli_rejects_fifo_without_waiting(self):
+        import os
+        with tempfile.TemporaryDirectory() as tmp:
+            fifo = Path(tmp) / 'image-fifo'
+            os.mkfifo(fifo)
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/test001_audit.py'),
+                                     '--verify-image', str(fifo)], capture_output=True, timeout=5)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.stdout, b'')
+            self.assertIn(b'regular file', result.stderr)
+
     def test_image_hash_without_python311_api(self):
         import hashlib
         from unittest.mock import patch
@@ -113,6 +190,8 @@ class AuditTests(unittest.TestCase):
             image = Path(tmp) / 'image'
             image.write_bytes(b'not the frozen image')
             _, lock = load_inputs(ROOT / 'tests/test001/audit-inputs')
+            # 保持长度匹配，确保确实走到哈希步骤，不被新增预检提前拒绝。
+            lock['image']['uncompressed_size'] = image.stat().st_size
             # 模拟 Python 3.10 不提供 file_digest；仍须正常识别坏镜像。
             with patch.dict(hashlib.__dict__):
                 hashlib.__dict__.pop('file_digest', None)

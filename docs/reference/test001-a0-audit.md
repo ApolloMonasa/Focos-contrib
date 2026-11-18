@@ -13,7 +13,7 @@ python3 -B -m unittest discover -s scripts -p test_test001_audit.py
 make check
 ```
 
-先创建 `target/`。默认只核对仓库 28 个原样文本输入，image_verification=NOT_RUN；加 `--verify-image` 后先私有复制整盘，以固定 1 MiB 块核对大小/SHA256（不依赖 Python 3.11 的 file_digest），再用只读 `debugfs -R 'cat /固定路径'` 核对 26 份文本与 4 个 ELF 的长度及哈希。任何成员错误都不输出 JSON，不因 debugfs 返回 0 就视为成功。工具不执行 shell 命令表、Lua、judge 或内核。只读审计不使用 build/capture/analyze 的运行包格式；stdout 是完整计算结束后的候选 JSON，没有验收 PASS 字段。输入集合或整盘身份不符退出 2；整盘校验通过后，成员短读/哈希不符属于 debugfs 执行失败，即使退出 0 也退出 1，并保留成员名和 stderr。其他工具执行失败同样退出 1，完成审计退出 0（不表示运行就绪）。
+先创建 `target/`。默认只核对仓库 28 个原样文本输入，image_verification=NOT_RUN；加 `--verify-image` 后以非阻塞方式打开源文件，从同一句柄的 fstat 拒绝非普通文件或异长输入，再私有复制整盘。复制最多写入冻结大小，另读一字节检查增长，提前 EOF 拒绝为输入错误；不按原路径重开。随后以固定 1 MiB 块核对大小/SHA256（不依赖 Python 3.11 的 file_digest），再用只读 `debugfs -R 'cat /固定路径'` 核对 26 份文本与 4 个 ELF 的长度及哈希。任何成员错误都不输出 JSON，不因 debugfs 返回 0 就视为成功。工具不执行 shell 命令表、Lua、judge 或内核。只读审计不使用 build/capture/analyze 的运行包格式；stdout 是完整计算结束后的候选 JSON，没有验收 PASS 字段。输入集合或整盘身份不符退出 2；整盘校验通过后，成员短读/哈希不符属于 debugfs 执行失败，即使退出 0 也退出 1，并保留成员名和 stderr。其他工具执行失败同样退出 1，完成审计退出 0（不表示运行就绪）。
 
 `--inputs DIR` 只能提供与仓库锁完全相同的文本集合和字节，不能覆盖锁、注入 judge 或扩大组范围；拒绝缺失、额外、符号链接与特殊文件。全部文本校验后在内存中消费，不在审计后重新读取原路径。信任仓库源码/锁和主机 Python/debugfs，不提供第三方配置或对抗同账户进程的承诺。
 
@@ -69,7 +69,7 @@ BusyBox 镜像多出的原始行为是 `printf "abc\n"` 和 `sh -c 'sleep 5' & .
 
 ## 本轮验证与自审
 
-8 个首批失败测试在 `1b75d11` 的未实现接口上失败；实现后增加坏镜像启动前拒绝、CLI 无部分 JSON 和逐行表再生核对三项。测试验证重复/顺序、read 转义、与主机 `/bin/sh` 的只读 read 对照、AST 不执行 judge、已知差异、额外/变更/链接输入和确定性输出。主机 shell 测试不冒充镜像 BusyBox 或 QEMU 执行。 后续补充缺少 file_digest API、debugfs 零/非零退出及版本查询失败的回归，共 14 项审计测试；工具读取失败不能被误归为输入错误。
+8 个首批失败测试在 `1b75d11` 的未实现接口上失败；实现后增加坏镜像启动前拒绝、CLI 无部分 JSON 和逐行表再生核对三项。测试验证重复/顺序、read 转义、与主机 `/bin/sh` 的只读 read 对照、AST 不执行 judge、已知差异、额外/变更/链接输入和确定性输出。主机 shell 测试不冒充镜像 BusyBox 或 QEMU 执行。 后续补充缺少 file_digest API、debugfs 零/非零退出及版本查询失败的回归，以及源文件类型、复制增长/缩短、路径替换与 FIFO 拒绝回归，共 18 项审计测试；工具读取失败不能被误归为输入错误。
 
 本地实际运行与提交对应的日志在 `target/a0-evidence/`，不提交大日志或镜像。提交前核对：新增路径已入 README；候选数据不写成已冻结；工具错误不生成成功 JSON；原始字段和命令执行语义分开；未做的运行条件审计明确列为待办。审计实现需一名非作者批准，#8/#47/#48 均不因本批关闭。
 
