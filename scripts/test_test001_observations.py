@@ -64,6 +64,23 @@ class DuplicateObservationTests(unittest.TestCase):
             ['libctest static argv', 'libctest dynamic tls'],
         )
 
+    def test_libctest_duplicate_pass_is_counted(self):
+        text = (
+            '========== START entry-static.exe argv ==========\n'
+            'Pass!\n'
+            'Pass!\n'
+            '========== END entry-static.exe argv ==========\n'
+        )
+        guard = check_observations('libctest', text, ['libctest static argv'])
+        self.assertEqual(guard.successes['libctest static argv'], 2)
+        self.assertEqual(guard.malformed, [])
+
+    def test_lmbench_unknown_label_is_extra(self):
+        guard = check_observations(
+            'lmbench', 'surprise throughput: 12.5 MB/sec\n', []
+        )
+        self.assertIn('lmbench surprise throughput', guard.extras)
+
     def test_libctest_missing_end_is_preserved_and_malformed(self):
         text = (
             '========== START entry-static.exe argv ==========\n'
@@ -111,11 +128,14 @@ class PerformanceMetricTests(unittest.TestCase):
             'b_malloc_sparse (0)\n'
             '  time: 0.061429400, virt: 38992, res: 38980, dirty: 38980\n'
         )
-        metrics = extract_metrics('libcbench', text, ['b_malloc_sparse (0)'])
+        metrics = extract_metrics(
+            'libcbench', text, ['b_malloc_sparse (0)'], line_offset=10
+        )
         self.assertEqual(len(metrics), 1)
         self.assertAlmostEqual(metrics[0]['value'], 0.0614294)
         self.assertEqual(metrics[0]['unit'], 's')
         self.assertEqual(metrics[0]['name'], 'b_malloc_sparse (0)')
+        self.assertEqual(metrics[0]['line'], 12)
 
     def test_lmbench_value_and_unit_are_preserved(self):
         metrics = extract_metrics(

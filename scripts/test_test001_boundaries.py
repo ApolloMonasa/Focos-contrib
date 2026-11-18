@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from test001.adapters import run_adapter
 from test001.errors import InputError, PublishError
 from test001.fsutil import create_output_dir, read_regular_bytes
+from test001.logs import split_sections
 
 
 class FakeCriteria:
@@ -85,6 +86,20 @@ class AdapterLimitTests(unittest.TestCase):
         with self.assertRaises(InputError):
             read_regular_bytes(fifo, label='fifo')
         self.assertLess(time.monotonic() - started, 1)
+
+
+class LogBoundaryTests(unittest.TestCase):
+    """组外识别出的性能结果必须进入协议错误。"""
+
+    def test_lmbench_label_after_group_is_protocol_error(self):
+        split = split_sections(
+            '#### OS COMP TEST GROUP START lmbench-glibc ####\n'
+            '#### OS COMP TEST GROUP END lmbench-glibc ####\n'
+            'Simple syscall: 0 microseconds\n'
+        )
+        self.assertEqual(split.protocol, 'ERROR')
+        self.assertEqual(split.unattributed[0]['event'], 'lmbench')
+        self.assertIn('line 3', ' '.join(split.errors))
 
 
 class OutputBoundaryTests(unittest.TestCase):

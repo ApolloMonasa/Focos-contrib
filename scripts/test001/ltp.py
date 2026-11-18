@@ -233,6 +233,19 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
                     'section_line': line_number,
                     'line': line_number + line_offset,
                 })
+        for match in UNKNOWN_RE.finditer(line):
+            token = match.group(1)
+            if token in RESULT_FLAGS or token in IGNORED_FLAGS:
+                continue
+            unattributed.append({
+                'event': token,
+                'section_line': line_number,
+                'line': line_number + line_offset,
+                'kind': 'ltp_unknown',
+            })
+            errors.append(
+                f'line {line_number}: unknown LTP flag outside invocation: {token}'
+            )
 
     if current is not None:
         errors.append(f'line {current.run_line}: LTP case has no end: {current.name}')

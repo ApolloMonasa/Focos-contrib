@@ -135,8 +135,13 @@ def _apply_observation_guard(items: list[dict], extras: list[dict],
         elif name in guard.failures and item['judgment'] != 'JUDGE_ERROR':
             item['judgment'] = 'FAIL'
             reasons.append('OBSERVED_FAILURE')
+        elif guard.group == 'libctest' and guard.successes.get(name, 0) > 1:
+            item['judgment'] = 'JUDGE_ERROR'
+            reason = f'DUPLICATE_PASS:{guard.successes[name]}'
+            reasons.append(reason)
+            errors.append(f'{name}:{reason}')
         elif (guard.group == 'libctest' and item['judgment'] == 'PASS'
-              and name not in guard.successes):
+              and guard.successes.get(name, 0) == 0):
             item['judgment'] = 'JUDGE_ERROR'
             reason = 'NO_IN_ATTEMPT_PASS'
             reasons.append(reason)
@@ -228,9 +233,15 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
     ltp_outside = [item for item in unattributed if item.get('kind') == 'ltp']
     if ltp_outside:
         reasons.append(f'LTP_UNATTRIBUTED_RESULT:outside:{len(ltp_outside)}')
+    ltp_unknown = [item for item in unattributed if item.get('kind') == 'ltp_unknown']
+    if ltp_unknown:
+        reasons.append(f'LTP_UNKNOWN_RESULT:outside:{len(ltp_unknown)}')
     non_ltp_outside = [item for item in unattributed if item.get('kind') == 'non_ltp']
     if non_ltp_outside:
         reasons.append(f'NON_LTP_UNATTRIBUTED_RESULT:outside:{len(non_ltp_outside)}')
+    cross_group = [item for item in unattributed if item.get('kind') == 'cross_group']
+    if cross_group:
+        reasons.append(f'CROSS_GROUP_RESULT:inside:{len(cross_group)}')
     for shard_id, exit_code in sorted(protocol.get('script_exit_codes', {}).items()):
         if exit_code != 0:
             reasons.append(f'SCRIPT_EXIT_{shard_id}:{exit_code}')
@@ -267,10 +278,20 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
                         f'LTP_SUMMARY_INCOMPLETE:{analysis.shard.shard_id}:'
                         f'{native["summary_incomplete"]}'
                     )
-            if native.get('unattributed'):
+            native_unattributed = native.get('unattributed', [])
+            if native_unattributed:
                 reasons.append(
                     f'LTP_UNATTRIBUTED_RESULT:{analysis.shard.shard_id}:'
-                    f'{len(native["unattributed"])}'
+                    f'{len(native_unattributed)}'
+                )
+            unknown_native = [
+                item for item in native_unattributed
+                if item.get('kind') == 'ltp_unknown'
+            ]
+            if unknown_native:
+                reasons.append(
+                    f'LTP_UNKNOWN_RESULT:{analysis.shard.shard_id}:'
+                    f'{len(unknown_native)}'
                 )
             if analysis.order_matches is False:
                 reasons.append(f'LTP_ORDER_MISMATCH:{analysis.shard.shard_id}')
@@ -391,6 +412,7 @@ def analyze_log(profile: Profile, criteria: Criteria, shards: list[Shard],
                 analysis.metrics = extract_metrics(
                     shard.group, analysis.section.text,
                     [item['name'] for item in profile.items_for(shard)],
+                    line_offset=analysis.section.start_line,
                 )
             analyses.append(analysis)
     protocol = _protocol(split_obj, shards, origin=origin)

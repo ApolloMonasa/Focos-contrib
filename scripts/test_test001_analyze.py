@@ -227,6 +227,7 @@ class HistoricalReplayTests(TemporaryOutput):
                 self.assertTrue(metrics)
                 self.assertTrue(all(metric['unit'] for metric in metrics))
                 self.assertTrue(all(metric['line'] > 0 for metric in metrics))
+                self.assertGreater(metrics[0]['line'], 600)
 
     def test_external_all_pass_is_still_blocked(self):
         output = self.out()
@@ -666,6 +667,18 @@ class RunPackageTests(TemporaryOutput):
         parts.append('#### OS COMP TEST GROUP END libctest-glibc ####')
         return ('\n'.join(parts) + '\n').encode(), len(names)
 
+    def test_libctest_duplicate_pass_blocks(self):
+        serial, _ = self.libctest_section()
+        serial = serial.replace(b'Pass!\n', b'Pass!\nPass!\n', 1)
+        run = make_run(self.base / 'run', ['libctest-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        first = report['groups'][0]['items'][0]
+        self.assertIn('DUPLICATE_PASS:2', first['reasons'])
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+
     def test_libctest_pass_after_end_blocks(self):
         serial, count = self.libctest_section(pass_after_end=True)
         run = make_run(self.base / 'run', ['libctest-glibc'], serial)
@@ -872,6 +885,39 @@ class RunPackageTests(TemporaryOutput):
                     if item['name'] == 'busybox date')
         self.assertEqual(item['judgment'], 'JUDGE_ERROR')
         self.assertTrue(any('DUPLICATE_OBSERVATION' in reason for reason in item['reasons']))
+
+    def test_cross_group_result_inside_lua_blocks(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        end = b'#### OS COMP TEST GROUP END lua-glibc ####'
+        serial = serial.replace(end, b'TFAIL: delayed\n' + end)
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['protocol']['status'], 'ERROR')
+        self.assertIn('CROSS_GROUP_RESULT:inside:1',
+                      report['acceptance']['reasons'])
+        self.assertEqual(report['protocol']['unattributed'][0]['kind'], 'cross_group')
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+
+    def test_unknown_ltp_flag_outside_invocation_blocks(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log([(name, ['TPASS: ok'], 0) for name in names])
+        end = b'#### OS COMP TEST GROUP END ltp-musl ####'
+        serial = serial.replace(end, b'TWHAT: delayed\n' + end)
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('LTP_UNKNOWN_RESULT:ltp-musl:1',
+                      report['acceptance']['reasons'])
+        self.assertEqual(report['groups'][0]['native']['unattributed'][0]['event'],
+                         'TWHAT')
+        self.assertEqual(report['totals']['accepted_pass'], 0)
 
     def test_unattributed_ltp_failure_blocks(self):
         rows = [json.loads(line) for line in

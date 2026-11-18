@@ -43,6 +43,16 @@ LMBENCH_COMMANDS = (
     ('lat_ctx', '-P', '1', '-s', '32', '2', '4', '8', '16', '24', '32', '64', '96'),
 )
 LMBENCH_INDEX = {command: index for index, command in enumerate(LMBENCH_COMMANDS)}
+LMBENCH_LABELS = {
+    'Simple syscall', 'Simple read', 'Simple write', 'Simple stat',
+    'Simple fstat', 'Simple open/close', "Select on 100 fd's",
+    'Signal handler installation', 'Signal handler overhead', 'Protection fault',
+    'Pipe latency', 'Process fork+exit', 'Process fork+execve',
+    'Process fork+/bin/sh -c', 'Static Process fork+exit',
+    'Static Process fork+execve', 'Static Process fork+/bin/sh -c',
+    'File /var/tmp/XXX write bandwidth', 'Pagefaults on /var/tmp/XXX',
+    'Pipe bandwidth',
+}
 IOZONE_HEADERS = (
     ('iozone throughput write/read measurements', 'iozone write/read'),
     ('iozone throughput random-read measurements', 'iozone random-read'),
@@ -63,7 +73,7 @@ class ObservationGuard:
     statuses: dict[str, list[str]]
     malformed: list[str]
     group: str
-    successes: set[str]
+    successes: Counter
 
 
 def _markers(group: str, text: str) -> list[str]:
@@ -134,7 +144,7 @@ def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], set[str]
     """basic/libctest 的边界、正文归属和重复次数统一状态机。"""
     names = []
     malformed = []
-    successes = set()
+    successes = Counter()
     open_name = None
     inside = False
 
@@ -209,7 +219,7 @@ def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], set[str]
             if normalized is None:
                 malformed.append(f'line {line_number}: Pass! outside case')
             else:
-                successes.add(normalized)
+                successes[normalized] += 1
 
     if open_name is not None:
         malformed.append(f'unclosed START: {open_name}')
@@ -237,10 +247,17 @@ def _lmbench(text: str, expected: list[str]) -> list[str]:
             names.append(expected[index])
         else:
             names.append('lmbench ' + shlex.join(command))
+    for raw in text.splitlines():
+        match = LMBENCH_METRIC.fullmatch(ANSI.sub('', raw).strip())
+        if match is None:
+            continue
+        label = match.group(1).strip()
+        if label not in LMBENCH_LABELS:
+            names.append('lmbench ' + label)
     return names
 
 
-def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
+def extract_metrics(group: str, text: str, expected: list[str], *, line_offset: int = 0) -> list[dict]:
     """从原始段保留性能数值和单位；冻结 adapter 仍只给 PASS/FAIL。"""
     metrics = []
     if group == 'libcbench':
@@ -257,7 +274,8 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                     value = float(match.group(1))
                     if math.isfinite(value):
                         metrics.append({'name': current, 'value': value,
-                                        'unit': 's', 'line': line_number})
+                                        'unit': 's', 'line': line_number + line_offset,
+                                        'section_line': line_number})
                     current = None
         return metrics
     if group == 'lmbench':
@@ -282,7 +300,8 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                 if math.isfinite(value):
                     metrics.append({'label': match.group(1).strip(),
                                     'value': value, 'unit': match.group(3),
-                                    'line': line_number, 'raw': raw})
+                                    'line': line_number + line_offset,
+                                    'section_line': line_number, 'raw': raw})
                 context = None
                 continue
             name = expected[context] if context is not None and context < len(expected) else None
@@ -292,7 +311,8 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                     metrics.append({'name': name, 'value': float(pair[2]),
                                     'unit': 'microseconds' if context == 16 else 'MB/sec',
                                     'input_size': float(pair[1]), 'input_size_unit': 'MB',
-                                    'line': line_number, 'raw': raw})
+                                    'line': line_number + line_offset,
+                                    'section_line': line_number, 'raw': raw})
                 elif line:
                     context = None
             elif context == 18:
@@ -302,7 +322,9 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                         metrics.append({'name': name, 'operation': operation,
                                         'value': int(row[column]), 'unit': 'operations/sec',
                                         'file_size': int(row[1]), 'file_size_unit': 'kB',
-                                        'files': int(row[2]), 'line': line_number, 'raw': raw})
+                                        'files': int(row[2]),
+                                        'line': line_number + line_offset,
+                                        'section_line': line_number, 'raw': raw})
                 elif line:
                     context = None
             elif context == 23:
@@ -310,7 +332,8 @@ def extract_metrics(group: str, text: str, expected: list[str]) -> list[dict]:
                 if row and math.isfinite(float(row[2])):
                     metrics.append({'name': name, 'value': float(row[2]),
                                     'unit': 'microseconds', 'processes': int(row[1]),
-                                    'line': line_number, 'raw': raw})
+                                    'line': line_number + line_offset,
+                                    'section_line': line_number, 'raw': raw})
                 elif line and not line.startswith('"size='):
                     context = None
     return metrics

@@ -4,7 +4,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .ltp import RESULT_RE, UNATTRIBUTED_FLAGS, strip_ansi
+from .ltp import (RESULT_FLAGS, RESULT_RE, UNATTRIBUTED_FLAGS, UNKNOWN_RE,
+                  IGNORED_FLAGS, strip_ansi)
 
 GROUP_RE = re.compile(r'^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$')
 LIBC_RE = re.compile(r'-(musl|glibc)\Z')
@@ -15,6 +16,44 @@ LIBCBENCH_RESULT = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)')
 UNIXBENCH_RESULT = re.compile(r'^Unixbench .+:')
 IOZONE_RESULT = re.compile(r'(?:iozone .*measurements|Max throughput per process)')
 LMBENCH_RESULT = re.compile(r'^\+ \./lmbench_all\b')
+NUMBER = r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
+LMBENCH_METRIC = re.compile(rf'^(.+?):\s*({NUMBER})\s+(microseconds|KB/sec|MB/sec)$')
+LMBENCH_HEADERS = {'file system latency', 'context switch overhead'}
+
+RESULT_GROUPS = {
+    'ltp': {'ltp'},
+    'testcase': {'lua', 'busybox'},
+    'pass': {'libctest'},
+    'case marker': {'basic', 'libctest'},
+    'team marker': {'iperf', 'netperf', 'cyclictest'},
+    'libcbench': {'libcbench'},
+    'unixbench': {'unixbench'},
+    'iozone': {'iozone'},
+    'lmbench': {'lmbench'},
+}
+
+
+def _result_kind(cleaned: str):
+    if RESULT_RE.search(cleaned):
+        return 'ltp'
+    if cleaned == 'Pass!':
+        return 'pass'
+    if TESTCASE_RESULT.search(cleaned):
+        return 'testcase'
+    if CASE_MARKER.match(cleaned):
+        return 'case marker'
+    if TEAM_RESULT.fullmatch(cleaned):
+        return 'team marker'
+    if LIBCBENCH_RESULT.match(cleaned):
+        return 'libcbench'
+    if UNIXBENCH_RESULT.match(cleaned):
+        return 'unixbench'
+    if IOZONE_RESULT.search(cleaned):
+        return 'iozone'
+    if (LMBENCH_RESULT.match(cleaned) or LMBENCH_METRIC.fullmatch(cleaned)
+            or cleaned in LMBENCH_HEADERS):
+        return 'lmbench'
+    return None
 
 
 @dataclass
@@ -78,44 +117,47 @@ def split_sections(text: str) -> SplitResult:
         if not match:
             if 'OS COMP TEST GROUP' in stripped and not stripped.startswith('+ '):
                 errors.append(f'line {line_number}: malformed group marker')
+            cleaned = strip_ansi(raw).strip()
             if current is not None:
+                kind = _result_kind(cleaned)
+                if kind is not None and current.group not in RESULT_GROUPS[kind]:
+                    unattributed.append({
+                        'line': line_number, 'kind': 'cross_group',
+                        'event': kind, 'section': f'{current.group}-{current.libc}',
+                        'text': cleaned[:200],
+                    })
+                    errors.append(
+                        f'line {line_number}: {kind} result inside '
+                        f'{current.group}-{current.libc} section'
+                    )
+                    continue
                 current.lines.append(raw)
                 continue
-            cleaned = strip_ansi(raw).strip()
-            ltp_found = False
-            for result in RESULT_RE.finditer(cleaned):
-                flag = result.group(1)
-                if flag not in UNATTRIBUTED_FLAGS:
-                    continue
-                ltp_found = True
-                unattributed.append({'line': line_number, 'kind': 'ltp',
-                                     'event': flag})
-                errors.append(f'line {line_number}: LTP result outside group: {flag}')
-            if ltp_found:
-                continue
-            non_ltp = None
-            if cleaned == 'Pass!':
-                non_ltp = 'Pass!'
-            elif TESTCASE_RESULT.search(cleaned):
-                non_ltp = 'testcase'
-            elif CASE_MARKER.match(cleaned):
-                non_ltp = 'case marker'
-            elif TEAM_RESULT.fullmatch(cleaned):
-                non_ltp = 'team marker'
-            elif LIBCBENCH_RESULT.match(cleaned):
-                non_ltp = 'libcbench'
-            elif UNIXBENCH_RESULT.match(cleaned):
-                non_ltp = 'unixbench'
-            elif IOZONE_RESULT.search(cleaned):
-                non_ltp = 'iozone'
-            elif LMBENCH_RESULT.match(cleaned):
-                non_ltp = 'lmbench'
-            if non_ltp is not None:
-                unattributed.append({'line': line_number, 'kind': 'non_ltp',
-                                     'event': non_ltp, 'text': cleaned[:200]})
-                errors.append(
-                    f'line {line_number}: non-LTP result outside group: {non_ltp}'
-                )
+            kind = _result_kind(cleaned)
+            if kind == 'ltp':
+                for result in RESULT_RE.finditer(cleaned):
+                    flag = result.group(1)
+                    if flag not in UNATTRIBUTED_FLAGS:
+                        continue
+                    unattributed.append({'line': line_number, 'kind': 'ltp',
+                                         'event': flag})
+                    errors.append(f'line {line_number}: LTP result outside group: {flag}')
+            else:
+                for result in UNKNOWN_RE.finditer(cleaned):
+                    token = result.group(1)
+                    if token in RESULT_FLAGS or token in IGNORED_FLAGS:
+                        continue
+                    unattributed.append({'line': line_number, 'kind': 'ltp_unknown',
+                                         'event': token})
+                    errors.append(
+                        f'line {line_number}: unknown LTP result outside group: {token}'
+                    )
+                if kind is not None:
+                    unattributed.append({'line': line_number, 'kind': 'non_ltp',
+                                         'event': kind, 'text': cleaned[:200]})
+                    errors.append(
+                        f'line {line_number}: non-LTP result outside group: {kind}'
+                    )
             continue
         state, name = match.groups()
         key = _key(name, errors=errors, section_errors=section_errors, line_number=line_number)

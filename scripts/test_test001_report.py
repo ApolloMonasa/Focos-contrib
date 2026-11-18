@@ -37,7 +37,8 @@ def sample_report():
                                   'section_line': 3}],
             },
             'metrics': [{'name': 'b_malloc_sparse (0)', 'value': 0.0614294,
-                         'unit': 's', 'line': 7}],
+                         'unit': 's', 'line': 7, 'operation': 'create',
+                         'files': 10, 'processes': 2}],
         }],
         'implementation': {'manifest_sha256': 'a' * 64},
     }
@@ -64,6 +65,9 @@ class MarkdownEscapingTests(unittest.TestCase):
         self.assertIn('`TFAIL`', text)
         self.assertIn('性能原值', text)
         self.assertIn('0.0614294', text)
+        self.assertIn('operation=create', text)
+        self.assertIn('files=10', text)
+        self.assertIn('processes=2', text)
 
 
 if __name__ == '__main__':

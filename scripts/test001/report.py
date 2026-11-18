@@ -110,13 +110,29 @@ def _markdown(report: dict) -> str:
     if metrics:
         lines += ['## 性能原值', '',
                   '冻结 adapter 只给 PASS/FAIL；以下数值和单位直接来自原始段文本。', '',
-                  '| 组 | 指标 | 值 | 单位 | 行 |',
-                  '| --- | --- | ---: | --- | ---: |']
+                  '| 组 | 指标 | 条件 | 值 | 单位 | 行 |',
+                  '| --- | --- | --- | ---: | --- | ---: |']
         for group, metric in metrics[:100]:
             label = metric.get('name', metric.get('label', ''))
+            conditions = []
+            if 'operation' in metric:
+                conditions.append(f"operation={metric['operation']}")
+            if 'file_size' in metric:
+                conditions.append(
+                    f"file_size={metric['file_size']}{metric.get('file_size_unit', '')}"
+                )
+            if 'input_size' in metric:
+                conditions.append(
+                    f"input_size={metric['input_size']}{metric.get('input_size_unit', '')}"
+                )
+            if 'files' in metric:
+                conditions.append(f"files={metric['files']}")
+            if 'processes' in metric:
+                conditions.append(f"processes={metric['processes']}")
             lines.append(
                 f"| {_cell(group['group'])} | {_cell(label)} | "
-                f"{metric['value']} | {_cell(metric['unit'])} | {metric['line']} |"
+                f"{_cell('; '.join(conditions))} | {metric['value']} | "
+                f"{_cell(metric['unit'])} | {metric['line']} |"
             )
         if len(metrics) > 100:
             lines.append(f'- 其余 {len(metrics) - 100} 项见 report.json。')
