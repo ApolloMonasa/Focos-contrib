@@ -83,7 +83,7 @@ busybox 的两个 extras 是这次重放发现的诊断差异，不是把旧摘�
 
 ## 真实 LTP 样本
 
-`tests/test001/fixtures/ltp/reference-ltp-sample-2026-11-18.log` 是从冻结镜像和 LTP 20240524 跑出的真实参考 Linux 短时样本：107 个 `RUN`、106 个完整结束，主机 120 秒超时后在 `cgroup_fj_proc` 截断。报告得到 30 个 PASS、76 个 FAIL、1 个未完成和 2734 个 MISSING；TPASS/TCONF/ANSI 颜色和旧式 `TAG 1 TPASS :` 格式都被解析。它只用于适配器正反例，不是完整批次，也不是 FocOS 成绩；运行条件的差异记在 `fixtures/ltp/index.json`。
+`tests/test001/fixtures/ltp/reference-ltp-sample-2026-11-18.log` 是从冻结镜像和 LTP 20240524 跑出的真实参考 Linux 短时样本：107 个 `RUN`、106 个完整结束，主机 120 秒超时后在 `cgroup_fj_proc` 截断。报告得到 30 个 PASS、76 个 FAIL，其余 2734 项为 MISSING（其中 1 项是 `cgroup_fj_proc` 的 INCOMPLETE_ATTEMPT，另 2733 项为 NO_RESULT；30+76+2734=2840）；TPASS/TCONF/ANSI 颜色和旧式 `TAG 1 TPASS :` 格式都被解析。它只用于适配器正反例，不是完整批次，也不是 FocOS 成绩；运行条件的差异记在 `fixtures/ltp/index.json`。
 
 ## 还没做什么
 

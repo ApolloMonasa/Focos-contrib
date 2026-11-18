@@ -1,11 +1,27 @@
 """报告序列化：先写来源副本和 Markdown，最后发布 report.json。"""
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .errors import PublishError
 from .fsutil import OutputDir, sha256_bytes
 from .strictjson import dumps
+
+
+def _code(value) -> str:
+    """生成可容纳任意反引号/竖线的行内代码，避免破坏 Markdown。"""
+    text = str(value).replace('\r', ' ').replace('\n', ' ')
+    longest = max((len(run) for run in re.findall(r'`+', text)), default=0)
+    fence = '`' * (longest + 1)
+    if text.startswith(('`', ' ')) or text.endswith(('`', ' ')):
+        text = f' {text} '
+    return f'{fence}{text}{fence}'
+
+
+def _cell(value) -> str:
+    """表格单元只转义结构字符；名称仍保留原文。"""
+    return str(value).replace('\r', ' ').replace('\n', ' ').replace('|', '\\|')
 
 
 def _markdown(report: dict) -> str:
@@ -33,11 +49,11 @@ def _markdown(report: dict) -> str:
     ]
     if report['acceptance']['reasons']:
         lines += ['## 阻断原因', '']
-        lines += [f'- `{reason}`' for reason in report['acceptance']['reasons']]
+        lines += [f'- {_code(reason)}' for reason in report['acceptance']['reasons']]
         lines.append('')
     if report['protocol'].get('errors'):
         lines += ['## 协议错误', '']
-        lines += [f'- {error}' for error in report['protocol']['errors']]
+        lines += [f'- {_code(error)}' for error in report['protocol']['errors']]
         lines.append('')
 
     lines += [
@@ -49,7 +65,7 @@ def _markdown(report: dict) -> str:
     for group in report['groups']:
         counts = group['counts']
         lines.append(
-            f"| {group['group']} | {group['libc']} | {group['section']} | {group['adapter']} | "
+            f"| {_cell(group['group'])} | {_cell(group['libc'])} | {_cell(group['section'])} | {_cell(group['adapter'])} | "
             f"{counts['selected_total']} | {counts['pass']} | {counts['partial']} | "
             f"{counts['fail']} | {counts['missing']} | {counts['not_run']} | {counts['judge_error']} |"
         )
@@ -66,7 +82,7 @@ def _markdown(report: dict) -> str:
             native = group['native']
             events = native.get('events', {})
             lines.append(
-                f"| {group['group']} | {events.get('TPASS', 0)} | {events.get('TFAIL', 0)} | "
+                f"| {_cell(group['group'])} | {events.get('TPASS', 0)} | {events.get('TFAIL', 0)} | "
                 f"{events.get('TBROK', 0)} | {events.get('TCONF', 0)} | {events.get('TWARN', 0)} | "
                 f"{events.get('TINFO', 0)} | {events.get('TDEBUG', 0)} | "
                 f"{native.get('summary_missing', 0)} | {native.get('summary_incomplete', 0)} | "
@@ -82,9 +98,10 @@ def _markdown(report: dict) -> str:
     if non_pass:
         lines += ['## 非 PASS 项', '', '最多列出 100 项；完整逐项结果在 report.json。', '']
         for group, item in non_pass[:100]:
-            reasons = ', '.join(item.get('reasons', [])) or '-'
+            reasons = ', '.join(item.get('reasons', [])) or '未记录原因'
             lines.append(
-                f"- `{group['shard_id']}` / `{item['name']}`：`{item['judgment']}`（{reasons}）"
+                f"- {_code(group['shard_id'])} / {_code(item['name'])}："
+                f"{_code(item['judgment'])}（{_code(reasons)}）"
             )
         if len(non_pass) > 100:
             lines.append(f'- 其余 {len(non_pass) - 100} 项省略。')
@@ -94,7 +111,7 @@ def _markdown(report: dict) -> str:
     if extras:
         lines += ['## 范围外名称', '', '未知名称单列，不进入分母，但阻断验收。', '']
         for group, extra in extras[:50]:
-            lines.append(f"- `{group['shard_id']}` / `{extra['name']}`")
+            lines.append(f"- {_code(group['shard_id'])} / {_code(extra['name'])}")
         if len(extras) > 50:
             lines.append(f'- 其余 {len(extras) - 50} 项省略。')
         lines.append('')

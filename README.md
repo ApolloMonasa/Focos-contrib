@@ -114,6 +114,7 @@ Focos/
 │   ├── test_test001_config.py         # PROFILE/CRITERIA/夹具身份检查
 │   ├── test_test001_ltp.py            # LTP 原生结果正反例
 │   ├── test_test001_observations.py   # 重复/未知观测守卫
+│   ├── test_test001_report.py          # Markdown 名称/占位符边界
 │   ├── test_test001_snapshot.py       # 实现快照与重执行
 │   └── update_test001_manifest.py     # 生成分析实现清单
 ├── tests/                             # 往届测例清单与来源

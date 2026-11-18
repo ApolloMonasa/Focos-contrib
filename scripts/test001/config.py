@@ -38,7 +38,7 @@ ACCEPTANCE_KEYS = {
     'require_protocol', 'require_sections', 'require_all_judgments',
     'forbid_extras', 'forbid_judge_errors', 'ltp_summary_required',
 }
-ADAPTER_KEYS = {'kind', 'entry', 'sha256', 'timeout_seconds', 'max_output_bytes', 'version'}
+ADAPTER_KEYS = {'kind', 'entry', 'sha256', 'timeout_seconds', 'max_output_bytes'}
 LIBACS = ('musl', 'glibc')
 
 

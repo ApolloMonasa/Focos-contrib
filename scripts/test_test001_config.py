@@ -117,6 +117,7 @@ class CriteriaTests(unittest.TestCase):
         """适配器集合与 PROFILE 组集合完全一致，LTP 使用内建解析器。"""
         self.assertEqual(set(self.v1.data['adapters']), set(self.profile.groups))
         self.assertEqual(self.v1.data['adapters']['ltp']['kind'], 'builtin')
+        self.assertNotIn('version', self.v1.data['adapters']['ltp'])
         self.assertFalse(self.v1.data['acceptance']['ltp_summary_required'])
         self.assertTrue(self.v2.data['acceptance']['ltp_summary_required'])
 

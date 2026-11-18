@@ -46,7 +46,7 @@ LTP 是 Linux 内核测试套件，按 2026-11-18 的 #8 扩围纳入本阶段�
 
 - 镜像 `pre-20250615/sdcard-rv.img.xz` 压缩 SHA256 `2b59aee4…aac087`，解压 4 GiB，SHA256 `95973543…e378b8`，本地核对通过。
 - LTP 目录 `/musl/ltp`、`/glibc/ltp`，`Version` 为 `20240524`；包装脚本 `ltp_testcode.sh` 只遍历 `ltp/testcases/bin` 顶层的普通文件，目录 `datafiles`、`ftrace_stress` 不执行。
-- 顶层文件数：musl 2820，glibc 2840。glibc 多出的 20 个都是 `cpuset_*`；两套同名文件只有 59 个 SHA256 相同。两个 libc 各有 `data`、`sched_datafile` 两个非 ELF、非脚本文件，包装脚本仍会尝试执行并记录结果。
+- 顶层文件数：musl 2820，glibc 2840。glibc 多出的 20 个都是 `cpuset_*`；两套 2820 个同名文件中有 878 个 SHA256 相同（876 个脚本 + 2 个非 ELF/脚本数据文件；ELF 全部不同）。两个 libc 各有 `data`、`sched_datafile` 两个非 ELF、非脚本文件，包装脚本仍会尝试执行并记录结果。
 - 包装脚本对每个文件无条件打印 `FAIL LTP CASE <name> : <ret>`，因此 FAIL 字样不能直接当失败；判分以文件内 LTP 原生结果和边界为准。官方 judge 仓库没有 LTP 判分器，A 阶段使用冻结的结果适配器解析 TPASS/TFAIL/TBROK/TCONF/TWARN，TINFO/TDEBUG 只作信息。
 - 每个调用无参数，工作目录按 libc 根目录 `/musl` 或 `/glibc` 冻结；调用顺序取镜像文件名排序。逐文件路径、长度、权限和 SHA256 在 [PROFILE](../../tests/test001/profiles/regional-2025-with-ltp-v1.json) 的调用清单中。
 - 这是清单事实，不是运行成绩；完整参考 Linux LTP 批次仍待 C/D，FocOS/VF2 适配器另定。

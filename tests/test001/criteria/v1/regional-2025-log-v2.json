@@ -71,8 +71,7 @@
     },
     "ltp": {
       "entry": "ltp_native",
-      "kind": "builtin",
-      "version": 1
+      "kind": "builtin"
     },
     "lua": {
       "entry": "adapters/official/judge_lua.py",
@@ -96,7 +95,7 @@
       "timeout_seconds": 30
     }
   },
-  "criteria_hash": "cbfde0bfe5aac474c18b01d4e776d1589148777985cb7f8d0b956ee308dc3bac",
+  "criteria_hash": "5c04fd46b74d4f3707a8f252870632dc2997435ddf8c95f58087fd276a002162",
   "criteria_id": "regional-2025-log-v2",
   "frozen_at": "2026-11-18",
   "implementation": {
@@ -106,7 +105,7 @@
       "scripts/test001",
       "tests/test001/criteria/v1/adapters"
     ],
-    "sha256": "60ed35fbb3be556bc9c13db011ea47e292942dec4ca6b647e772286cc7ce6452"
+    "sha256": "b864a368351d31bc2ba8b1f05735cd8f26c067194faa584b03e08302addbc39b"
   },
   "kind": "test001_criteria",
   "mapping": {
