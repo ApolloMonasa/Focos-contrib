@@ -76,17 +76,18 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
         'argv': [
             'qemu-system-riscv64', '-machine', 'virt',
             '-bios', '/fixture/firmware.bin',
-            '-kernel', '/fixture/kernel',
-            '-initrd', '/fixture/initramfs',
-            '-drive', 'file=/fixture/base.img,if=none,format=raw,id=x0',
+            '-kernel', '/build/kernel',
+            '-initrd', '/build/initramfs',
+            '-drive', 'file=/run/cow.qcow2,if=none,format=qcow2,id=x0',
         ],
         'started_at': '2026-11-18T00:00:00+00:00',
         'finished_at': '2026-11-18T00:01:00+00:00',
         'limits': {'timeout_seconds': 180, 'serial_bytes': 268435456,
                    'output_bytes': 1048576},
         'cow_layer': {
-            'format': 'qcow2', 'sha256': '1' * 64, 'size': 65536,
-            'created': True, 'base_img_sha256': build['base_img_sha256'],
+            'path': '/run/cow.qcow2', 'format': 'qcow2',
+            'sha256': '1' * 64, 'size': 65536, 'created': True,
+            'base_img_sha256': build['base_img_sha256'],
         },
         'read_only_inputs': [
             {'role': 'kernel', 'path': '/build/kernel',
@@ -446,6 +447,58 @@ class RunContractTests(TemporaryOutput):
             index = capture['argv'].index('-bios') + 1
             capture['argv'][index] = 'default'
         self.mutate(run, bad_bios)
+        self.assert_rejected(run)
+
+    def test_unverified_kernel_argv_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def other_kernel(capture):
+            index = capture['argv'].index('-kernel') + 1
+            capture['argv'][index] = '/unverified/other-kernel'
+        self.mutate(run, other_kernel)
+        self.assert_rejected(run)
+
+    def test_duplicate_bios_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        self.mutate(run, lambda capture: capture['argv'].extend(['-bios', 'default']))
+        self.assert_rejected(run)
+
+    def test_base_drive_with_readonly_off_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def base_drive(capture):
+            index = capture['argv'].index('-drive') + 1
+            capture['argv'][index] = (
+                'file=/build/base.img,if=none,format=raw,readonly=off,id=x0'
+            )
+        self.mutate(run, base_drive)
+        self.assert_rejected(run)
+
+    def test_cow_drive_readonly_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def readonly_cow(capture):
+            index = capture['argv'].index('-drive') + 1
+            capture['argv'][index] = (
+                'file=/run/cow.qcow2,if=none,format=qcow2,readonly=on,id=x0'
+            )
+        self.mutate(run, readonly_cow)
+        self.assert_rejected(run)
+
+    def test_cow_drive_format_mismatch_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+
+        def wrong_format(capture):
+            index = capture['argv'].index('-drive') + 1
+            capture['argv'][index] = (
+                'file=/run/cow.qcow2,if=none,format=raw,id=x0'
+            )
+        self.mutate(run, wrong_format)
         self.assert_rejected(run)
 
     def test_changed_integrity_blocks_but_package_is_analyzed(self):

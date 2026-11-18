@@ -54,13 +54,38 @@ def read_regular_bytes(path: Path, *, label: str, max_bytes: int | None = None) 
         os.close(descriptor)
 
 
-def _reject_symlink_ancestors(path: Path, *, label: str):
-    for component in (path, *path.parents):
-        try:
-            if component.is_symlink():
-                raise InputError(f'{label}: path contains a symlink: {component}')
-        except OSError as exc:
-            raise InputError(f'{label}: cannot inspect {component}: {exc}') from exc
+def _open_directory_chain(path: Path, *, label: str) -> int:
+    """从 / 开始逐级 openat(O_NOFOLLOW)，不信任任何祖先路径。"""
+    parts = path.parts
+    if not parts or parts[0] != '/':
+        raise InputError(f'{label}: output path must be absolute')
+    try:
+        descriptor = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    except OSError as exc:
+        raise PublishError(f'{label}: cannot open root directory: {exc}') from exc
+    try:
+        for component in parts[1:]:
+            if component in ('', '.', '..'):
+                raise InputError(f'{label}: output path has unsafe component: {component!r}')
+            try:
+                child = os.open(
+                    component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=descriptor,
+                )
+            except OSError as exc:
+                if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
+                    raise InputError(
+                        f'{label}: cannot open directory {component}: {exc}'
+                    ) from exc
+                raise PublishError(
+                    f'{label}: cannot open directory {component}: {exc}'
+                ) from exc
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
 
 
 def create_output_dir(path: Path, *, label: str = 'output') -> 'OutputDir':
@@ -70,13 +95,7 @@ def create_output_dir(path: Path, *, label: str = 'output') -> 'OutputDir':
     name = path.name
     if not name or name in ('.', '..'):
         raise InputError(f'{label}: invalid output directory: {path}')
-    _reject_symlink_ancestors(parent, label=label)
-    try:
-        parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    except OSError as exc:
-        if exc.errno in (errno.ENOENT, errno.ENOTDIR, errno.ELOOP):
-            raise InputError(f'{label}: cannot open parent directory: {parent}: {exc}') from exc
-        raise PublishError(f'{label}: cannot open parent directory: {parent}: {exc}') from exc
+    parent_fd = _open_directory_chain(parent, label=label)
     try:
         try:
             os.mkdir(name, 0o700, dir_fd=parent_fd)

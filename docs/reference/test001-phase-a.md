@@ -28,7 +28,7 @@ python3 scripts/test001.py analyze \
 - `--run` 消费固定布局的 `capture.json`、`serial.log`、`firmware.bin`；不能再用 `--profile/--group/--libc/--shard` 覆盖运行包选择。
 - 普通分析完成报告即退出 0，即使结论是 BLOCKED；`--require-pass` 只在结论不是 PASS 时退出 1。
 - 入口先把当前实现和配置复制到私有快照，再从快照执行；报告中的实现哈希对应实际执行的代码，不依赖调用前导入的内存副本。
-- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。创建时即打开并持有目录句柄，发布阶段不再按路径重新打开。适配器输出按流式读取，超过显式字节限额即终止整个进程组；目录 fsync 失败会撤销已可见的 `report.json`。`report.json` 最后原子发布，`report.md` 的哈希记录在其中。
+- 输出目录必须不存在；已存在、祖先含符号链接或写入失败都不覆盖旧结果。创建时从 `/` 开始逐级 `openat(O_NOFOLLOW)` 打开并持有目录句柄，发布阶段不再按路径重新打开。适配器输出按流式读取，超过显式字节限额即终止整个进程组；目录 fsync 失败会撤销已可见的 `report.json`。`report.json` 最后原子发布，`report.md` 的哈希记录在其中。
 
 ## 冻结了什么
 
@@ -50,8 +50,8 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 - `run_id`、PROFILE identity、selection、subject/platform、capture 状态/退出码、serial 与 firmware 文件哈希/长度；
 - `build.manifest_sha256`、`kernel_sha256`、`initramfs_sha256`、`base_img_sha256`；
-- `qemu.path/sha256/version`、实际 `argv`（必须含 `-bios`、`-kernel`、`-initrd`、`-drive`，且 `-bios` 指向 `firmware.bin`）、`started_at/finished_at`、`limits`；
-- `firmware.source/version/original_path`、`cow_layer` 的初始哈希/长度/格式/创建结果及基盘绑定；
+- `qemu.path/sha256/version`、实际 `argv`、`started_at/finished_at`、`limits`；argv 严格解析：拒绝重复的 `-bios/-kernel/-initrd/-drive` 等单例参数，`-kernel/-initrd/-bios` 必须逐字等于对应只读角色路径，唯一 `-drive` 必须指向 `cow_layer.path`、format 与 COW 一致、不是基盘且不能 `readonly=on`；
+- `firmware.source/version/original_path`、`cow_layer.path/format` 的初始哈希/长度/创建结果及基盘绑定；
 - `read_only_inputs` 必须恰好包含 kernel/initramfs/base_img/firmware/qemu 五个角色及各自前后 SHA256；
 - `capture_implementation.files` 的完整相对路径和逐文件 SHA256。
 

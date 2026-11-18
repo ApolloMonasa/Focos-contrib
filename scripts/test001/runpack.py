@@ -24,7 +24,7 @@ BUILD_KEYS = {'manifest_sha256', 'kernel_sha256', 'initramfs_sha256', 'base_img_
 QEMU_KEYS = {'path', 'sha256', 'version'}
 FIRMWARE_KEYS = {'file', 'sha256', 'size', 'source', 'version', 'original_path'}
 LIMIT_KEYS = {'timeout_seconds', 'serial_bytes', 'output_bytes'}
-COW_KEYS = {'format', 'sha256', 'size', 'created', 'base_img_sha256'}
+COW_KEYS = {'path', 'format', 'sha256', 'size', 'created', 'base_img_sha256'}
 READ_KEYS = {'role', 'path', 'sha256_before', 'sha256_after'}
 IMPLEMENTATION_KEYS = {'files'}
 IMPLEMENTATION_FILE_KEYS = {'path', 'sha256'}
@@ -96,19 +96,59 @@ def _positive_int(value, *, label: str) -> int:
     return value
 
 
-def _check_argv(argv):
+SINGLETON_FLAGS = {'-bios', '-kernel', '-initrd', '-drive', '-machine',
+                   '-m', '-smp', '-append'}
+
+
+def _parse_drive(value: str) -> dict:
+    if not isinstance(value, str) or not value:
+        raise InputError('capture -drive has no value')
+    options = {}
+    for part in value.split(','):
+        key, separator, option = part.partition('=')
+        if not separator or not key or key in options:
+            raise InputError('capture -drive options are malformed or duplicated')
+        options[key] = option
+    if not options.get('file'):
+        raise InputError('capture -drive has no file')
+    if 'readonly' in options and options['readonly'] not in ('on', 'off'):
+        raise InputError('capture -drive readonly is invalid')
+    if 'format' not in options:
+        raise InputError('capture -drive has no format')
+    return options
+
+
+def _check_argv(argv, paths: dict, qemu_path: str, cow: dict):
     if (not isinstance(argv, list) or not argv
-            or any(not isinstance(value, str) or not value or '\x00' in value for value in argv)):
+            or any(not isinstance(value, str) or not value or '\x00' in value
+                   for value in argv)):
         raise InputError('capture argv is invalid')
+    for flag in SINGLETON_FLAGS:
+        if argv.count(flag) > 1:
+            raise InputError(f'capture argv repeats {flag}')
     for flag in ('-bios', '-kernel', '-initrd', '-drive'):
         if flag not in argv:
             raise InputError(f'capture argv is missing {flag}')
         index = argv.index(flag)
         if index + 1 >= len(argv) or not argv[index + 1]:
             raise InputError(f'capture argv has no value for {flag}')
-    bios_index = argv.index('-bios') + 1
-    if Path(argv[bios_index]).name != 'firmware.bin':
-        raise InputError('capture argv -bios is not the private firmware copy')
+    if Path(argv[0]).name != Path(qemu_path).name:
+        raise InputError('capture argv does not name the recorded QEMU binary')
+    if argv[argv.index('-bios') + 1] != paths['firmware']:
+        raise InputError('capture argv -bios is not the verified firmware')
+    if argv[argv.index('-kernel') + 1] != paths['kernel']:
+        raise InputError('capture argv -kernel is not the verified kernel')
+    if argv[argv.index('-initrd') + 1] != paths['initramfs']:
+        raise InputError('capture argv -initrd is not the verified initramfs')
+    drive = _parse_drive(argv[argv.index('-drive') + 1])
+    if drive['file'] == paths['base_img']:
+        raise InputError('capture argv attaches the base image as a writable drive')
+    if drive['file'] != cow['path']:
+        raise InputError('capture argv drive is not the exclusive COW layer')
+    if drive['format'] != cow['format']:
+        raise InputError('capture argv drive format does not match the COW layer')
+    if drive.get('readonly') == 'on':
+        raise InputError('capture argv COW layer is read-only')
 
 
 def _check_read_only_inputs(items, expected: dict[str, str], integrity: str):
@@ -124,17 +164,20 @@ def _check_read_only_inputs(items, expected: dict[str, str], integrity: str):
         _string(item['path'], label=f'read_only_inputs[{index}].path')
         before = _hex(item['sha256_before'], label=f'read_only_inputs[{index}].before')
         after = _hex(item['sha256_after'], label=f'read_only_inputs[{index}].after')
-        roles[role] = (before, after)
+        roles[role] = (item['path'], before, after)
     if set(roles) != READ_ONLY_ROLES:
         missing = sorted(READ_ONLY_ROLES - set(roles))
         extra = sorted(set(roles) - READ_ONLY_ROLES)
         raise InputError(f'capture read_only_inputs roles mismatch; missing={missing}, extra={extra}')
+    paths = {}
     for role, expected_hash in expected.items():
-        before, after = roles[role]
+        path, before, after = roles[role]
+        paths[role] = path
         if expected_hash not in (before, after):
             raise InputError(f'capture read_only_inputs {role} does not match frozen identity')
         if integrity == 'VERIFIED' and before != after:
             raise InputError(f'capture read_only_inputs {role} changed under VERIFIED')
+    return paths
 
 
 def load_run_package(path: Path, profile: Profile) -> RunPackage:
@@ -229,9 +272,6 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
     _string(qemu['version'], label='capture qemu version')
     _hex(qemu['sha256'], label='capture qemu sha256')
 
-    _check_argv(capture['argv'])
-    if Path(capture['argv'][0]).name != Path(qemu['path']).name:
-        raise InputError('capture argv does not name the recorded QEMU binary')
     started = _timestamp(capture['started_at'], label='capture started_at')
     finished = _timestamp(capture['finished_at'], label='capture finished_at')
     if finished < started:
@@ -248,6 +288,9 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
     cow = capture['cow_layer']
     _require_keys(cow, COW_KEYS, label='capture cow_layer')
     _check_unknown(cow, COW_KEYS, label='capture cow_layer')
+    _string(cow['path'], label='capture cow_layer path')
+    if '\x00' in cow['path']:
+        raise InputError('capture cow_layer path contains NUL')
     _string(cow['format'], label='capture cow_layer format')
     _hex(cow['sha256'], label='capture cow_layer sha256')
     if type(cow['size']) is not int or cow['size'] < 0:
@@ -265,8 +308,11 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
         'firmware': firmware['sha256'],
         'qemu': qemu['sha256'],
     }
-    _check_read_only_inputs(capture['read_only_inputs'], expected_read_only,
-                            capture['input_integrity'])
+    paths = _check_read_only_inputs(capture['read_only_inputs'], expected_read_only,
+                                    capture['input_integrity'])
+    if paths['qemu'] != qemu['path']:
+        raise InputError('capture qemu path does not match read-only identity')
+    _check_argv(capture['argv'], paths, qemu['path'], cow)
 
     implementation = capture['capture_implementation']
     _require_keys(implementation, IMPLEMENTATION_KEYS, label='capture implementation')

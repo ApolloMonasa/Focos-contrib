@@ -1,6 +1,7 @@
 """适配器资源限额与输出发布边界；不启动 QEMU。"""
 import errno
 import hashlib
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -91,6 +92,36 @@ class OutputBoundaryTests(unittest.TestCase):
         self.addCleanup(output.close)
         output.write_atomic('report.json', b'{}')
         self.assertEqual([path.name for path in output.path.iterdir()], ['report.json'])
+
+    def test_intermediate_symlink_is_rejected(self):
+        real = self.root / 'real' / 'sub'
+        real.mkdir(parents=True)
+        link = self.root / 'link'
+        link.symlink_to(self.root / 'real', target_is_directory=True)
+        with self.assertRaises(InputError):
+            create_output_dir(link / 'sub' / 'out')
+        self.assertFalse((real / 'out').exists())
+
+    def test_ancestor_swap_before_component_open_cannot_redirect(self):
+        base = self.root / 'base'
+        (base / 'sub').mkdir(parents=True)
+        evil = self.root / 'evil'
+        (evil / 'sub').mkdir(parents=True)
+        real_open = os.open
+        swapped = False
+
+        def fake_open(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal swapped
+            if not swapped and path == 'base' and dir_fd is not None:
+                swapped = True
+                base.rename(self.root / 'base-real')
+                (self.root / 'base').symlink_to(evil, target_is_directory=True)
+            return real_open(path, flags, mode, dir_fd=dir_fd)
+
+        with mock.patch('test001.fsutil.os.open', side_effect=fake_open):
+            with self.assertRaises(InputError):
+                create_output_dir(base / 'sub' / 'out')
+        self.assertFalse((evil / 'sub' / 'out').exists())
 
     def test_created_handle_survives_parent_rename(self):
         parent = self.root / 'parent'
