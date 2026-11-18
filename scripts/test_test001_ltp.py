@@ -172,13 +172,13 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(entry['summary_incomplete'])
         self.assertEqual(result.native['summary_incomplete'], 1)
 
-    def test_multiple_summaries_are_preserved(self):
+    def test_multiple_summaries_are_preserved_but_rejected(self):
         result = parse(
             'RUN LTP CASE alpha\nTPASS: ok\nSummary:\npassed   1\n'
             'Summary:\npassed   1\nFAIL LTP CASE alpha : 0'
         )
         entry = item(result, 'alpha')
-        self.assertEqual(entry['judgment'], 'PASS')
+        self.assertEqual(entry['judgment'], 'JUDGE_ERROR')
         self.assertEqual(len(entry['summaries']), 2)
 
     def test_order_mismatch_is_reported(self):

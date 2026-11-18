@@ -1,4 +1,5 @@
 """从原始段文本独立提取观测名称，防止适配器覆盖重复项或丢掉未知项。"""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -7,14 +8,8 @@ import math
 import re
 import shlex
 
-MARKER = re.compile(r'^=+\s*(START|END)\s+(.+?)\s*=+\s*$')
-ANSI = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
-NUMBER = r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
-LIBCBENCH_TIME = re.compile(rf'time:\s*({NUMBER}),')
-LMBENCH_METRIC = re.compile(rf'^(.+?):\s*({NUMBER})\s+(microseconds|KB/sec|MB/sec)$')
-TESTCASE = re.compile(r'testcase (.+) (\bsuccess\b|\bfail\b)')
-UNIXBENCH = re.compile(r'^Unixbench (.+?):\s*(.*?)\s*$', re.M)
-LIBCBENCH = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', re.M)
+from .protocol import lex, NUMBER
+
 LMBENCH_COMMANDS = (
     ('lat_syscall', '-P', '1', 'null'),
     ('lat_syscall', '-P', '1', 'read'),
@@ -30,8 +25,14 @@ LMBENCH_COMMANDS = (
     ('lat_proc', '-P', '1', 'fork'),
     ('lat_proc', '-P', '1', 'exec'),
     ('lat_proc', '-P', '1', 'shell'),
-    ('lmdd', 'label=File /var/tmp/XXX write bandwidth:', 'of=/var/tmp/XXX',
-     'move=1m', 'fsync=1', 'print=3'),
+    (
+        'lmdd',
+        'label=File /var/tmp/XXX write bandwidth:',
+        'of=/var/tmp/XXX',
+        'move=1m',
+        'fsync=1',
+        'print=3',
+    ),
     ('lat_pagefault', '-P', '1', '/var/tmp/XXX'),
     ('lat_mmap', '-P', '1', '512k', '/var/tmp/XXX'),
     ('bw_pipe', '-P', '1'),
@@ -44,13 +45,25 @@ LMBENCH_COMMANDS = (
 )
 LMBENCH_INDEX = {command: index for index, command in enumerate(LMBENCH_COMMANDS)}
 LMBENCH_LABELS = {
-    'Simple syscall', 'Simple read', 'Simple write', 'Simple stat',
-    'Simple fstat', 'Simple open/close', "Select on 100 fd's",
-    'Signal handler installation', 'Signal handler overhead', 'Protection fault',
-    'Pipe latency', 'Process fork+exit', 'Process fork+execve',
-    'Process fork+/bin/sh -c', 'Static Process fork+exit',
-    'Static Process fork+execve', 'Static Process fork+/bin/sh -c',
-    'File /var/tmp/XXX write bandwidth', 'Pagefaults on /var/tmp/XXX',
+    'Simple syscall',
+    'Simple read',
+    'Simple write',
+    'Simple stat',
+    'Simple fstat',
+    'Simple open/close',
+    "Select on 100 fd's",
+    'Signal handler installation',
+    'Signal handler overhead',
+    'Protection fault',
+    'Pipe latency',
+    'Process fork+exit',
+    'Process fork+execve',
+    'Process fork+/bin/sh -c',
+    'Static Process fork+exit',
+    'Static Process fork+execve',
+    'Static Process fork+/bin/sh -c',
+    'File /var/tmp/XXX write bandwidth',
+    'Pagefaults on /var/tmp/XXX',
     'Pipe bandwidth',
 }
 IOZONE_HEADERS = (
@@ -76,18 +89,20 @@ class ObservationGuard:
     successes: Counter
 
 
-def _markers(group: str, text: str) -> list[str]:
-    pattern = re.compile(
-        rf'^=+\s*{re.escape(group)}\s+(\S+)\s+end:\s*\S+\s*=+\s*$', re.M
-    )
-    return [match.group(1) for match in pattern.finditer(text)]
+def _markers(group: str, records) -> list[str]:
+    return [
+        event.fields[1]
+        for event in records
+        if event.kind == 'team_result' and event.fields[0] == group
+    ]
 
 
-def _iozone(text: str) -> list[str]:
+def _iozone(records) -> list[str]:
     names = []
     current = None
     sub_key = None
-    for line in text.splitlines():
+    for event in records:
+        line = event.text
         for needle, label in IOZONE_HEADERS:
             if needle in line:
                 current = label
@@ -99,22 +114,16 @@ def _iozone(text: str) -> list[str]:
     return names
 
 
-def _testcase_pairs(text: str) -> list[tuple[str, str]]:
+def _testcase_pairs(records) -> list[tuple[str, str]]:
+    return [event.fields for event in records if event.kind == 'testcase']
+
+
+def _testcase_malformed(records) -> list[str]:
     return [
-        (match.group(1).strip(), match.group(2))
-        for match in TESTCASE.finditer(text)
+        event.raw.strip()
+        for event in records
+        if event.kind == 'invalid_testcase' or event.kind == 'testcase' and not event.canonical
     ]
-
-
-def _testcase_malformed(text: str) -> list[str]:
-    malformed = []
-    for raw in text.splitlines():
-        if 'testcase ' not in raw:
-            continue
-        statuses = re.findall(r'\b(success|fail)\b', raw)
-        if len(statuses) != 1 or not TESTCASE.search(raw):
-            malformed.append(raw.strip())
-    return malformed
 
 
 def _libctest_normalized(name: str):
@@ -124,23 +133,7 @@ def _libctest_normalized(name: str):
     return f'libctest {match.group(1)} {match.group(2)}'
 
 
-def _libctest_marker(raw: str):
-    match = re.search(
-        r'\b(START|END)\s+(entry-(?:static|dynamic)\.exe\s+\S+)', raw
-    )
-    if match is None:
-        return None
-    return match.group(1), match.group(2)
-
-
-def _basic_marker(raw: str):
-    match = re.search(r'=+\s*(START|END)\s+(.+?)\s*=+', raw)
-    if match is None:
-        return None
-    return match.group(1), match.group(2).strip()
-
-
-def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], Counter]:
+def _marker_guard(group: str, records) -> tuple[list[str], list[str], Counter]:
     """basic/libctest 的边界、正文归属和重复次数统一状态机。"""
     names = []
     malformed = []
@@ -151,18 +144,14 @@ def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], Counter]
     def begin(raw_name: str, line_number: int):
         nonlocal open_name, inside
         if open_name is not None:
-            malformed.append(
-                f'line {line_number}: nested START {raw_name} before END {open_name}'
-            )
+            malformed.append(f'line {line_number}: nested START {raw_name} before END {open_name}')
         if group == 'basic':
             names.append(raw_name)
         else:
             normalized = _libctest_normalized(raw_name)
             if normalized is None:
                 names.append('libctest ' + raw_name)
-                malformed.append(
-                    f'line {line_number}: unknown libctest START name: {raw_name}'
-                )
+                malformed.append(f'line {line_number}: unknown libctest START name: {raw_name}')
             else:
                 names.append(normalized)
         open_name = raw_name
@@ -173,48 +162,28 @@ def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], Counter]
         if open_name is None:
             malformed.append(f'line {line_number}: END without START: {raw_name}')
         elif raw_name != open_name:
-            malformed.append(
-                f'line {line_number}: END {raw_name} does not match START {open_name}'
-            )
+            malformed.append(f'line {line_number}: END {raw_name} does not match START {open_name}')
             open_name = None
             inside = False
         else:
             open_name = None
             inside = False
 
-    for line_number, raw in enumerate(text.splitlines(), 1):
-        stripped = raw.strip()
-        match = MARKER.fullmatch(stripped)
-        if match is not None:
-            state, name = match.groups()
+    for event in records:
+        line_number = event.line
+        if event.kind == 'invalid_case':
+            malformed.append(f'line {line_number}: non-canonical marker: {event.text}')
+            continue
+        if event.kind == 'case_marker':
+            state, name = event.fields
+            if not event.canonical:
+                malformed.append(f'line {line_number}: non-canonical marker: {event.text}')
             if state == 'START':
                 begin(name, line_number)
             else:
                 finish(name, line_number)
             continue
-
-        if group == 'libctest':
-            suspicious = any(token in raw for token in (
-                'START entry-static.exe', 'START entry-dynamic.exe',
-                'END entry-static.exe', 'END entry-dynamic.exe',
-            ))
-            parsed = _libctest_marker(raw) if suspicious else None
-        else:
-            suspicious = '========== START ' in raw or '========== END ' in raw
-            parsed = _basic_marker(raw) if suspicious else None
-        if suspicious:
-            malformed.append(
-                f'line {line_number}: non-canonical marker: {stripped}'
-            )
-            if parsed is not None:
-                state, name = parsed
-                if state == 'START':
-                    begin(name, line_number)
-                else:
-                    finish(name, line_number)
-            continue
-
-        if group == 'libctest' and raw == 'Pass!':
+        if group == 'libctest' and event.kind == 'case_pass':
             normalized = _libctest_normalized(open_name) if inside and open_name else None
             if normalized is None:
                 malformed.append(f'line {line_number}: Pass! outside case')
@@ -225,158 +194,185 @@ def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], Counter]
         malformed.append(f'unclosed START: {open_name}')
     return names, malformed, successes
 
-def _lmbench(text: str, expected: list[str]) -> list[str]:
+
+def _lmbench(records, expected: list[str]) -> list[str]:
     names = []
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line.startswith('+ '):
-            continue
-        try:
-            args = shlex.split(line[2:])
-        except ValueError:
-            if line[2:].startswith('./lmbench_all'):
-                names.append('lmbench malformed-trace ' + line[2:])
-            continue
-        if not args or args[0] != './lmbench_all':
-            continue
-        command = tuple(args[1:])
-        index = LMBENCH_INDEX.get(command)
-        if command == tuple(' '.join(LMBENCH_COMMANDS[14]).split()):
-            index = 14
-        if index is not None and index < len(expected):
-            names.append(expected[index])
-        else:
-            names.append('lmbench ' + shlex.join(command))
-    for raw in text.splitlines():
-        match = LMBENCH_METRIC.fullmatch(ANSI.sub('', raw).strip())
-        if match is None:
-            continue
-        label = match.group(1).strip()
-        if label not in LMBENCH_LABELS:
-            names.append('lmbench ' + label)
+    for event in records:
+        if event.kind == 'lmbench_trace':
+            if not event.canonical:
+                names.append('lmbench malformed-trace ' + event.text)
+                continue
+            command = event.fields
+            index = LMBENCH_INDEX.get(command)
+            if command == tuple(' '.join(LMBENCH_COMMANDS[14]).split()):
+                index = 14
+            if index is not None and index < len(expected):
+                names.append(expected[index])
+            else:
+                names.append('lmbench ' + shlex.join(command))
+        elif event.kind == 'lmbench_metric':
+            label = event.fields[0]
+            if label not in LMBENCH_LABELS:
+                names.append('lmbench ' + label)
     return names
 
 
-def extract_metrics(group: str, text: str, expected: list[str], *, line_offset: int = 0) -> list[dict]:
+def extract_metrics(
+    group: str, text: str, expected: list[str], *, line_offset: int = 0, events=None
+) -> list[dict]:
     """从原始段保留性能数值和单位；冻结 adapter 仍只给 PASS/FAIL。"""
     metrics = []
+    records = lex(text, line_offset=line_offset) if events is None else events
     if group == 'libcbench':
         names = set(expected)
         current = None
-        for line_number, raw in enumerate(text.splitlines(), 1):
-            line = ANSI.sub('', raw).strip()
-            if line in names:
+        for event in records:
+            line_number, raw, line = event.line - line_offset, event.raw, event.text
+            if event.kind == 'libcbench_label' and line in names:
                 current = line
                 continue
             if current is not None:
-                match = LIBCBENCH_TIME.match(line)
-                if match:
-                    value = float(match.group(1))
+                if event.kind == 'libcbench_time':
+                    value = float(event.fields[0])
                     if math.isfinite(value):
-                        metrics.append({'name': current, 'value': value,
-                                        'unit': 's', 'line': line_number + line_offset,
-                                        'section_line': line_number})
+                        metrics.append(
+                            {
+                                'name': current,
+                                'value': value,
+                                'unit': 's',
+                                'line': line_number + line_offset,
+                                'section_line': line_number,
+                            }
+                        )
                     current = None
         return metrics
     if group == 'lmbench':
         context = None
-        for line_number, raw in enumerate(text.splitlines(), 1):
-            line = ANSI.sub('', raw).strip()
-            if line.startswith('+ '):
-                context = None
-                try:
-                    args = shlex.split(line[2:])
-                except ValueError:
-                    continue
-                if args and args[0] == './lmbench_all':
-                    context = LMBENCH_INDEX.get(tuple(args[1:]))
+        for event in records:
+            line_number, raw, line = event.line - line_offset, event.raw, event.text
+            if event.kind == 'lmbench_trace':
+                context = LMBENCH_INDEX.get(event.fields) if event.canonical else None
+                if event.fields == tuple(' '.join(LMBENCH_COMMANDS[14]).split()):
+                    context = 14
                 continue
-            if line in ('file system latency', 'context switch overhead'):
+            if event.kind == 'lmbench_header':
                 context = 18 if line == 'file system latency' else 23
                 continue
-            match = LMBENCH_METRIC.fullmatch(line)
-            if match:
-                value = float(match.group(2))
+            if event.kind == 'lmbench_metric':
+                label, number, unit = event.fields
+                value = float(number)
                 if math.isfinite(value):
-                    metrics.append({'label': match.group(1).strip(),
-                                    'value': value, 'unit': match.group(3),
-                                    'line': line_number + line_offset,
-                                    'section_line': line_number, 'raw': raw})
+                    metrics.append(
+                        {
+                            'label': label,
+                            'value': value,
+                            'unit': unit,
+                            'line': event.line,
+                            'section_line': line_number,
+                            'raw': raw,
+                        }
+                    )
                 context = None
                 continue
             name = expected[context] if context is not None and context < len(expected) else None
             if context in (16, 19, 20, 21, 22):
                 pair = re.fullmatch(rf'({NUMBER})\s+({NUMBER})', line)
                 if pair and all(math.isfinite(float(v)) for v in pair.groups()):
-                    metrics.append({'name': name, 'value': float(pair[2]),
-                                    'unit': 'microseconds' if context == 16 else 'MB/sec',
-                                    'input_size': float(pair[1]), 'input_size_unit': 'MB',
-                                    'line': line_number + line_offset,
-                                    'section_line': line_number, 'raw': raw})
+                    metrics.append(
+                        {
+                            'name': name,
+                            'value': float(pair[2]),
+                            'unit': 'microseconds' if context == 16 else 'MB/sec',
+                            'input_size': float(pair[1]),
+                            'input_size_unit': 'MB',
+                            'line': line_number + line_offset,
+                            'section_line': line_number,
+                            'raw': raw,
+                        }
+                    )
                 elif line:
                     context = None
             elif context == 18:
                 row = re.fullmatch(r'(\d+)k\s+(\d+)\s+(\d+)\s+(\d+)', line)
                 if row:
                     for column, operation in ((3, 'create'), (4, 'delete')):
-                        metrics.append({'name': name, 'operation': operation,
-                                        'value': int(row[column]), 'unit': 'operations/sec',
-                                        'file_size': int(row[1]), 'file_size_unit': 'kB',
-                                        'files': int(row[2]),
-                                        'line': line_number + line_offset,
-                                        'section_line': line_number, 'raw': raw})
+                        metrics.append(
+                            {
+                                'name': name,
+                                'operation': operation,
+                                'value': int(row[column]),
+                                'unit': 'operations/sec',
+                                'file_size': int(row[1]),
+                                'file_size_unit': 'kB',
+                                'files': int(row[2]),
+                                'line': line_number + line_offset,
+                                'section_line': line_number,
+                                'raw': raw,
+                            }
+                        )
                 elif line:
                     context = None
             elif context == 23:
                 row = re.fullmatch(rf'(\d+)\s+({NUMBER})', line)
                 if row and math.isfinite(float(row[2])):
-                    metrics.append({'name': name, 'value': float(row[2]),
-                                    'unit': 'microseconds', 'processes': int(row[1]),
-                                    'line': line_number + line_offset,
-                                    'section_line': line_number, 'raw': raw})
+                    metrics.append(
+                        {
+                            'name': name,
+                            'value': float(row[2]),
+                            'unit': 'microseconds',
+                            'processes': int(row[1]),
+                            'line': line_number + line_offset,
+                            'section_line': line_number,
+                            'raw': raw,
+                        }
+                    )
                 elif line and not line.startswith('"size='):
                     context = None
     return metrics
 
 
-def observed_names(group: str, text: str, expected: list[str] | None = None) -> list[str]:
-    """按固定组格式提取原始观测名称；未知格式不猜测。"""
+def observed_names(
+    group: str, text: str, expected: list[str] | None = None, *, events=None
+) -> list[str]:
+    """消费共享结构事件，冻结判据的名称投影不改变原始事件。"""
+    records = lex(text) if events is None else events
     if group in ('basic', 'libctest'):
-        names, _, _ = _marker_guard(group, text)
+        names, _, _ = _marker_guard(group, records)
         return names
     if group in ('lua', 'busybox'):
-        return [name for name, _ in _testcase_pairs(text)]
+        return [name for name, _ in _testcase_pairs(records)]
     if group == 'iozone':
-        return _iozone(text)
+        return _iozone(records)
     if group == 'unixbench':
-        return ['Unixbench ' + match.group(1) for match in UNIXBENCH.finditer(text)]
+        return ['Unixbench ' + e.fields[0] for e in records if e.kind == 'unixbench']
     if group in ('iperf', 'netperf', 'cyclictest'):
-        return _markers(group, text)
+        return _markers(group, records)
     if group == 'libcbench':
-        return [match.group(0).strip() for match in LIBCBENCH.finditer(text)]
+        return [e.fields[0] for e in records if e.kind == 'libcbench_label']
     if group == 'lmbench':
-        return _lmbench(text, expected or [])
+        return _lmbench(records, expected or [])
     return []
 
 
-def check_observations(group: str, text: str, expected: list[str]) -> ObservationGuard:
-    """返回范围外名称和重复名称；重复不代表可以挑最后一次成功。"""
-    counts = Counter(observed_names(group, text, expected))
-    expected_set = set(expected)
-    extras = sorted(name for name in counts if name not in expected_set)
+def check_observations(
+    group: str, text: str, expected: list[str], *, events=None
+) -> ObservationGuard:
+    records = lex(text) if events is None else events
+    counts = Counter(observed_names(group, text, expected, events=records))
+    extras = sorted(name for name in counts if name not in set(expected))
     duplicates = sorted(name for name, count in counts.items() if count > 1)
-    statuses: dict[str, list[str]] = {}
+    statuses = {}
     if group in ('lua', 'busybox'):
-        for name, status in _testcase_pairs(text):
+        for name, status in _testcase_pairs(records):
             statuses.setdefault(name, []).append(status)
     failures = {name for name, values in statuses.items() if 'fail' in values}
-    successes = set()
+    successes = Counter()
     if group in ('basic', 'libctest'):
-        _, malformed, successes = _marker_guard(group, text)
+        _, malformed, successes = _marker_guard(group, records)
     elif group in ('lua', 'busybox'):
-        malformed = _testcase_malformed(text)
+        malformed = _testcase_malformed(records)
     else:
         malformed = []
-    return ObservationGuard(counts=counts, extras=extras, duplicates=duplicates,
-                            failures=failures, statuses=statuses, malformed=malformed,
-                            group=group, successes=successes)
+    return ObservationGuard(
+        counts, extras, duplicates, failures, statuses, malformed, group, successes
+    )

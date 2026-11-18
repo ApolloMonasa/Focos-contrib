@@ -900,6 +900,26 @@ class RunPackageTests(TemporaryOutput):
         self.assertEqual(report['protocol']['unattributed'][0]['kind'], 'cross_group')
         self.assertEqual(report['totals']['accepted_pass'], 0)
 
+    def test_structural_ltp_rules_block_full_run(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group']=='ltp' and row['libc']=='musl']
+        summary = ['Summary:', 'passed 1', 'failed 0', 'broken 0', 'skipped 0', 'warnings 0']
+        for criteria, first_lines, expected_judgment in (
+                (J1,['TINFO: diagnostic quotes TPASS: only'],'FAIL'),
+                (J2,['TPASS: ok',*summary,*summary],'JUDGE_ERROR')):
+            with self.subTest(criteria=criteria):
+                cases = [(name, first_lines if i==0 else ['TPASS: ok',*summary],0)
+                         for i,name in enumerate(names)]
+                run=make_run(self.base/str(uuid.uuid4()),['ltp-musl'],ltp_log(cases))
+                result,output=self.run_analyze(run,criteria,require_pass=True)
+                self.assertEqual(result.returncode,1,result.stderr)
+                report=load_report(output)
+                self.assertEqual(report['groups'][0]['items'][0]['judgment'],expected_judgment)
+                self.assertEqual(report['totals']['accepted_pass'],0)
+                self.assertEqual(report['totals']['selected_total'],2820)
+
     def test_unknown_ltp_flag_outside_invocation_blocks(self):
         rows = [json.loads(line) for line in
                 (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')

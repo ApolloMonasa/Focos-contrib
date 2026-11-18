@@ -161,7 +161,7 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
             items = _not_run_items(profile, shard)
             return GroupAnalysis(shard, section, status, 'ltp_native', items, [], [],
                                  {'events': {}, 'summaries': {}}, _count_items(items))
-        parsed = parse_ltp_section(section.text, expected, line_offset=section.start_line)
+        parsed = parse_ltp_section(section.text, expected, line_offset=section.start_line, events=section.events)
         errors = list(parsed.errors)
         if parsed.unattributed:
             errors.append(f'LTP_UNATTRIBUTED_RESULT:{len(parsed.unattributed)}')
@@ -180,7 +180,7 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
                              None, _count_items(items))
 
     guard = check_observations(
-        shard.group, section.text, [item['name'] for item in expected]
+        shard.group, section.text, [item['name'] for item in expected], events=section.events
     )
     planned = group_meta.get('planned_occurrences', {})
     if adapter_root is None:
@@ -412,7 +412,7 @@ def analyze_log(profile: Profile, criteria: Criteria, shards: list[Shard],
                 analysis.metrics = extract_metrics(
                     shard.group, analysis.section.text,
                     [item['name'] for item in profile.items_for(shard)],
-                    line_offset=analysis.section.start_line,
+                    line_offset=analysis.section.start_line, events=analysis.section.events,
                 )
             analyses.append(analysis)
     protocol = _protocol(split_obj, shards, origin=origin)

@@ -1,27 +1,22 @@
 """LTP 原生结果适配器：先保留每次尝试和原生计数，再给调用判分。"""
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-RESULT_FLAGS = ('TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN', 'TINFO', 'TDEBUG')
-UNATTRIBUTED_FLAGS = {'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN'}
-ANSI_RE = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
-RESULT_RE = re.compile(r'(?:^|\s)(TPASS|TFAIL|TBROK|TCONF|TWARN|TINFO|TDEBUG)\s*:')
-UNKNOWN_RE = re.compile(r'(?:^|\s)(T[A-Z][A-Z0-9_]{2,})\s*:')
-IGNORED_FLAGS = {'TERRNO', 'TTERRNO', 'TRERRNO'}
-SUMMARY_LINE_RE = re.compile(r'^(passed|failed|broken|skipped|warnings)\s*:?\s*(\d+)\s*$')
-LEGACY_RE = re.compile(r'^(Total Tests|Passed|Failed|Not Supported)\s*:\s*(\d+)\s*$')
+from .protocol import Event, lex, RESULT_FLAGS, UNATTRIBUTED_FLAGS
 
 
 @dataclass
 class Attempt:
     name: str
     run_line: int
+    line_offset: int = 0
     end_line: int | None = None
     exit_code: int | None = None
     complete: bool = False
-    lines: list[str] = field(default_factory=list)
+    records: list[Event] = field(default_factory=list)
     events: dict[str, int] = field(default_factory=dict)
     summaries: list[dict[str, int]] = field(default_factory=list)
     summary_incomplete: bool = False
@@ -49,8 +44,12 @@ class Attempt:
             reasons.append(f'EXIT_{self.exit_code}')
         else:
             native_failures = []
-            for flag, label in (('TFAIL', 'TFAIL'), ('TBROK', 'TBROK'),
-                                ('TCONF', 'TCONF'), ('TWARN', 'TWARN')):
+            for flag, label in (
+                ('TFAIL', 'TFAIL'),
+                ('TBROK', 'TBROK'),
+                ('TCONF', 'TCONF'),
+                ('TWARN', 'TWARN'),
+            ):
                 if self.events.get(flag, 0):
                     native_failures.append(f'{label}_{self.events[flag]}')
             if native_failures:
@@ -69,6 +68,8 @@ class Attempt:
             'complete': self.complete,
             'run_line': self.run_line,
             'end_line': self.end_line,
+            'run_section_line': self.run_line - self.line_offset,
+            'end_section_line': None if self.end_line is None else self.end_line - self.line_offset,
             'events': dict(sorted(self.events.items())),
             'summaries': list(self.summaries),
             'summary_incomplete': self.summary_incomplete,
@@ -90,78 +91,77 @@ class LtpParse:
     unattributed: list[dict]
 
 
-def _summaries_from_lines(lines: list[str], *, attempt: Attempt) -> list[dict[str, int]]:
-    summaries = []
-    for index, raw in enumerate(lines):
-        if strip_ansi(raw).strip() != 'Summary:':
-            continue
-        values = {}
-        cursor = index + 1
-        while cursor < len(lines):
-            line = strip_ansi(lines[cursor]).strip()
-            if not line:
-                cursor += 1
-                continue
-            match = SUMMARY_LINE_RE.fullmatch(line)
-            if not match:
-                break
-            key, value = match.groups()
-            if key in values:
-                attempt.parse_errors.append(f'DUPLICATE_SUMMARY_FIELD:{key}')
-            values[key] = int(value)
-            cursor += 1
-        if not values:
-            attempt.parse_errors.append('EMPTY_SUMMARY')
-        elif set(values) != {'passed', 'failed', 'broken', 'skipped', 'warnings'}:
-            attempt.summary_incomplete = True
-        summaries.append(values)
-    if summaries:
-        return summaries
-    legacy = {}
-    for raw in lines:
-        match = LEGACY_RE.fullmatch(strip_ansi(raw).strip())
-        if not match:
-            continue
-        key, value = match.groups()
-        if key == 'Total Tests':
-            continue
-        legacy[{'Passed': 'passed', 'Failed': 'failed', 'Not Supported': 'skipped'}[key]] = int(value)
-    if legacy:
-        attempt.summary_incomplete = True
-        return [legacy]
-    return []
-
-
-def strip_ansi(text: str) -> str:
-    """去掉串口颜色控制码；原始字节仍由报告输入哈希保存。"""
-    return ANSI_RE.sub('', text)
-
-
 def _parse_attempt(attempt: Attempt):
+    """只消费共享词法的结构字段；汇总块只允许一次，不叠加重复计数。"""
     counts = {flag: 0 for flag in RESULT_FLAGS}
     unknown = set()
-    for raw in attempt.lines:
-        line = strip_ansi(raw)
-        for match in RESULT_RE.finditer(line):
-            counts[match.group(1)] += 1
-        for match in UNKNOWN_RE.finditer(line):
-            token = match.group(1)
-            if token not in RESULT_FLAGS and token not in IGNORED_FLAGS:
-                unknown.add(token)
+    modern = []
+    legacy = {}
+    active = None
+    for event in attempt.records:
+        if event.kind == 'ltp_result':
+            counts[event.fields[0]] += 1
+        elif event.kind == 'ltp_unknown':
+            unknown.add(event.fields[0])
+        if event.kind == 'summary':
+            active = {}
+            modern.append(active)
+        elif event.kind == 'summary_field' and active is not None:
+            key, value = event.fields
+            if key in active:
+                attempt.parse_errors.append(f'DUPLICATE_SUMMARY_FIELD:{key}')
+            active[key] = int(value)
+        elif event.kind == 'legacy_summary':
+            key, value = event.fields
+            if key in legacy:
+                attempt.parse_errors.append(f'DUPLICATE_LEGACY_FIELD:{key}')
+            legacy[key] = int(value)
+            active = None
+        elif event.text:
+            active = None
+    if len(modern) > 1:
+        attempt.parse_errors.append('DUPLICATE_SUMMARY')
+    if modern and legacy:
+        attempt.parse_errors.append('MIXED_SUMMARY_FORMATS')
+    for values in modern:
+        if not values:
+            attempt.parse_errors.append('EMPTY_SUMMARY')
+        if set(values) != {'passed', 'failed', 'broken', 'skipped', 'warnings'}:
+            attempt.summary_incomplete = True
+    if modern:
+        attempt.summaries = modern
+    elif legacy:
+        attempt.summary_incomplete = True
+        attempt.summaries = [
+            {
+                dst: legacy[src]
+                for src, dst in (
+                    ('Passed', 'passed'),
+                    ('Failed', 'failed'),
+                    ('Not Supported', 'skipped'),
+                )
+                if src in legacy
+            }
+        ]
     attempt.events = {flag: count for flag, count in counts.items() if count}
     attempt.unknown_flags = sorted(unknown)
-    attempt.summaries = _summaries_from_lines(attempt.lines, attempt=attempt)
     if unknown:
         attempt.parse_errors.append('UNKNOWN_RESULT_FLAG:' + ','.join(sorted(unknown)))
     for summary in attempt.summaries:
-        pairs = (('passed', 'TPASS'), ('failed', 'TFAIL'), ('broken', 'TBROK'),
-                 ('skipped', 'TCONF'), ('warnings', 'TWARN'))
-        for summary_key, event_key in pairs:
-            if summary_key in summary and summary[summary_key] != counts[event_key]:
+        for key, flag in (
+            ('passed', 'TPASS'),
+            ('failed', 'TFAIL'),
+            ('broken', 'TBROK'),
+            ('skipped', 'TCONF'),
+            ('warnings', 'TWARN'),
+        ):
+            if key in summary and summary[key] != counts[flag]:
                 attempt.summary_mismatch = True
 
 
-def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) -> LtpParse:
+def parse_ltp_section(
+    text: str, expected: list[dict], *, line_offset: int = 0, events=None
+) -> LtpParse:
     """按固定版本的原生标志解析一个 ltp-<libc> 段。"""
     expected_names = [item['name'] for item in expected]
     expected_set = set(expected_names)
@@ -170,18 +170,17 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
     observed_order: list[str] = []
     unattributed: list[dict] = []
     current: Attempt | None = None
-    lines = text.splitlines()
+    records = lex(text, line_offset=line_offset) if events is None else events
 
     def finish(attempt: Attempt | None):
         if attempt is None:
             return
         attempts.setdefault(attempt.name, []).append(attempt)
 
-    for line_number, raw in enumerate(lines, 1):
-        stripped = strip_ansi(raw).strip()
-        run = re.fullmatch(r'RUN LTP CASE (.+)', stripped)
-        if run:
-            name = run.group(1)
+    for event in records:
+        line_number = event.line
+        if event.kind == 'ltp_start':
+            name = event.fields[0]
             if current is not None:
                 errors.append(
                     f'line {line_number}: RUN LTP CASE before previous case ended: {name}'
@@ -193,12 +192,11 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
                 errors.append(f'line {line_number}: unknown LTP case: {name}')
             if attempts.get(name):
                 errors.append(f'line {line_number}: duplicate LTP case: {name}')
-            current = Attempt(name=name, run_line=line_number)
+            current = Attempt(name=name, run_line=line_number, line_offset=line_offset)
             observed_order.append(name)
             continue
-        end = re.fullmatch(r'FAIL LTP CASE (.+) : (\S+)', stripped)
-        if end:
-            name, raw_exit = end.groups()
+        if event.kind == 'ltp_end':
+            name, raw_exit = event.fields
             if current is None:
                 errors.append(f'line {line_number}: LTP case end without start: {name}')
                 continue
@@ -222,30 +220,26 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
             current = None
             continue
         if current is not None:
-            current.lines.append(raw)
+            current.records.append(event)
             continue
-        line = strip_ansi(raw)
-        for match in RESULT_RE.finditer(line):
-            flag = match.group(1)
-            if flag in UNATTRIBUTED_FLAGS:
-                unattributed.append({
-                    'event': flag,
-                    'section_line': line_number,
-                    'line': line_number + line_offset,
-                })
-        for match in UNKNOWN_RE.finditer(line):
-            token = match.group(1)
-            if token in RESULT_FLAGS or token in IGNORED_FLAGS:
-                continue
-            unattributed.append({
-                'event': token,
-                'section_line': line_number,
-                'line': line_number + line_offset,
-                'kind': 'ltp_unknown',
-            })
-            errors.append(
-                f'line {line_number}: unknown LTP flag outside invocation: {token}'
-            )
+        if (
+            event.kind == 'ltp_result'
+            and event.fields[0] in UNATTRIBUTED_FLAGS
+            or event.kind == 'ltp_unknown'
+        ):
+            record = {
+                'event': event.fields[0],
+                'section_line': line_number - line_offset,
+                'line': event.line,
+            }
+            if event.kind == 'ltp_unknown':
+                record['kind'] = 'ltp_unknown'
+                errors.append(
+                    f'line {line_number}: unknown LTP flag outside invocation: {event.fields[0]}'
+                )
+            unattributed.append(record)
+        elif event.kind in ('summary', 'summary_field', 'legacy_summary'):
+            errors.append(f'line {line_number}: summary outside invocation')
 
     if current is not None:
         errors.append(f'line {current.run_line}: LTP case has no end: {current.name}')
@@ -263,19 +257,26 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
     for name in expected_names:
         cases = attempts.get(name, [])
         if not cases:
-            items.append({
-                'name': name, 'judgment': 'MISSING', 'reasons': ['NO_RESULT'],
-                'native': {'events': {}},
-            })
+            items.append(
+                {
+                    'name': name,
+                    'judgment': 'MISSING',
+                    'reasons': ['NO_RESULT'],
+                    'native': {'events': {}},
+                }
+            )
             continue
         if len(cases) > 1:
             if any(case.summary_incomplete for case in cases):
                 summary_incomplete += 1
-            items.append({
-                'name': name, 'judgment': 'JUDGE_ERROR',
-                'reasons': ['DUPLICATE_ATTEMPT'],
-                'attempts': [case.result() for case in cases],
-            })
+            items.append(
+                {
+                    'name': name,
+                    'judgment': 'JUDGE_ERROR',
+                    'reasons': ['DUPLICATE_ATTEMPT'],
+                    'attempts': [case.result() for case in cases],
+                }
+            )
             continue
         case = cases[0]
         result = case.result()
@@ -291,10 +292,12 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
     for name, cases in sorted(attempts.items()):
         if name in expected_set:
             continue
-        extras.append({
-            'name': name,
-            'attempts': [case.result() for case in cases],
-        })
+        extras.append(
+            {
+                'name': name,
+                'attempts': [case.result() for case in cases],
+            }
+        )
 
     native = {flag: 0 for flag in RESULT_FLAGS}
     summaries = {'passed': 0, 'failed': 0, 'broken': 0, 'skipped': 0, 'warnings': 0}
@@ -302,16 +305,27 @@ def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) 
         for case in cases:
             for flag, count in case.events.items():
                 native[flag] = native.get(flag, 0) + count
-            for summary in case.summaries:
-                for key, value in summary.items():
+            # 重复块仍在逐调用诊断中保留，但不能重复累加原生汇总。
+            if len(case.summaries) == 1 and not any(
+                'SUMMARY' in error or 'LEGACY_FIELD' in error for error in case.parse_errors
+            ):
+                for key, value in case.summaries[0].items():
                     summaries[key] = summaries.get(key, 0) + value
     return LtpParse(
-        items=items, extras=extras, errors=errors,
-        native={'events': {flag: count for flag, count in native.items() if count},
-                'summaries': {key: value for key, value in summaries.items() if value},
-                'summary_missing': summary_missing, 'summary_incomplete': summary_incomplete,
-                'summary_mismatch': summary_mismatch, 'unattributed': unattributed},
+        items=items,
+        extras=extras,
+        errors=errors,
+        native={
+            'events': {flag: count for flag, count in native.items() if count},
+            'summaries': {key: value for key, value in summaries.items() if value},
+            'summary_missing': summary_missing,
+            'summary_incomplete': summary_incomplete,
+            'summary_mismatch': summary_mismatch,
+            'unattributed': unattributed,
+        },
         order_matches=observed_order == expected_names,
-        summary_missing=summary_missing, summary_incomplete=summary_incomplete,
-        summary_mismatch=summary_mismatch, unattributed=unattributed,
+        summary_missing=summary_missing,
+        summary_incomplete=summary_incomplete,
+        summary_mismatch=summary_mismatch,
+        unattributed=unattributed,
     )

@@ -109,12 +109,15 @@ Focos/
 │   ├── test_smoke.py                  # 检查器标记、退出状态与超时测试
 │   ├── test001.py                     # TEST-001 实现快照入口
 │   ├── test001/                       # 清单读取、LTP/官方判据适配与报告
+│   │   ├── protocol.py                # 共享结构事件、原始位置与格式规则
+│   │   └── worker.py                  # 私有快照中的独立分析入口
 │   ├── test_test001_analyze.py        # 历史回放、运行包和 LTP 负例
 │   ├── test_test001_boundaries.py     # 适配器限额、fsync 与 mkdir 边界
 │   ├── test_test001_config.py         # PROFILE/CRITERIA/夹具身份检查
 │   ├── test_test001_ltp.py            # LTP 原生结果正反例
 │   ├── test_test001_observations.py   # 重复/未知观测守卫
 │   ├── test_test001_report.py          # Markdown 名称/占位符边界
+│   ├── test_test001_protocol.py       # 格式、基数、位置组合与验收不变量
 │   ├── test_test001_snapshot.py       # 实现快照与重执行
 │   └── update_test001_manifest.py     # 生成分析实现清单
 ├── tests/                             # 往届测例清单与来源
@@ -142,6 +145,7 @@ Focos/
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
 │       ├── test001-redesign.md         # TEST-001 接口、历史教训与分期验收
+│       ├── test001-protocol.md         # 结构事件、状态转换与验收不变量
 │       ├── test001-phase-a.md          # A 阶段清单、analyze 用法与已知边界
 │       └── test-audit.md              # 历史测评分支与测例审计
 ├── .cargo/                            # Cargo 的仓库级配置

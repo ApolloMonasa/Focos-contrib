@@ -95,7 +95,7 @@
       "timeout_seconds": 30
     }
   },
-  "criteria_hash": "0e0eae8b142fe6429b0ea4ef4fd0854bdfedba6ca4cbd47b2bab74861cbddc8b",
+  "criteria_hash": "5ba9d6c2d0ab776ba13e0d7a7cb052cafa7e612fa2459a3dd782cbcc56c935df",
   "criteria_id": "regional-2025-log-v1",
   "frozen_at": "2026-11-18",
   "implementation": {
@@ -105,7 +105,7 @@
       "scripts/test001",
       "tests/test001/criteria/v1/adapters"
     ],
-    "sha256": "b4d534d98cc72cb72a0bac4a5df5fd7009c6f01579156d81e1065b8fe5c25233"
+    "sha256": "d921b31803cf6cf1d9754300710911a86ec422b5af59cd2f2f7135b7c636fd69"
   },
   "kind": "test001_criteria",
   "mapping": {
@@ -113,7 +113,7 @@
     "notes": "适配器输出名与 PROFILE 的 invocation.name 逐项相同；不从运行后输出增删分母。",
     "profile_hash": "7bda0e4e1424c59f3162150ba82c7c23662a76c0b354262e32cf446e218c6869"
   },
-  "revision": 1,
+  "revision": 2,
   "schema_version": 2,
   "supported_profiles": [
     {

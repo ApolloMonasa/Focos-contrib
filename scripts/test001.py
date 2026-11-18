@@ -64,12 +64,12 @@ def _prepare_snapshot(repo_root: Path):
 def _child(argv):
     snapshot = _prepare_snapshot(Path(__file__).resolve().parents[1])
     environment = os.environ.copy()
-    environment['TEST001_SNAPSHOT'] = '1'
+    environment.pop('TEST001_SNAPSHOT', None)
     environment.pop('PYTHONPATH', None)
     try:
         completed = subprocess.run(
             [sys.executable, '-E', '-s', '-B',
-             str(snapshot / 'scripts/test001.py'), *argv],
+             str(snapshot / 'scripts/test001/worker.py'), *argv],
             env=environment,
         )
     finally:
@@ -79,9 +79,6 @@ def _child(argv):
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
-    if os.environ.get('TEST001_SNAPSHOT') == '1':
-        from test001.cli import main as cli_main
-        return cli_main(argv)
     try:
         return _child(argv)
     except OSError as exc:

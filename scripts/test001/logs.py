@@ -1,63 +1,13 @@
 """严格切分组段：重复、嵌套、错配和未闭合都不能覆盖旧段。"""
+
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
 
-from .ltp import (RESULT_FLAGS, RESULT_RE, UNATTRIBUTED_FLAGS, UNKNOWN_RE,
-                  IGNORED_FLAGS, strip_ansi)
+from .protocol import Event, lex, UNATTRIBUTED_FLAGS
 
-GROUP_RE = re.compile(r'^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$')
 LIBC_RE = re.compile(r'-(musl|glibc)\Z')
-TESTCASE_RESULT = re.compile(r'\btestcase .+ \b(?:success|fail)\b')
-CASE_MARKER = re.compile(r'^=+\s*(?:START|END)\s+')
-TEAM_RESULT = re.compile(r'^=+\s*\S+\s+\S+\s+end:\s*\S+\s*=+\s*$')
-LIBCBENCH_RESULT = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)')
-UNIXBENCH_RESULT = re.compile(r'^Unixbench .+:')
-IOZONE_RESULT = re.compile(r'(?:iozone .*measurements|Max throughput per process)')
-LMBENCH_RESULT = re.compile(r'^\+ \./lmbench_all\b')
-NUMBER = r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
-LMBENCH_METRIC = re.compile(rf'^(.+?):\s*({NUMBER})\s+(microseconds|KB/sec|MB/sec)$')
-LMBENCH_HEADERS = {'file system latency', 'context switch overhead'}
-
-RESULT_GROUPS = {
-    'ltp': {'ltp'},
-    'ltp_unknown': {'ltp'},
-    'testcase': {'lua', 'busybox'},
-    'pass': {'libctest'},
-    'case marker': {'basic', 'libctest'},
-    'team marker': {'iperf', 'netperf', 'cyclictest'},
-    'libcbench': {'libcbench'},
-    'unixbench': {'unixbench'},
-    'iozone': {'iozone'},
-    'lmbench': {'lmbench'},
-}
-
-
-def _result_kind(cleaned: str):
-    if RESULT_RE.search(cleaned):
-        return 'ltp'
-    if any(match.group(1) not in RESULT_FLAGS and match.group(1) not in IGNORED_FLAGS
-           for match in UNKNOWN_RE.finditer(cleaned)):
-        return 'ltp_unknown'
-    if cleaned == 'Pass!':
-        return 'pass'
-    if TESTCASE_RESULT.search(cleaned):
-        return 'testcase'
-    if CASE_MARKER.match(cleaned):
-        return 'case marker'
-    if TEAM_RESULT.fullmatch(cleaned):
-        return 'team marker'
-    if LIBCBENCH_RESULT.match(cleaned):
-        return 'libcbench'
-    if UNIXBENCH_RESULT.match(cleaned):
-        return 'unixbench'
-    if IOZONE_RESULT.search(cleaned):
-        return 'iozone'
-    if (LMBENCH_RESULT.match(cleaned) or LMBENCH_METRIC.fullmatch(cleaned)
-            or cleaned in LMBENCH_HEADERS):
-        return 'lmbench'
-    return None
 
 
 @dataclass
@@ -69,10 +19,13 @@ class Section:
     start_line: int = 0
     end_line: int | None = None
     truncated: bool = False
+    events: list[Event] = field(default_factory=list)
 
     @property
     def text(self) -> str:
-        return '\n'.join(self.lines)
+        # 官方 Python judge 按 LF 比较正文；只归一化 CRLF 的行终止符。
+        # Event.raw 和 source.log 仍保留原始 CR，原日志行号不变。
+        return '\n'.join(line.removesuffix('\r') for line in self.lines)
 
 
 @dataclass
@@ -89,16 +42,9 @@ def _key(raw: str, *, errors: list[str], section_errors: dict, line_number: int)
     if not match:
         errors.append(f'line {line_number}: group marker has no libc suffix: {raw}')
         return None
-    key = (raw[:match.start()], match.group(1))
+    key = (raw[: match.start()], match.group(1))
     section_errors.setdefault(key, [])
     return key
-
-
-def _compatible_groups(kind: str, cleaned: str) -> set[str]:
-    # 团队标记携带实际组名，不能把三种组视为可互换。
-    if kind == 'team marker':
-        return {cleaned.lstrip('= ').split()[0]}
-    return RESULT_GROUPS[kind]
 
 
 def split_sections(text: str) -> SplitResult:
@@ -122,56 +68,55 @@ def split_sections(text: str) -> SplitResult:
             sections[current.key] = current
         current = None
 
-    for line_number, raw in enumerate(text.splitlines(), 1):
-        stripped = raw.strip()
-        match = GROUP_RE.fullmatch(stripped)
-        if not match:
-            if 'OS COMP TEST GROUP' in stripped and not stripped.startswith('+ '):
+    for event in lex(text):
+        line_number, raw = event.line, event.raw
+        if event.kind != 'group':
+            if event.kind == 'invalid_group':
                 errors.append(f'line {line_number}: malformed group marker')
-            cleaned = strip_ansi(raw).strip()
+            structural = bool(event.groups)
             if current is not None:
-                kind = _result_kind(cleaned)
-                if kind is not None and current.group not in _compatible_groups(kind, cleaned):
-                    unattributed.append({
-                        'line': line_number, 'kind': 'cross_group',
-                        'event': kind, 'section': f'{current.group}-{current.libc}',
-                        'text': cleaned[:200],
-                    })
-                    errors.append(
-                        f'line {line_number}: {kind} result inside '
-                        f'{current.group}-{current.libc} section'
+                if structural and current.group not in event.groups:
+                    unattributed.append(
+                        {
+                            'line': line_number,
+                            'kind': 'cross_group',
+                            'event': event.kind,
+                            'section': f'{current.group}-{current.libc}',
+                            'text': event.text[:200],
+                        }
                     )
-                # 协议错误单独保留，正文不删行，避免后续证据行号偏移。
+                    errors.append(
+                        f'line {line_number}: {event.kind} result inside {current.group}-{current.libc} section'
+                    )
                 current.lines.append(raw)
-                continue
-            kind = _result_kind(cleaned)
-            if kind == 'ltp':
-                for result in RESULT_RE.finditer(cleaned):
-                    flag = result.group(1)
-                    if flag not in UNATTRIBUTED_FLAGS:
-                        continue
-                    unattributed.append({'line': line_number, 'kind': 'ltp',
-                                         'event': flag})
-                    errors.append(f'line {line_number}: LTP result outside group: {flag}')
-            else:
-                for result in UNKNOWN_RE.finditer(cleaned):
-                    token = result.group(1)
-                    if token in RESULT_FLAGS or token in IGNORED_FLAGS:
-                        continue
-                    unattributed.append({'line': line_number, 'kind': 'ltp_unknown',
-                                         'event': token})
-                    errors.append(
-                        f'line {line_number}: unknown LTP result outside group: {token}'
-                    )
-                if kind is not None and kind != 'ltp_unknown':
-                    unattributed.append({'line': line_number, 'kind': 'non_ltp',
-                                         'event': kind, 'text': cleaned[:200]})
-                    errors.append(
-                        f'line {line_number}: non-LTP result outside group: {kind}'
-                    )
+                current.events.append(event)
+            elif structural:
+                if event.kind == 'ltp_result' and event.fields[0] not in UNATTRIBUTED_FLAGS:
+                    continue
+                kind = 'ltp' if event.groups == frozenset({'ltp'}) else 'non_ltp'
+                if event.kind == 'ltp_unknown':
+                    kind = 'ltp_unknown'
+                name = (
+                    (event.fields[0] if event.fields else event.kind)
+                    if kind in ('ltp', 'ltp_unknown')
+                    else {
+                        'testcase': 'testcase',
+                        'lmbench_metric': 'lmbench',
+                        'lmbench_trace': 'lmbench',
+                        'lmbench_header': 'lmbench',
+                    }.get(event.kind, event.kind)
+                )
+                unattributed.append(
+                    {'line': line_number, 'kind': kind, 'event': name, 'text': event.text[:200]}
+                )
+                errors.append(f'line {line_number}: {kind} result outside group: {name}')
             continue
-        state, name = match.groups()
+        state, name = event.fields
+        # 异常边界也是原始证据，保留后再处理状态；合法闭合边界不属正文。
         key = _key(name, errors=errors, section_errors=section_errors, line_number=line_number)
+        if current is not None and (state == 'START' or key != current.key):
+            current.lines.append(raw)
+            current.events.append(event)
         if key is None:
             continue
         if state == 'START':
@@ -218,5 +163,10 @@ def split_sections(text: str) -> SplitResult:
         protocol = 'INCOMPLETE'
     else:
         protocol = 'VALID'
-    return SplitResult(sections=sections, errors=errors, protocol=protocol,
-                       section_errors=section_errors, unattributed=unattributed)
+    return SplitResult(
+        sections=sections,
+        errors=errors,
+        protocol=protocol,
+        section_errors=section_errors,
+        unattributed=unattributed,
+    )
