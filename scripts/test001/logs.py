@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from .ltp import RESULT_RE, UNATTRIBUTED_FLAGS, strip_ansi
+
 GROUP_RE = re.compile(r'^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$')
 LIBC_RE = re.compile(r'-(musl|glibc)\Z')
 
@@ -29,6 +31,7 @@ class SplitResult:
     errors: list[str]
     protocol: str
     section_errors: dict[tuple[str, str], list[str]]
+    unattributed: list[dict] = field(default_factory=list)
 
 
 def _key(raw: str, *, errors: list[str], section_errors: dict, line_number: int):
@@ -46,6 +49,7 @@ def split_sections(text: str) -> SplitResult:
     sections: dict[tuple[str, str], Section] = {}
     errors: list[str] = []
     section_errors: dict[tuple[str, str], list[str]] = {}
+    unattributed: list[dict] = []
     current: Section | None = None
 
     def close_current(*, truncated: bool, line_number: int):
@@ -69,6 +73,13 @@ def split_sections(text: str) -> SplitResult:
                 errors.append(f'line {line_number}: malformed group marker')
             if current is not None:
                 current.lines.append(raw)
+                continue
+            for result in RESULT_RE.finditer(strip_ansi(raw)):
+                flag = result.group(1)
+                if flag not in UNATTRIBUTED_FLAGS:
+                    continue
+                unattributed.append({'line': line_number, 'event': flag})
+                errors.append(f'line {line_number}: LTP result outside group: {flag}')
             continue
         state, name = match.groups()
         key = _key(name, errors=errors, section_errors=section_errors, line_number=line_number)
@@ -119,4 +130,4 @@ def split_sections(text: str) -> SplitResult:
     else:
         protocol = 'VALID'
     return SplitResult(sections=sections, errors=errors, protocol=protocol,
-                       section_errors=section_errors)
+                       section_errors=section_errors, unattributed=unattributed)

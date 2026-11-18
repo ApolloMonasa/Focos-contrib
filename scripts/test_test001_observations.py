@@ -23,6 +23,28 @@ class DuplicateObservationTests(unittest.TestCase):
         self.assertEqual(guard.duplicates, ['lua date.lua'])
         self.assertIn('lua date.lua', guard.failures)
 
+    def test_lua_trailing_diagnostic_failure_is_not_lost(self):
+        text = (
+            'testcase lua date.lua fail trailing-diagnostic\n'
+            'testcase lua date.lua success\n'
+        )
+        guard = check_observations('lua', text, ['lua date.lua'])
+        self.assertEqual(guard.counts['lua date.lua'], 2)
+        self.assertEqual(guard.duplicates, ['lua date.lua'])
+        self.assertIn('lua date.lua', guard.failures)
+        self.assertEqual(guard.statuses['lua date.lua'], ['fail', 'success'])
+
+    def test_lua_malformed_testcase_is_flagged(self):
+        text = 'testcase lua date.lua unknown\n'
+        guard = check_observations('lua', text, ['lua date.lua'])
+        self.assertEqual(guard.malformed, ['testcase lua date.lua unknown'])
+        self.assertEqual(guard.duplicates, [])
+
+    def test_lua_ambiguous_statuses_are_flagged(self):
+        text = 'testcase lua date.lua fail success\n'
+        guard = check_observations('lua', text, ['lua date.lua'])
+        self.assertEqual(guard.malformed, ['testcase lua date.lua fail success'])
+
     def test_busybox_unknown_testcase_is_extra(self):
         text = 'testcase busybox surprise success\n'
         guard = check_observations('busybox', text, ['busybox date'])

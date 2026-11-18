@@ -600,6 +600,42 @@ class RunPackageTests(TemporaryOutput):
         result = cli(*args)
         return result, output
 
+    def test_lua_trailing_failure_is_not_overwritten(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        serial = serial.replace(
+            b'testcase lua date.lua success',
+            b'testcase lua date.lua fail trailing-diagnostic\n'
+            b'testcase lua date.lua success',
+            1,
+        )
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        date = next(item for item in report['groups'][0]['items']
+                    if item['name'] == 'lua date.lua')
+        self.assertEqual(date['judgment'], 'JUDGE_ERROR')
+        self.assertIn('DUPLICATE_OBSERVATION:2/1', date['reasons'])
+
+    def test_lua_malformed_testcase_blocks(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        serial = serial.replace(
+            b'testcase lua date.lua success',
+            b'testcase lua date.lua unknown\n'
+            b'testcase lua date.lua success',
+            1,
+        )
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertTrue(any('MALFORMED_OBSERVATION' in error
+                            for error in report['groups'][0]['judge_errors']))
+
     def test_lua_run_passes_and_reanalysis_keeps_identity(self):
         serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
         run = make_run(self.base / 'run', ['lua-glibc'], serial)
@@ -743,6 +779,25 @@ class RunPackageTests(TemporaryOutput):
         unattributed = report['groups'][0]['native']['unattributed']
         self.assertEqual(unattributed[0]['event'], 'TFAIL')
         self.assertGreater(unattributed[0]['line'], 0)
+
+    def test_ltp_failure_after_group_end_blocks(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log([(name, ['TPASS: ok'], 0) for name in names])
+        serial += b'TFAIL: delayed failure after group end\n'
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['protocol']['status'], 'ERROR')
+        self.assertIn('LTP_UNATTRIBUTED_RESULT:outside:1',
+                      report['acceptance']['reasons'])
+        self.assertEqual(report['protocol']['unattributed'][0]['event'], 'TFAIL')
+        self.assertGreater(report['protocol']['unattributed'][0]['line'], 0)
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        self.assertEqual(report['groups'][0]['native']['unattributed'], [])
 
     def test_ltp_summary_mismatch_blocks_j1(self):
         rows = [json.loads(line) for line in

@@ -62,8 +62,8 @@ LTP 包装脚本只遍历 `ltp/testcases/bin` 顶层普通文件，目录 `dataf
 
 - 来源分 `external_log` 与 `recorded_capture`。外部日志的 subject/platform 固定 `unknown`、capture 为 `NOT_RECORDED`、input_integrity 为 `UNVERIFIED`，即使逐项全 PASS 也不能验收通过。
 - 采集状态、完整性、协议、段和判分分字段保存。截断段保留已观察值，但 acceptance 仍 BLOCKED，`accepted_pass=0`。
-- 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
-- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。已有原生汇总与事件冲突时 J1/J2 都阻断；J2 另外要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。调用顺序必须匹配冻结列表，否则记 `LTP_ORDER_MISMATCH`。未知名称单列且阻断验收，不进入分母。
+- 非 LTP 使用冻结的官方/团队结果适配器；对 basic/libctest/lua/busybox/iozone/unixbench/iperf/netperf/cyclictest/libcbench/lmbench 段，分析器另有原始观测守卫，从段文本独立核对重复和未知名称，适配器只保留最后一次成功也不能绕过。Lua/BusyBox 的 `testcase` 行按官方判据的非锚定 `success|fail` 语法解析，尾随诊断文本仍可识别；同一名称的 fail+success 记为重复/失败，含 `testcase` 但无法唯一解析结果的行记 `MALFORMED_OBSERVATION` 并阻断。适配器崩溃、超时、非法 JSON、重复名称或非有限数值记 JUDGE_ERROR。
+- LTP 保存每次尝试、退出码、TPASS/TFAIL/TBROK/TCONF/TWARN 事件和原生汇总；TINFO/TDEBUG 只作信息。跳过、警告、TBROK、非零退出和无 TPASS 都不通过；重复尝试不能被后次成功覆盖。已有原生汇总与事件冲突时 J1/J2 都阻断；J2 另外要求现代汇总的 passed/failed/broken/skipped/warnings 五个字段完整，缺字段记 `summary_incomplete` 并阻断。调用顺序必须匹配冻结列表，否则记 `LTP_ORDER_MISMATCH`。组内 invocation 外的结果事件保留段内/全局行号并记入 `native.unattributed`；组 END 之外的 LTP 结果事件保留全局行号并进入协议错误，二者都阻断验收。未知名称单列且阻断验收，不进入分母。
 - 同一运行包用 J1/J2 重判时，`run_id`、采集清单哈希、PROFILE 哈希、selection 和分母不变；CRITERIA 身份与结论可以不同。J2 的额外 LTP 汇总要求只影响分析，不重跑 QEMU。
 
 ## 15 份历史结果对照

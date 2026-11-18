@@ -112,6 +112,8 @@ def _apply_observation_guard(items: list[dict], extras: list[dict],
                              guard, planned: dict) -> tuple[list[dict], list[dict], list[str]]:
     """独立校验原始观测：重复尝试不能被最后一次成功覆盖，未知名称单列。"""
     errors = []
+    for line in guard.malformed:
+        errors.append(f'MALFORMED_OBSERVATION:{line[:160]}')
     for item in items:
         name = item['name']
         count = guard.counts.get(name, 0)
@@ -215,6 +217,10 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
         reasons.append(f'INPUT_INTEGRITY_{input_integrity}')
     if protocol['status'] != policy['require_protocol']:
         reasons.append(f'PROTOCOL_{protocol["status"]}')
+    if protocol.get('unattributed'):
+        reasons.append(
+            f'LTP_UNATTRIBUTED_RESULT:outside:{len(protocol["unattributed"])}'
+        )
     for analysis in analyses:
         if analysis.section_status != policy['require_sections']:
             reasons.append(f'SECTION_{analysis.section_status}:{analysis.shard.shard_id}')
@@ -338,7 +344,8 @@ def _protocol(split: SplitResult, shards: list[Shard], *, origin: str) -> dict:
     status = split.protocol
     if errors and status == 'VALID':
         status = 'ERROR'
-    return {'status': status, 'errors': errors, 'unselected_sections': outside}
+    return {'status': status, 'errors': errors, 'unselected_sections': outside,
+            'unattributed': split.unattributed}
 
 
 def analyze_log(profile: Profile, criteria: Criteria, shards: list[Shard],

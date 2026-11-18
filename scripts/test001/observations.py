@@ -10,7 +10,7 @@ BASIC_START = re.compile(r'^=+\s*START\s+(.+?)\s*=+\s*$', re.M)
 LIBCTEST_START = re.compile(
     r'^=+\s*START entry-(static|dynamic)\.exe\s+(\S+)\s*=+\s*$', re.M
 )
-TESTCASE = re.compile(r'^testcase (.+?) (success|fail)\s*$', re.M)
+TESTCASE = re.compile(r'testcase (.+) (\bsuccess\b|\bfail\b)')
 UNIXBENCH = re.compile(r'^Unixbench (.+?):\s*(.*?)\s*$', re.M)
 LIBCBENCH = re.compile(r'^b_[^\r\n(]+\([^\r\n]*\)\s*$', re.M)
 LMBENCH_COMMANDS = (
@@ -59,6 +59,7 @@ class ObservationGuard:
     duplicates: list[str]
     failures: set[str]
     statuses: dict[str, list[str]]
+    malformed: list[str]
 
 
 def _markers(group: str, text: str) -> list[str]:
@@ -89,6 +90,17 @@ def _testcase_pairs(text: str) -> list[tuple[str, str]]:
         (match.group(1).strip(), match.group(2))
         for match in TESTCASE.finditer(text)
     ]
+
+
+def _testcase_malformed(text: str) -> list[str]:
+    malformed = []
+    for raw in text.splitlines():
+        if 'testcase ' not in raw:
+            continue
+        statuses = re.findall(r'\b(success|fail)\b', raw)
+        if len(statuses) != 1 or not TESTCASE.search(raw):
+            malformed.append(raw.strip())
+    return malformed
 
 
 def _lmbench(text: str, expected: list[str]) -> list[str]:
@@ -151,5 +163,6 @@ def check_observations(group: str, text: str, expected: list[str]) -> Observatio
         for name, status in _testcase_pairs(text):
             statuses.setdefault(name, []).append(status)
     failures = {name for name, values in statuses.items() if 'fail' in values}
+    malformed = _testcase_malformed(text) if group in ('lua', 'busybox') else []
     return ObservationGuard(counts=counts, extras=extras, duplicates=duplicates,
-                            failures=failures, statuses=statuses)
+                            failures=failures, statuses=statuses, malformed=malformed)
