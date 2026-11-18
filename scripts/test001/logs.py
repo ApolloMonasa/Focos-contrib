@@ -22,6 +22,7 @@ LMBENCH_HEADERS = {'file system latency', 'context switch overhead'}
 
 RESULT_GROUPS = {
     'ltp': {'ltp'},
+    'ltp_unknown': {'ltp'},
     'testcase': {'lua', 'busybox'},
     'pass': {'libctest'},
     'case marker': {'basic', 'libctest'},
@@ -36,6 +37,9 @@ RESULT_GROUPS = {
 def _result_kind(cleaned: str):
     if RESULT_RE.search(cleaned):
         return 'ltp'
+    if any(match.group(1) not in RESULT_FLAGS and match.group(1) not in IGNORED_FLAGS
+           for match in UNKNOWN_RE.finditer(cleaned)):
+        return 'ltp_unknown'
     if cleaned == 'Pass!':
         return 'pass'
     if TESTCASE_RESULT.search(cleaned):
@@ -90,6 +94,13 @@ def _key(raw: str, *, errors: list[str], section_errors: dict, line_number: int)
     return key
 
 
+def _compatible_groups(kind: str, cleaned: str) -> set[str]:
+    # 团队标记携带实际组名，不能把三种组视为可互换。
+    if kind == 'team marker':
+        return {cleaned.lstrip('= ').split()[0]}
+    return RESULT_GROUPS[kind]
+
+
 def split_sections(text: str) -> SplitResult:
     """只按完整组标记切分；正文保持原始行顺序。"""
     sections: dict[tuple[str, str], Section] = {}
@@ -120,7 +131,7 @@ def split_sections(text: str) -> SplitResult:
             cleaned = strip_ansi(raw).strip()
             if current is not None:
                 kind = _result_kind(cleaned)
-                if kind is not None and current.group not in RESULT_GROUPS[kind]:
+                if kind is not None and current.group not in _compatible_groups(kind, cleaned):
                     unattributed.append({
                         'line': line_number, 'kind': 'cross_group',
                         'event': kind, 'section': f'{current.group}-{current.libc}',
@@ -130,7 +141,7 @@ def split_sections(text: str) -> SplitResult:
                         f'line {line_number}: {kind} result inside '
                         f'{current.group}-{current.libc} section'
                     )
-                    continue
+                # 协议错误单独保留，正文不删行，避免后续证据行号偏移。
                 current.lines.append(raw)
                 continue
             kind = _result_kind(cleaned)
@@ -152,7 +163,7 @@ def split_sections(text: str) -> SplitResult:
                     errors.append(
                         f'line {line_number}: unknown LTP result outside group: {token}'
                     )
-                if kind is not None:
+                if kind is not None and kind != 'ltp_unknown':
                     unattributed.append({'line': line_number, 'kind': 'non_ltp',
                                          'event': kind, 'text': cleaned[:200]})
                     errors.append(

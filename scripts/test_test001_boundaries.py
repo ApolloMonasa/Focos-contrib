@@ -101,6 +101,26 @@ class LogBoundaryTests(unittest.TestCase):
         self.assertEqual(split.unattributed[0]['event'], 'lmbench')
         self.assertIn('line 3', ' '.join(split.errors))
 
+    def test_team_result_cannot_cross_into_another_team_group(self):
+        result = split_sections(
+            '#### OS COMP TEST GROUP START iperf-glibc ####\n'
+            '====== netperf surprise end: fail ======\n'
+            '#### OS COMP TEST GROUP END iperf-glibc ####\n'
+        )
+        self.assertEqual(result.protocol, 'ERROR')
+        self.assertEqual(result.unattributed[0]['kind'], 'cross_group')
+        self.assertEqual(result.sections[('iperf', 'glibc')].lines,
+                         ['====== netperf surprise end: fail ======'])
+
+    def test_unknown_ltp_flag_inside_non_ltp_group_blocks(self):
+        result = split_sections(
+            '#### OS COMP TEST GROUP START lua-glibc ####\n'
+            'TWHAT: delayed\n'
+            '#### OS COMP TEST GROUP END lua-glibc ####\n'
+        )
+        self.assertEqual(result.protocol, 'ERROR')
+        self.assertEqual(result.unattributed[0]['kind'], 'cross_group')
+
 
 class OutputBoundaryTests(unittest.TestCase):
     """mkdir 基础设施错误是发布失败；同步失败不能留下完成标记。"""

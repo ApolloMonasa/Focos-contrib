@@ -140,7 +140,7 @@ def _basic_marker(raw: str):
     return match.group(1), match.group(2).strip()
 
 
-def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], set[str]]:
+def _marker_guard(group: str, text: str) -> tuple[list[str], list[str], Counter]:
     """basic/libctest 的边界、正文归属和重复次数统一状态机。"""
     names = []
     malformed = []
