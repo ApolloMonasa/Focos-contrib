@@ -71,6 +71,8 @@ def split_sections(text: str) -> SplitResult:
     for event in lex(text):
         line_number, raw = event.line, event.raw
         if event.kind != 'group':
+            if not event.canonical:
+                errors.append(f'line {line_number}: non-canonical {event.kind} record')
             if event.kind == 'invalid_group':
                 errors.append(f'line {line_number}: malformed group marker')
             structural = bool(event.groups)

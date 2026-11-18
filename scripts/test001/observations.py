@@ -8,7 +8,7 @@ import math
 import re
 import shlex
 
-from .protocol import lex, NUMBER
+from .protocol import lex, NUMBER, evidence
 
 LMBENCH_COMMANDS = (
     ('lat_syscall', '-P', '1', 'null'),
@@ -84,9 +84,10 @@ class ObservationGuard:
     duplicates: list[str]
     failures: set[str]
     statuses: dict[str, list[str]]
-    malformed: list[str]
+    malformed: list[dict]
     group: str
     successes: Counter
+    evidence: list[dict]
 
 
 def _markers(group: str, records) -> list[str]:
@@ -118,9 +119,13 @@ def _testcase_pairs(records) -> list[tuple[str, str]]:
     return [event.fields for event in records if event.kind == 'testcase']
 
 
-def _testcase_malformed(records) -> list[str]:
+def _diagnostic(event, message: str, line_offset: int = 0):
+    return {**evidence(event, line_offset), 'message': message}
+
+
+def _testcase_malformed(records, line_offset=0):
     return [
-        event.raw.strip()
+        _diagnostic(event, 'invalid or ambiguous testcase result', line_offset)
         for event in records
         if event.kind == 'invalid_testcase' or event.kind == 'testcase' and not event.canonical
     ]
@@ -133,36 +138,41 @@ def _libctest_normalized(name: str):
     return f'libctest {match.group(1)} {match.group(2)}'
 
 
-def _marker_guard(group: str, records) -> tuple[list[str], list[str], Counter]:
+def _marker_guard(group: str, records, line_offset=0) -> tuple[list[str], list[str], Counter]:
     """basic/libctest 的边界、正文归属和重复次数统一状态机。"""
     names = []
     malformed = []
     successes = Counter()
     open_name = None
     inside = False
+    open_event = None
+
+    def record(message, at=None):
+        malformed.append(_diagnostic(event if at is None else at, message, line_offset))
 
     def begin(raw_name: str, line_number: int):
-        nonlocal open_name, inside
+        nonlocal open_name, inside, open_event
         if open_name is not None:
-            malformed.append(f'line {line_number}: nested START {raw_name} before END {open_name}')
+            record(f'line {line_number}: nested START {raw_name} before END {open_name}')
         if group == 'basic':
             names.append(raw_name)
         else:
             normalized = _libctest_normalized(raw_name)
             if normalized is None:
                 names.append('libctest ' + raw_name)
-                malformed.append(f'line {line_number}: unknown libctest START name: {raw_name}')
+                record(f'line {line_number}: unknown libctest START name: {raw_name}')
             else:
                 names.append(normalized)
         open_name = raw_name
+        open_event = event
         inside = True
 
     def finish(raw_name: str, line_number: int):
-        nonlocal open_name, inside
+        nonlocal open_name, inside, open_event
         if open_name is None:
-            malformed.append(f'line {line_number}: END without START: {raw_name}')
+            record(f'line {line_number}: END without START: {raw_name}')
         elif raw_name != open_name:
-            malformed.append(f'line {line_number}: END {raw_name} does not match START {open_name}')
+            record(f'line {line_number}: END {raw_name} does not match START {open_name}')
             open_name = None
             inside = False
         else:
@@ -172,12 +182,12 @@ def _marker_guard(group: str, records) -> tuple[list[str], list[str], Counter]:
     for event in records:
         line_number = event.line
         if event.kind == 'invalid_case':
-            malformed.append(f'line {line_number}: non-canonical marker: {event.text}')
+            record(f'line {line_number}: non-canonical marker: {event.text}')
             continue
         if event.kind == 'case_marker':
             state, name = event.fields
             if not event.canonical:
-                malformed.append(f'line {line_number}: non-canonical marker: {event.text}')
+                record(f'line {line_number}: non-canonical marker: {event.text}')
             if state == 'START':
                 begin(name, line_number)
             else:
@@ -186,12 +196,12 @@ def _marker_guard(group: str, records) -> tuple[list[str], list[str], Counter]:
         if group == 'libctest' and event.kind == 'case_pass':
             normalized = _libctest_normalized(open_name) if inside and open_name else None
             if normalized is None:
-                malformed.append(f'line {line_number}: Pass! outside case')
+                record(f'line {line_number}: Pass! outside case')
             else:
                 successes[normalized] += 1
 
     if open_name is not None:
-        malformed.append(f'unclosed START: {open_name}')
+        record(f'unclosed START: {open_name}', open_event)
     return names, malformed, successes
 
 
@@ -228,8 +238,8 @@ def extract_metrics(
         current = None
         for event in records:
             line_number, raw, line = event.line - line_offset, event.raw, event.text
-            if event.kind == 'libcbench_label' and line in names:
-                current = line
+            if event.kind == 'libcbench_label':
+                current = line if line in names else None
                 continue
             if current is not None:
                 if event.kind == 'libcbench_time':
@@ -244,6 +254,8 @@ def extract_metrics(
                                 'section_line': line_number,
                             }
                         )
+                    current = None
+                elif line:
                     current = None
         return metrics
     if group == 'lmbench':
@@ -355,9 +367,9 @@ def observed_names(
 
 
 def check_observations(
-    group: str, text: str, expected: list[str], *, events=None
+    group: str, text: str, expected: list[str], *, events=None, line_offset=0
 ) -> ObservationGuard:
-    records = lex(text) if events is None else events
+    records = lex(text, line_offset=line_offset) if events is None else events
     counts = Counter(observed_names(group, text, expected, events=records))
     extras = sorted(name for name in counts if name not in set(expected))
     duplicates = sorted(name for name, count in counts.items() if count > 1)
@@ -368,11 +380,19 @@ def check_observations(
     failures = {name for name, values in statuses.items() if 'fail' in values}
     successes = Counter()
     if group in ('basic', 'libctest'):
-        _, malformed, successes = _marker_guard(group, records)
+        _, malformed, successes = _marker_guard(group, records, line_offset)
     elif group in ('lua', 'busybox'):
-        malformed = _testcase_malformed(records)
+        malformed = _testcase_malformed(records, line_offset)
     else:
         malformed = []
     return ObservationGuard(
-        counts, extras, duplicates, failures, statuses, malformed, group, successes
+        counts,
+        extras,
+        duplicates,
+        failures,
+        statuses,
+        malformed,
+        group,
+        successes,
+        [evidence(event, line_offset) for event in records if event.kind != 'text'],
     )

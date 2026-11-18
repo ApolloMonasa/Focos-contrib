@@ -10,17 +10,17 @@ UNATTRIBUTED_FLAGS = {'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN'}
 IGNORED_FLAGS = {'TERRNO', 'TTERRNO', 'TRERRNO'}
 NUMBER = r'(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?'
 ANSI_RE = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
-GROUP_RE = re.compile(r'^####\s*OS COMP TEST GROUP\s+(START|END)\s+(\S+)\s*####\s*$')
-MARKER = re.compile(r'^=+\s*(START|END)\s+(.+?)\s*=+\s*$')
+GROUP_RE = re.compile(r'^####[ \t]*OS COMP TEST GROUP[ \t]+(START|END)[ \t]+(\S+)[ \t]*####[ \t]*$')
+MARKER = re.compile(r'^=+[ \t]*(START|END)[ \t]+(.+?)[ \t]*=+[ \t]*$')
 TESTCASE = re.compile(r'testcase (.+) (\bsuccess\b|\bfail\b)')
-LMBENCH_METRIC = re.compile(rf'^(.+?):\s*({NUMBER})\s+(microseconds|KB/sec|MB/sec)$')
+LMBENCH_METRIC = re.compile(rf'^(.+?):[ \t]*({NUMBER})[ \t]+(microseconds|KB/sec|MB/sec)$')
 LMBENCH_HEADERS = {'file system latency', 'context switch overhead'}
-SUMMARY_LINE_RE = re.compile(r'^(passed|failed|broken|skipped|warnings)\s*:?\s*(\d+)\s*$')
-LEGACY_RE = re.compile(r'^(Total Tests|Passed|Failed|Not Supported)\s*:\s*(\d+)\s*$')
+SUMMARY_LINE_RE = re.compile(r'^(passed|failed|broken|skipped|warnings)[ \t]*:?[ \t]*(\d+)[ \t]*$')
+LEGACY_RE = re.compile(r'^(Total Tests|Passed|Failed|Not Supported)[ \t]*:[ \t]*(\d+)[ \t]*$')
 # 前缀是协议字段，冒号后的消息不再扫描；支持冻结的现代及旧式格式。
 LTP_RECORD = re.compile(
-    r'^(?:(?:[^\s:]+:\d+:\s*)|(?:[^\s:]+\s+\d+\s+))?'
-    r'(T[A-Z][A-Z0-9_]{2,})\s*:\s*(.*)$'
+    r'^(?:(?:[^\s:]+:\d+:[ \t]*)|(?:[^\s:]+[ \t]+\d+[ \t]+))?'
+    r'(T[A-Z][A-Z0-9_]{2,})[ \t]*:[ \t]*(.*)$'
 )
 
 
@@ -39,17 +39,20 @@ def strip_ansi(text: str) -> str:
     return ANSI_RE.sub('', text)
 
 
-def classify(raw: str, number: int) -> Event:
-    text = strip_ansi(raw).strip()
+def classify(raw: str, number: int, *, crlf=False) -> Event:
+    text = strip_ansi(raw)
+    if crlf:
+        text = text.removesuffix('\r')
+    text = text.strip(' \t')
 
     def event(kind, fields=(), groups=(), canonical=True):
         return Event(number, raw, text, kind, tuple(fields), frozenset(groups), canonical)
 
+    if text and text[0].isspace():
+        return event('invalid_record', canonical=False)
     m = GROUP_RE.fullmatch(text)
     if m:
         return event('group', m.groups())
-    if 'OS COMP TEST GROUP' in text and not text.startswith('+ '):
-        return event('invalid_group')
     m = re.fullmatch(r'RUN LTP CASE (.+)', text)
     if m:
         return event('ltp_start', m.groups(), ('ltp',))
@@ -62,6 +65,8 @@ def classify(raw: str, number: int) -> Event:
         if m[1] in IGNORED_FLAGS:
             kind = 'text'
         return event(kind, m.groups(), ('ltp',) if kind != 'text' else ())
+    if 'OS COMP TEST GROUP' in text and not text.startswith('+ '):
+        return event('invalid_group')
     if text == 'Summary:':
         return event('summary', groups=('ltp',))
     m = SUMMARY_LINE_RE.fullmatch(text)
@@ -76,10 +81,10 @@ def classify(raw: str, number: int) -> Event:
             'case_marker', m.groups(), ('libctest',) if m[2].startswith('entry-') else ('basic',)
         )
     # 疑似官方标记也必须可见；不能因非规范语法而隐藏一次尝试。
-    m = re.search(r'\b(START|END)\s+(entry-(?:static|dynamic)\.exe\s+\S+)', text)
+    m = re.search(r'\b(START|END)[ \t]+(entry-(?:static|dynamic)\.exe[ \t]+\S+)', text)
     if m:
         return event('case_marker', m.groups(), ('libctest',), False)
-    m = re.search(r'=+\s*(START|END)\s+(.+?)\s*=+', text)
+    m = re.search(r'=+[ \t]*(START|END)[ \t]+(.+?)[ \t]*=+', text)
     if m:
         return event('case_marker', m.groups(), ('basic',), False)
     if any(
@@ -92,21 +97,26 @@ def classify(raw: str, number: int) -> Event:
     m = TESTCASE.search(raw)
     if m:
         name, status = m.groups()
-        owner = name.split()[0]
+        owner = name.split(' ', 1)[0]
         ambiguous = len(re.findall(r'\b(success|fail)\b', raw)) != 1
-        return event('testcase', (name.strip(), status), (owner,), not ambiguous)
+        return event('testcase', (name.strip(' \t'), status), (owner,), not ambiguous)
     if 'testcase ' in raw:
         return event('invalid_testcase', groups=('lua', 'busybox'), canonical=False)
-    m = re.fullmatch(r'=+\s*(\S+)\s+(\S+)\s+end:\s*(\S+)\s*=+\s*', text)
+    m = re.fullmatch(r'=+[ \t]*(\S+)[ \t]+(\S+)[ \t]+end:[ \t]*(\S+)[ \t]*=+[ \t]*', text)
     if m:
         return event('team_result', m.groups(), (m[1],))
     m = re.fullmatch(r'b_[^\r\n(]+\([^\r\n]*\)', text)
     if m:
         return event('libcbench_label', (text,), ('libcbench',))
-    m = re.match(rf'time:\s*({NUMBER}),', text)
+    m = re.fullmatch(
+        rf'time:[ \t]*({NUMBER}),[ \t]*virt:[ \t]*[0-9]+,[ \t]*res:[ \t]*[0-9]+(?:,[ \t]*dirty:[ \t]*[0-9]+)?',
+        text,
+    )
     if m:
         return event('libcbench_time', m.groups(), ('libcbench',))
-    m = re.fullmatch(r'Unixbench (.+?):\s*(.*?)\s*', text)
+    if text.startswith('time:'):
+        return event('invalid_libcbench_time', groups=('libcbench',), canonical=False)
+    m = re.fullmatch(r'Unixbench (.+?):[ \t]*(.*?)[ \t]*', text)
     if m:
         return event('unixbench', m.groups(), ('unixbench',))
     if re.search(
@@ -131,9 +141,24 @@ def classify(raw: str, number: int) -> Event:
     return event('text')
 
 
+def evidence(event: Event, line_offset: int = 0) -> dict:
+    """诊断统一引用原始事件，聚合计数不替代可回查证据。"""
+    return {
+        'line': event.line,
+        'section_line': event.line - line_offset,
+        'raw': event.raw,
+        'kind': event.kind,
+        'fields': list(event.fields),
+    }
+
+
 def lex(text: str, *, line_offset: int = 0) -> tuple[Event, ...]:
     # 串口记录由 LF 分隔；VT/FF/Unicode 分隔符属于正文，不能伪造新结果行。
     lines = text.split('\n')
+    final_terminated = text.endswith('\n')
     if lines and lines[-1] == '':
         lines.pop()
-    return tuple(classify(raw, number) for number, raw in enumerate(lines, 1 + line_offset))
+    return tuple(
+        classify(raw, number, crlf=index < len(lines) - 1 or final_terminated)
+        for index, (number, raw) in enumerate(enumerate(lines, 1 + line_offset))
+    )

@@ -38,13 +38,13 @@ class DuplicateObservationTests(unittest.TestCase):
     def test_lua_malformed_testcase_is_flagged(self):
         text = 'testcase lua date.lua unknown\n'
         guard = check_observations('lua', text, ['lua date.lua'])
-        self.assertEqual(guard.malformed, ['testcase lua date.lua unknown'])
+        self.assertEqual(guard.malformed[0]['raw'], 'testcase lua date.lua unknown')
         self.assertEqual(guard.duplicates, [])
 
     def test_lua_ambiguous_statuses_are_flagged(self):
         text = 'testcase lua date.lua fail success\n'
         guard = check_observations('lua', text, ['lua date.lua'])
-        self.assertEqual(guard.malformed, ['testcase lua date.lua fail success'])
+        self.assertEqual(guard.malformed[0]['raw'], 'testcase lua date.lua fail success')
 
     def test_busybox_unknown_testcase_is_extra(self):
         text = 'testcase busybox surprise success\n'
@@ -88,7 +88,7 @@ class DuplicateObservationTests(unittest.TestCase):
         )
         guard = check_observations('libctest', text, ['libctest static argv'])
         self.assertEqual(guard.counts['libctest static argv'], 1)
-        self.assertTrue(any('unclosed START' in line for line in guard.malformed))
+        self.assertTrue(any('unclosed START' in line['message'] for line in guard.malformed))
 
     def test_basic_missing_end_is_preserved_and_malformed(self):
         text = (
@@ -97,7 +97,7 @@ class DuplicateObservationTests(unittest.TestCase):
         )
         guard = check_observations('basic', text, ['test_brk'])
         self.assertEqual(guard.counts['test_brk'], 1)
-        self.assertTrue(any('unclosed START' in line for line in guard.malformed))
+        self.assertTrue(any('unclosed START' in line['message'] for line in guard.malformed))
 
     def test_libctest_end_mismatch_is_malformed(self):
         text = (
@@ -107,7 +107,7 @@ class DuplicateObservationTests(unittest.TestCase):
         )
         guard = check_observations('libctest', text, ['libctest static argv'])
         self.assertEqual(guard.counts['libctest static argv'], 1)
-        self.assertTrue(any('does not match' in line for line in guard.malformed))
+        self.assertTrue(any('does not match' in line['message'] for line in guard.malformed))
 
     def test_basic_duplicate_start_is_visible(self):
         text = (

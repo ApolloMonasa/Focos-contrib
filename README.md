@@ -117,6 +117,7 @@ Focos/
 │   ├── test_test001_ltp.py            # LTP 原生结果正反例
 │   ├── test_test001_observations.py   # 重复/未知观测守卫
 │   ├── test_test001_report.py          # Markdown 名称/占位符边界
+│   ├── test_test001_protocol_edges.py # 结构空白、汇总一致性与诊断位置
 │   ├── test_test001_protocol.py       # 格式、基数、位置组合与验收不变量
 │   ├── test_test001_snapshot.py       # 实现快照与重执行
 │   └── update_test001_manifest.py     # 生成分析实现清单

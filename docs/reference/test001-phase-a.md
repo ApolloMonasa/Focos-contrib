@@ -109,4 +109,4 @@ python3 scripts/update_test001_manifest.py
 
 性能报告保留 libcbench 计时和 lmbench 标签指标；无标签 mmap/读带宽须绑定冻结命令 trace，文件系统及上下文切换表格分别记录操作/进程数、原值、单位和原始行。缺命令上下文的双数字不猜测归属。
 
-本轮协议收敛按[日志协议](test001-protocol.md)：结构事件在 protocol.py 一次生成，组切分、调用守卫和性能报告共享字段及原始位置。两套 CRITERIA 的 revision 更新为 2，PROFILE 不变；旧分析身份仍可在 Git 历史追溯。公开入口始终建立快照，worker.py 只作为快照子入口，环境不再决定是否执行快照。
+本轮协议收敛按[日志协议](test001-protocol.md)：结构事件在 protocol.py 一次生成，组切分、调用守卫和性能报告共享字段及原始位置。两套 CRITERIA 的 revision 更新为 3，PROFILE 不变；旧分析身份仍可在 Git 历史追溯。公开入口始终建立快照，worker.py 只作为快照子入口，环境不再决定是否执行快照。

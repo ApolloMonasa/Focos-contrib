@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .protocol import Event, lex, RESULT_FLAGS, UNATTRIBUTED_FLAGS
+from .protocol import Event, lex, RESULT_FLAGS, UNATTRIBUTED_FLAGS, evidence
 
 
 @dataclass
@@ -75,6 +75,12 @@ class Attempt:
             'summary_incomplete': self.summary_incomplete,
             'summary_mismatch': self.summary_mismatch,
             'unknown_flags': sorted(self.unknown_flags),
+            'evidence': [
+                evidence(e, self.line_offset)
+                for e in self.records
+                if e.kind
+                in ('ltp_result', 'ltp_unknown', 'summary', 'summary_field', 'legacy_summary')
+            ],
         }
 
 
@@ -136,6 +142,7 @@ def _parse_attempt(attempt: Attempt):
             {
                 dst: legacy[src]
                 for src, dst in (
+                    ('Total Tests', 'total'),
                     ('Passed', 'passed'),
                     ('Failed', 'failed'),
                     ('Not Supported', 'skipped'),
@@ -143,6 +150,14 @@ def _parse_attempt(attempt: Attempt):
                 if src in legacy
             }
         ]
+    if legacy:
+        if set(legacy) != {'Total Tests', 'Passed', 'Failed', 'Not Supported'}:
+            attempt.parse_errors.append('INCOMPLETE_LEGACY_SUMMARY')
+        elif legacy['Total Tests'] != legacy['Passed'] + legacy['Failed'] + legacy[
+            'Not Supported'
+        ] or legacy['Total Tests'] != sum(counts[f] for f in UNATTRIBUTED_FLAGS):
+            attempt.summary_mismatch = True
+            attempt.parse_errors.append('LEGACY_TOTAL_MISMATCH')
     attempt.events = {flag: count for flag, count in counts.items() if count}
     attempt.unknown_flags = sorted(unknown)
     if unknown:

@@ -28,6 +28,8 @@ class GroupAnalysis:
     counts: dict
     order_matches: bool | None = None
     metrics: list[dict] | None = None
+    diagnostics: list[dict] | None = None
+    evidence: list[dict] | None = None
 
 
 def _empty_counts() -> dict:
@@ -113,8 +115,8 @@ def _apply_observation_guard(items: list[dict], extras: list[dict],
                              guard, planned: dict) -> tuple[list[dict], list[dict], list[str]]:
     """独立校验原始观测：重复尝试不能被最后一次成功覆盖，未知名称单列。"""
     errors = []
-    for line in guard.malformed:
-        errors.append(f'MALFORMED_OBSERVATION:{line[:160]}')
+    for diagnostic in guard.malformed:
+        errors.append(f"MALFORMED_OBSERVATION:line {diagnostic['line']}:{diagnostic['message']}")
     for item in items:
         name = item['name']
         count = guard.counts.get(name, 0)
@@ -180,7 +182,7 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
                              None, _count_items(items))
 
     guard = check_observations(
-        shard.group, section.text, [item['name'] for item in expected], events=section.events
+        shard.group, section.text, [item['name'] for item in expected], events=section.events, line_offset=section.start_line
     )
     planned = group_meta.get('planned_occurrences', {})
     if adapter_root is None:
@@ -193,11 +195,13 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
         } for item in expected]
         items, extras, guard_errors = _apply_observation_guard(items, [], guard, planned)
         return GroupAnalysis(shard, section, status, group_meta['adapter'], items, extras,
-                             [output.error, *guard_errors], None, _count_items(items))
+                             [output.error, *guard_errors], None, _count_items(items),
+                             diagnostics=guard.malformed, evidence=guard.evidence)
     items, extras = _map_judge_items(expected, output.items)
     items, extras, guard_errors = _apply_observation_guard(items, extras, guard, planned)
     return GroupAnalysis(shard, section, status, group_meta['adapter'], items, extras,
-                         guard_errors, None, _count_items(items))
+                         guard_errors, None, _count_items(items),
+                         diagnostics=guard.malformed, evidence=guard.evidence)
 
 
 def validate_selection(profile: Profile, shards: list[Shard]):
@@ -320,6 +324,10 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
         if analysis.native is not None:
             group['native'] = analysis.native
             group['order_matches'] = analysis.order_matches
+        if analysis.diagnostics is not None:
+            group['diagnostics'] = analysis.diagnostics
+        if analysis.evidence is not None:
+            group['evidence'] = analysis.evidence
         if analysis.metrics is not None:
             group['metrics'] = analysis.metrics
         groups.append(group)

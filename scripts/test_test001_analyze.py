@@ -920,6 +920,31 @@ class RunPackageTests(TemporaryOutput):
                 self.assertEqual(report['totals']['accepted_pass'],0)
                 self.assertEqual(report['totals']['selected_total'],2820)
 
+    def test_malformed_guard_report_points_to_original_records(self):
+        serial=section_bytes(HISTORICAL/'logs/ref_lua3.log','lua','glibc')
+        end=b'#### OS COMP TEST GROUP END lua-glibc ####'
+        bad=b'testcase lua date.lua unknown\n'
+        serial=serial.replace(end,bad+bad+end)
+        run=make_run(self.base/'run',['lua-glibc'],serial)
+        result,output=self.run_analyze(run,J1,require_pass=True)
+        self.assertEqual(result.returncode,1,result.stderr)
+        group=load_report(output)['groups'][0]
+        diagnostics=group['diagnostics']
+        self.assertEqual(len(diagnostics),2)
+        self.assertNotEqual(diagnostics[0]['line'],diagnostics[1]['line'])
+        for diagnostic in diagnostics:
+            self.assertEqual(serial.decode().split('\n')[diagnostic['line']-1],diagnostic['raw'])
+
+    def test_native_failure_report_points_to_original_records(self):
+        serial=ltp_log([(LTP_CASE,['TFAIL: actual','TWHAT: unknown'],0)])
+        run=make_run(self.base/'run',['ltp-musl'],serial)
+        result,output=self.run_analyze(run,J1,require_pass=True)
+        self.assertEqual(result.returncode,1,result.stderr)
+        item=next(i for i in load_report(output)['groups'][0]['items'] if i['name']==LTP_CASE)
+        self.assertEqual(len(item['evidence']),2)
+        for event in item['evidence']:
+            self.assertEqual(serial.decode().split('\n')[event['line']-1],event['raw'])
+
     def test_unknown_ltp_flag_outside_invocation_blocks(self):
         rows = [json.loads(line) for line in
                 (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
