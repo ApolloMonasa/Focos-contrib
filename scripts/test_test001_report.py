@@ -31,6 +31,11 @@ def sample_report():
             'shard_id': 'ltp-musl', 'adapter': 'ltp_native', 'counts': counts,
             'items': [{'name': 'case`one|two', 'judgment': 'FAIL', 'reasons': []}],
             'extras': [{'name': 'extra`one|two'}],
+            'native': {
+                'events': {'TPASS': 1}, 'summaries': {},
+                'unattributed': [{'event': 'TFAIL', 'line': 42,
+                                  'section_line': 3}],
+            },
         }],
         'implementation': {'manifest_sha256': 'a' * 64},
     }
@@ -53,6 +58,8 @@ class MarkdownEscapingTests(unittest.TestCase):
         self.assertIn('未记录原因', text)
         self.assertNotIn('（-）', text)
         self.assertIn('| ltp | musl | COMPLETE | ltp_native |', text)
+        self.assertIn('line 42', text)
+        self.assertIn('`TFAIL`', text)
 
 
 if __name__ == '__main__':

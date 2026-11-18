@@ -319,6 +319,11 @@ def load_run_package(path: Path, profile: Profile) -> RunPackage:
     _check_unknown(build, BUILD_KEYS, label='capture build')
     for key in BUILD_KEYS:
         _hex(build[key], label=f'capture build {key}')
+    frozen_image = profile.data.get('inputs', {}).get('image', {}).get(
+        'uncompressed_sha256')
+    _hex(frozen_image, label='profile image uncompressed_sha256')
+    if build['base_img_sha256'] != frozen_image:
+        raise InputError('capture base image does not match the frozen profile image')
 
     qemu = capture['qemu']
     _require_keys(qemu, QEMU_KEYS, label='capture qemu')

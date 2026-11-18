@@ -42,6 +42,11 @@ def profile_hash() -> str:
     return json.loads((ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.json').read_text())['profile_hash']
 
 
+def profile_image_hash() -> str:
+    profile = json.loads((ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.json').read_text())
+    return profile['inputs']['image']['uncompressed_sha256']
+
+
 def make_run(base: Path, selection: list[str], serial: bytes, *,
              status: str = 'EXITED', exit_code: int | None = 0,
              integrity: str = 'VERIFIED', campaign: dict | None = None) -> Path:
@@ -53,7 +58,7 @@ def make_run(base: Path, selection: list[str], serial: bytes, *,
         'manifest_sha256': 'a' * 64,
         'kernel_sha256': 'b' * 64,
         'initramfs_sha256': 'c' * 64,
-        'base_img_sha256': 'd' * 64,
+        'base_img_sha256': profile_image_hash(),
     }
     qemu_sha = 'e' * 64
     firmware_sha = hashlib.sha256(firmware).hexdigest()
@@ -525,6 +530,21 @@ class RunContractTests(TemporaryOutput):
         self.mutate(run, wrong_format)
         self.assert_rejected(run)
 
+    def test_base_image_not_frozen_profile_is_rejected(self):
+        serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
+        run = make_run(self.base / 'run', ['lua-glibc'], serial)
+        wrong = 'd' * 64
+
+        def wrong_image(capture):
+            capture['build']['base_img_sha256'] = wrong
+            capture['cow_layer']['base_img_sha256'] = wrong
+            for item in capture['read_only_inputs']:
+                if item['role'] == 'base_img':
+                    item['sha256_before'] = wrong
+                    item['sha256_after'] = wrong
+        self.mutate(run, wrong_image)
+        self.assert_rejected(run)
+
     def test_changed_integrity_blocks_but_package_is_analyzed(self):
         serial = section_bytes(HISTORICAL / 'logs/ref_lua3.log', 'lua', 'glibc')
         run = make_run(self.base / 'run', ['lua-glibc'], serial, integrity='CHANGED')
@@ -701,6 +721,28 @@ class RunPackageTests(TemporaryOutput):
                     if item['name'] == 'busybox date')
         self.assertEqual(item['judgment'], 'JUDGE_ERROR')
         self.assertTrue(any('DUPLICATE_OBSERVATION' in reason for reason in item['reasons']))
+
+    def test_unattributed_ltp_failure_blocks(self):
+        rows = [json.loads(line) for line in
+                (ROOT / 'tests/test001/profiles/regional-2025-with-ltp-v1.invocations.jsonl')
+                .read_text().splitlines()]
+        names = [row['name'] for row in rows if row['group'] == 'ltp' and row['libc'] == 'musl']
+        serial = ltp_log([(name, ['TPASS: ok'], 0) for name in names])
+        end = b'#### OS COMP TEST GROUP END ltp-musl ####'
+        serial = serial.replace(
+            end, b'TFAIL: delayed failure outside invocation\n' + end
+        )
+        run = make_run(self.base / 'run', ['ltp-musl'], serial)
+        result, output = self.run_analyze(run, J1, require_pass=True)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        report = load_report(output)
+        self.assertEqual(report['acceptance']['status'], 'BLOCKED')
+        self.assertIn('LTP_UNATTRIBUTED_RESULT:ltp-musl:1',
+                      report['acceptance']['reasons'])
+        self.assertEqual(report['totals']['accepted_pass'], 0)
+        unattributed = report['groups'][0]['native']['unattributed']
+        self.assertEqual(unattributed[0]['event'], 'TFAIL')
+        self.assertGreater(unattributed[0]['line'], 0)
 
     def test_ltp_summary_mismatch_blocks_j1(self):
         rows = [json.loads(line) for line in

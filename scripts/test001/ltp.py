@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 RESULT_FLAGS = ('TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN', 'TINFO', 'TDEBUG')
+UNATTRIBUTED_FLAGS = {'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN'}
 ANSI_RE = re.compile(r'\x1b\[[0-9;?]*[A-Za-z]')
 RESULT_RE = re.compile(r'(?:^|\s)(TPASS|TFAIL|TBROK|TCONF|TWARN|TINFO|TDEBUG)\s*:')
 UNKNOWN_RE = re.compile(r'(?:^|\s)(T[A-Z][A-Z0-9_]{2,})\s*:')
@@ -86,6 +87,7 @@ class LtpParse:
     summary_missing: int
     summary_incomplete: int
     summary_mismatch: int
+    unattributed: list[dict]
 
 
 def _summaries_from_lines(lines: list[str], *, attempt: Attempt) -> list[dict[str, int]]:
@@ -159,13 +161,14 @@ def _parse_attempt(attempt: Attempt):
                 attempt.summary_mismatch = True
 
 
-def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
+def parse_ltp_section(text: str, expected: list[dict], *, line_offset: int = 0) -> LtpParse:
     """按固定版本的原生标志解析一个 ltp-<libc> 段。"""
     expected_names = [item['name'] for item in expected]
     expected_set = set(expected_names)
     attempts: dict[str, list[Attempt]] = {}
     errors: list[str] = []
     observed_order: list[str] = []
+    unattributed: list[dict] = []
     current: Attempt | None = None
     lines = text.splitlines()
 
@@ -220,6 +223,16 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
             continue
         if current is not None:
             current.lines.append(raw)
+            continue
+        line = strip_ansi(raw)
+        for match in RESULT_RE.finditer(line):
+            flag = match.group(1)
+            if flag in UNATTRIBUTED_FLAGS:
+                unattributed.append({
+                    'event': flag,
+                    'section_line': line_number,
+                    'line': line_number + line_offset,
+                })
 
     if current is not None:
         errors.append(f'line {current.run_line}: LTP case has no end: {current.name}')
@@ -284,8 +297,8 @@ def parse_ltp_section(text: str, expected: list[dict]) -> LtpParse:
         native={'events': {flag: count for flag, count in native.items() if count},
                 'summaries': {key: value for key, value in summaries.items() if value},
                 'summary_missing': summary_missing, 'summary_incomplete': summary_incomplete,
-                'summary_mismatch': summary_mismatch},
+                'summary_mismatch': summary_mismatch, 'unattributed': unattributed},
         order_matches=observed_order == expected_names,
         summary_missing=summary_missing, summary_incomplete=summary_incomplete,
-        summary_mismatch=summary_mismatch,
+        summary_mismatch=summary_mismatch, unattributed=unattributed,
     )

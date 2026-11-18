@@ -89,6 +89,20 @@ def _markdown(report: dict) -> str:
                 f"{native.get('summary_mismatch', 0)} |"
             )
         lines.append('')
+        unattributed = [
+            (group, event)
+            for group in native_groups
+            for event in group['native'].get('unattributed', [])
+        ]
+        if unattributed:
+            lines += ['## LTP 未归属结果', '',
+                      '以下结果不在任何 invocation 内，无法归属，阻断验收。', '']
+            for group, event in unattributed:
+                lines.append(
+                    f"- {_code(group['shard_id'])} line {event['line']}："
+                    f"{_code(event['event'])}"
+                )
+            lines.append('')
 
     non_pass = []
     for group in report['groups']:

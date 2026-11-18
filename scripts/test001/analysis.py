@@ -147,8 +147,10 @@ def _analyze_group(profile: Profile, criteria: Criteria, shard: Shard,
             items = _not_run_items(profile, shard)
             return GroupAnalysis(shard, section, status, 'ltp_native', items, [], [],
                                  {'events': {}, 'summaries': {}}, _count_items(items))
-        parsed = parse_ltp_section(section.text, expected)
+        parsed = parse_ltp_section(section.text, expected, line_offset=section.start_line)
         errors = list(parsed.errors)
+        if parsed.unattributed:
+            errors.append(f'LTP_UNATTRIBUTED_RESULT:{len(parsed.unattributed)}')
         invocation_ids = {inv['name']: inv['invocation_id'] for inv in expected}
         for item in parsed.items:
             item['invocation_id'] = invocation_ids.get(item['name'])
@@ -246,6 +248,11 @@ def _build_report(profile: Profile, criteria: Criteria, shards: list[Shard],
                         f'LTP_SUMMARY_INCOMPLETE:{analysis.shard.shard_id}:'
                         f'{native["summary_incomplete"]}'
                     )
+            if native.get('unattributed'):
+                reasons.append(
+                    f'LTP_UNATTRIBUTED_RESULT:{analysis.shard.shard_id}:'
+                    f'{len(native["unattributed"])}'
+                )
             if analysis.order_matches is False:
                 reasons.append(f'LTP_ORDER_MISMATCH:{analysis.shard.shard_id}')
     acceptance = 'PASS' if not reasons else 'BLOCKED'
