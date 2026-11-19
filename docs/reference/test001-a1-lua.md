@@ -1,0 +1,36 @@
+# TEST-001 A1：Lua 单组纯解析
+
+本批实现 [解析契约](test001-analysis-contract.md) 的 Lua 子集，只处理内存 bytes，不读文件、不运行 judge、不发布报告。真实语法来自 [A0 样本](test001-a0-lua-samples.md)。其他组、CLI、完整 PROFILE/CRITERIA 和运行包仍未支持。
+
+## 接口与语言
+
+`analyze_lua(raw, libc, selection=None)` 接收不可变 bytes、musl/glibc，以及九个已审 Lua 参数的非空子集；默认全组。selection 不决定顺序，顺序始终从原脚本九项投影。未知/重复参数和非法 libc 属于 ValueError；不接受自定义 PROFILE。此局部计划是解析测试接口，不宣称运行配置已经冻结。
+
+每条 LF 记录保留原始字节、半开区间、1 起行号和识别字符到原始字节的映射。CRLF 仅去识别副本的尾 CR。允许 SGR 仅为 ESC[0m、ESC[31m、ESC[32m、ESC[33m、ESC[39m；不接受其他转义。结构允许 ASCII SP/HT 首尾及字段间隔，完整单行匹配；NBSP、VT、FF、裸 CR、非法 UTF-8 不得产生结果。无末尾 LF 的结构记损坏，不能构成成功结束。本子集对非法 UTF-8、未支持控制符或非 ASCII 空白的整条记录报错，即使它是诊断；普通可打印 Unicode 诊断仍可保留为信息。
+
+合法结构为组 START/END 和 `testcase GROUP NAME success|fail`；仅 lua 结果可被本接口消费。保留前缀为去掉 ASCII SP/HT 后的 `####`、`testcase`、RUN/FAIL LTP CASE、Summary、passed/failed/broken/skipped/warnings/Total Tests，以及 TPASS/TFAIL/TBROK/TCONF/TWARN。损坏或未支持结构记错误，不降为信息。TINFO/TDEBUG 等普通消息不递归扫描其中的标记；未知诊断保留 opaque 信息，不承诺识别任意自然语言伪造。
+
+## 状态与结果
+
+组从 idle 经唯一匹配 START 进入 active，再由匹配 END 闭合。错组/错 libc、嵌套、重复或错配标记不改变有效活动组；EOF 活动组记 TRUNCATED。组前/组后结果记归属错误，不能借用请求中的 libc 绑定为有效调用。
+
+结果行是 Lua 的单行调用观察。保留全部观察及尝试，按原位置比较预期顺序，未知/范围外/重复/组外结果不从观察序列过滤。仅组内、当前 libc 的已知参数可归属调用；范围外项仍保留真实身份和结果，但不扩大 selection。结果缺项：合法组已开始为 MISSING，否则 NOT_RUN。重复尝试为 JUDGE_ERROR，保留先前 fail；合法单次 success/fail 分别为 PASS/FAIL，仅表达包装器协议。顺序、边界和词法错误独立保留在 protocol 中，不以单条 PASS 清除。
+
+返回冻结 dataclass 与 tuple：Record、Assignment、Observation、InvocationResult、AnalysisResult。每条记录恰有一个 assignment；错误记录归 error，合法信息归当前组或日志范围。证据只引用同一批 record_id，没有第二次正文扫描。protocol 为 COMPLETE/INCOMPLETE/ERROR；错误优先于不完整，零组或缺顺序尾部也不完整。acceptance 永远 BLOCKED、trust=external_log/unknown，不提供 accepted_pass。没有 JSON/Markdown 渲染或 CLI；这些留到 A2。
+
+## 验证门槛
+
+真实两套组片段为正例；合成反例覆盖 LF/CRLF/SGR、字节位置、非法分隔符/编码/控制序列、跨 LF、消息引用、组前后和错组结果、缺组/缺项/截断、重复与失败后成功、未知/范围外参数、顺序重排和子集投影。每个测试同时检查记录归属、保留事实和协议结论，不能只断言 acceptance=BLOCKED。
+
+本批变异检查覆盖非法结构降信息、丢弃首次失败和忽略顺序；完整契约中的 LTP 孤立汇总、对照 judge 授权、包快照等变异随对应阶段实现，不声称已完成完整 A1。
+
+本批实际变异结果（各运行同一组 15 个测试，不改期望）：
+
+| 删除/替换的不变量 | 触发断言失败数 |
+| --- | ---: |
+| 含非法字节/未闭合结构的 kind 从 invalid 改为 information | 9 |
+| 调用只保留最后一个 attempt | 1 |
+| 禁用逐项身份与预期顺序比较 | 1 |
+| 保留前缀但不匹配语法的结构全部改为 information | 3 |
+
+正常实现同组测试通过；变异运行均为断言失败而非导入/执行异常。LTP 孤立字段、对照授权、旧运行包实现快照等尚无对应实现，不计为已完成变异。详细日志在本地 target/a1-lua-evidence/，PR 列实际命令与结果。
