@@ -9,7 +9,7 @@
 | 3 写测试 | 让测试因缺失行为失败，保留原因 | 失败不是故意破坏编译 |
 | 4 实现 | 写到测试通过，再重构、回归 | 不放宽断言、不伪造成功 |
 | 5 提 PR | 填 [PR 模板](../.github/pull_request_template.md)，附准确 SPEC 与证据 | 行为、规格、命令和提交对应 |
-| 6 合入 | 审阅通过后 squash，更新 Issue；完成、替代或下一步变化时同步 [任务入口](backlog.md) | 未完成整项验收时保持 Issue 开放，入口不再引导重复认领 |
+| 6 合入 | 审阅通过后 squash，更新 Issue | 未完成整项验收时保持 Issue 开放 |
 
 小缺陷可在同一 PR 更新 SPEC、失败测试和修复，但行为改变仍先审约定。纯文档检查事实、链接和可读性，不补无关代码测试。
 
@@ -17,7 +17,7 @@
 
 从最新 `upstream/main` 建 `spec/编号-主题`、`feat/编号-主题` 或 `fix/编号-主题`，推到个人 fork。操作命令见 [上手指南](getting-started.md)。一人同时一个实现任务；每周 30 分钟合流演示。
 
-Assignee 是模块 owner；reviewer 与下一步写在 Issue 顶部。owner 维护依赖、SPEC/PR/结果链接，卡住一天就找队友，超过两天拆小或结对。待认领表由 [开放 Issue](https://github.com/MindScrath/Focos/issues) 自动反映，文档不再复制一张进度表。
+Assignee 是模块 owner；reviewer 与下一步写在 Issue 顶部。owner 维护依赖、SPEC/PR/结果链接，卡住一天就找队友，超过两天拆小或结对。认领情况由 [开放 Issue](https://github.com/MindScrath/Focos/issues?q=is%3Aissue%20is%3Aopen) 反映；[任务导航](backlog.md) 只维护模块索引，下一步与进度只在 Issue 更新。
 
 ## 测哪些层
 
