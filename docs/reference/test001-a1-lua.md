@@ -10,6 +10,8 @@
 
 合法结构为组 START/END 和 `testcase GROUP NAME success|fail`；仅 lua 结果可被本接口消费。保留前缀为去掉 ASCII SP/HT 后的 `####`、`testcase`、RUN/FAIL LTP CASE、Summary、passed/failed/broken/skipped/warnings/Total Tests，以及 TPASS/TFAIL/TBROK/TCONF/TWARN。损坏或未支持结构记错误，不降为信息。TINFO/TDEBUG 等普通消息不递归扫描其中的标记；未知诊断保留 opaque 信息，不承诺识别任意自然语言伪造。
 
+损坏结果前缀在同一词法阶段单独标记：只从记录开头越过空白、已登记控制字符、非法 UTF-8 字节以及 CSI/OSC 前缀，遇到普通文字即停止。OSC 消息体不透明，未终止 OSC 不向消息内部搜索。此标志只允许生成身份/状态均未知的观察，不修改识别文本，也不能恢复成合法结果。原始记录仍为 INVALID_STRUCTURE，另记 ORDER_UNVERIFIABLE；不从请求中的 selection 猜名称、libc 或成功状态。损坏组标记不因此变成调用，普通消息中的 testcase 不递归识别。
+
 ## 状态与结果
 
 组从 idle 经唯一匹配 START 进入 active，再由匹配 END 闭合。错组/错 libc、嵌套、重复或错配标记不改变有效活动组；EOF 活动组记 TRUNCATED。组前/组后结果记归属错误，不能借用请求中的 libc 绑定为有效调用。

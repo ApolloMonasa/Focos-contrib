@@ -210,6 +210,47 @@ class LuaParserTests(unittest.TestCase):
                 self.assertEqual(len(diagnostics), 1)
                 self.assertEqual(diagnostics[0].expected, ('lua', 'musl', next_name))
 
+    def test_damaged_prefix_preserves_unknown_start(self):
+        prefixes = ('\u202e', '\u009b', '\u200b', '\ufeff', '\u00a0', '\u2028')
+        prefixes = tuple(p.encode() for p in prefixes) + (
+            b'\xff', b'\xe2\x82', b'\x00', b'\x1b[2K', b'\x1b[35m',
+            b'\x1b]0;title\x07', b'\x1b[32m\xe2\x80\xae', b' \t\xff\xc2\xa0')
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix):
+                raw = START + prefix + A + END
+                r = self.parse(raw)
+                self.assertEqual(r.protocol.value, 'ERROR')
+                self.assertIn('ORDER_UNVERIFIABLE', self.codes(r))
+                self.assertNotIn('ORDER_INCOMPLETE', self.codes(r))
+                self.assertEqual(r.observed_sequence, ((None, None, None),))
+                self.assertEqual(len(r.observations), 1)
+                observation = r.observations[0]
+                self.assertEqual(observation.record_id, 2)
+                self.assertIsNone(observation.name)
+                self.assertIsNone(observation.status)
+                self.assertFalse(observation.in_selection)
+                self.assertEqual(r.invocations[0].judgment.value, 'MISSING')
+                self.assertEqual(r.invocations[0].attempts, ())
+                self.assertEqual(r.assignments[1].owner, 'error')
+                self.assertEqual(r.records[1].raw, prefix + A)
+
+    def test_damaged_prefix_does_not_search_inside_messages(self):
+        lines = (b'TINFO: quotes ' + A, b'message: \xe2\x80\xae' + A,
+                 b'\x1b]0;testcase lua date.lua success\x07 diagnostic\n',
+                 b'\x1b]0;testcase lua date.lua success\n',
+                 '\u009dtestcase lua date.lua success\u009c\n'.encode(),
+                 b'literal \\xff' + A)
+        for line in lines:
+            with self.subTest(line=line):
+                r = self.parse(START + line + END)
+                self.assertEqual(r.observations, ())
+                self.assertIn('ORDER_INCOMPLETE', self.codes(r))
+                self.assertEqual(r.invocations[0].judgment.value, 'MISSING')
+        combined = self.parse(START + A + b'\xe2\x80\xae' + A + END)
+        self.assertEqual(combined.observed_sequence, (('lua', 'musl', 'date.lua'), (None, None, None)))
+        self.assertEqual(len(combined.invocations[0].attempts), 1)
+        self.assertEqual(combined.protocol.value, 'ERROR')
+
     def test_immutable_and_invalid_selection(self):
         r = self.parse(START + A + END)
         with self.assertRaises(FrozenInstanceError):

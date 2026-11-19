@@ -138,6 +138,37 @@ RESERVED = ('####', 'testcase', 'RUN LTP CASE', 'FAIL LTP CASE', 'Summary',
             'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN')
 
 
+# 仅用于损坏前缀的保留标志识别，不参与合法结构匹配。
+CSI_PREFIX = re.compile(r'(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]')
+OSC_PREFIX = re.compile(r'(?:\x1b\]|\x9d)[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)')
+
+
+def _result_prefix(text):
+    """只越过开头的空白/控制/坏字节，绝不搜索普通消息内部。"""
+    position = 0
+    while position < len(text):
+        if text.startswith('testcase', position):
+            return True
+        if text.startswith(('\x1b]', '\x9d'), position):
+            # OSC 消息体不透明；未终止时也不能把其中 testcase 当成调用。
+            message = OSC_PREFIX.match(text, position)
+            if message is None:
+                return False
+            position = message.end()
+            continue
+        char = text[position]
+        if char in ('\x1b', '\x9b') and not text.startswith('testcase', position + 1):
+            sequence = CSI_PREFIX.match(text, position)
+            if sequence:
+                position = sequence.end()
+                continue
+        if char.isspace() or char in UNSUPPORTED_CONTROLS or 0xDC80 <= ord(char) <= 0xDCFF:
+            position += 1
+            continue
+        return False
+    return False
+
+
 def _recognition(body, start):
     normalized, positions = bytearray(), []
     i, invalid = 0, False
@@ -154,12 +185,13 @@ def _recognition(body, start):
     try:
         text = normalized.decode('utf-8')
     except UnicodeDecodeError:
+        result_like = _result_prefix(normalized.decode('utf-8', errors='surrogateescape'))
         text, mapping = '', []
         for byte, position in zip(normalized, positions):
             char = chr(byte) if byte < 128 else f'\\x{byte:02x}'
             text += char
             mapping.extend([position] * len(char))
-        return text, tuple(mapping), True
+        return text, tuple(mapping), True, result_like
     invalid |= any((char.isspace() and char not in ' \t') or
                    char in UNSUPPORTED_CONTROLS
                    for char in text)
@@ -167,7 +199,7 @@ def _recognition(body, start):
     for char in text:
         mapping.append(positions[byte_index])
         byte_index += len(char.encode('utf-8'))
-    return text, tuple(mapping), invalid
+    return text, tuple(mapping), invalid, _result_prefix(text)
 
 
 def _records(raw):
@@ -179,7 +211,7 @@ def _records(raw):
         body = original[:-1] if lf >= 0 else original
         if lf >= 0 and body.endswith(b'\r'):
             body = body[:-1]
-        text, mapping, invalid = _recognition(body, offset)
+        text, mapping, invalid, result_like = _recognition(body, offset)
         token = text.strip(' \t')
         group_match, result_match = GROUP.fullmatch(token), RESULT.fullmatch(token)
         reserved = token.startswith(RESERVED)
@@ -196,7 +228,7 @@ def _records(raw):
             kind = 'invalid' if token.startswith(('####', 'testcase')) else 'unsupported'
         records.append(Record(len(records) + 1, len(records) + 1, offset, end, original,
                               text, mapping, kind, group, libc, name, status,
-                              token.startswith('testcase')))
+                              result_like))
         offset = end
     return tuple(records)
 
