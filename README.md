@@ -35,7 +35,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 ## 第一天怎么做
 
 1. 按 [上手指南](docs/getting-started.md) 运行 `make check`，看到 `PASS: BOOT-001`。
-2. 到 [任务入口](docs/backlog.md) 认领一小步，约队友审阅。
+2. 从 [任务导航](docs/backlog.md) 找到对应 Issue，认领一小步并约队友审阅。
 3. 用 [SPEC 模板](specs/TEMPLATE.md) 约定行为，按 [六步 SOP](docs/collaboration.md) 实现并提交 PR。
 
 | 想了解什么 | 去哪里 |
@@ -142,7 +142,7 @@ Focos/
 ├── docs/                              # 上手、设计与验证指南
 │   ├── getting-started.md             # 配环境、运行和首次提交
 │   ├── architecture.md                # 内核分层与跨平台扩展图
-│   ├── backlog.md                     # 可认领任务与依赖入口
+│   ├── backlog.md                     # 模块与 Issue 导航，实时进度在 Issue
 │   ├── collaboration.md               # 认领、测试、审阅与合入流程
 │   ├── roadmap.md                     # 周目标与进度取舍
 │   ├── verification.md                # 怎样接入测例并记录功能证据
