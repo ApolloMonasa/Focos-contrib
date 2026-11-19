@@ -209,11 +209,13 @@ def verify_image(image, lock):
         members.update(lock['executables'])
         for name, meta in members.items():
             # 路径来自仓库锁，不接受调用者的 debugfs 命令。
-            if not re.fullmatch(r'/[a-z0-9_./]+', meta['path']) or '..' in meta['path']:
-                raise ValueError('invalid locked image path')
             operation = meta.get('operation', 'cat')
             if operation not in ('cat', 'ls -p'):
                 raise ValueError('unsupported locked image operation')
+            root_listing = operation == 'ls -p' and meta['path'] == '/'
+            if not root_listing and (
+                    not re.fullmatch(r'/[a-z0-9_./]+', meta['path']) or '..' in meta['path']):
+                raise ValueError('invalid locked image path')
             result = run_debugfs(['-R', operation + ' ' + meta['path'], str(snapshot)],
                                  f'member read: {name}', 30)
             # debugfs 某些读取错误仍退出 0，长度和哈希必须同时符合。
