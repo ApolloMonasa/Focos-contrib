@@ -38,6 +38,23 @@ class Code(Enum):
 
 
 @dataclass(frozen=True)
+class Unit:
+    start: int
+    end: int
+    text: str | None
+    bad_byte: int | None
+
+
+@dataclass(frozen=True)
+class Token:
+    kind: str
+    unit_start: int
+    unit_end: int
+    start: int
+    end: int
+
+
+@dataclass(frozen=True)
 class Record:
     record_id: int
     line: int
@@ -52,6 +69,8 @@ class Record:
     name: str | None = None
     status: str | None = None
     result_like: bool = False
+    units: tuple = ()
+    tokens: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -130,7 +149,7 @@ UNSUPPORTED_CONTROLS = frozenset(
 )
 
 
-SGR = (b'\x1b[0m', b'\x1b[31m', b'\x1b[32m', b'\x1b[33m', b'\x1b[39m')
+SGR_TEXT = ('\x1b[0m', '\x1b[31m', '\x1b[32m', '\x1b[33m', '\x1b[39m')
 GROUP = re.compile(r'####[ \t]+OS[ \t]+COMP[ \t]+TEST[ \t]+GROUP[ \t]+(START|END)[ \t]+([a-z0-9_]+)-(musl|glibc)[ \t]+####')
 RESULT = re.compile(r'testcase[ \t]+([a-z0-9_]+)[ \t]+([A-Za-z0-9_.+-]+)[ \t]+(success|fail)')
 RESERVED = ('####', 'testcase', 'RUN LTP CASE', 'FAIL LTP CASE', 'Summary',
@@ -138,68 +157,108 @@ RESERVED = ('####', 'testcase', 'RUN LTP CASE', 'FAIL LTP CASE', 'Summary',
             'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN')
 
 
-# 仅用于损坏前缀的保留标志识别，不参与合法结构匹配。
-CSI_PREFIX = re.compile(r'(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]')
-OSC_PREFIX = re.compile(r'(?:\x1b\]|\x9d)[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)')
+def _units(body, start):
+    """按原始 UTF-8 边界解码一次；坏字节保留为独立 Unit。"""
+    units, position = [], start
+    for char in body.decode('utf-8', errors='surrogateescape'):
+        if 0xDC80 <= ord(char) <= 0xDCFF:
+            unit = Unit(position, position + 1, None, ord(char) - 0xDC00)
+        else:
+            unit = Unit(position, position + len(char.encode('utf-8')), char, None)
+        units.append(unit)
+        position = unit.end
+    return tuple(units)
 
 
-def _result_prefix(text):
-    """只越过开头的空白/控制/坏字节，绝不搜索普通消息内部。"""
-    position = 0
-    while position < len(text):
-        if text.startswith('testcase', position):
-            return True
-        if text.startswith(('\x1b]', '\x9d'), position):
-            # OSC 消息体不透明；未终止时也不能把其中 testcase 当成调用。
-            message = OSC_PREFIX.match(text, position)
-            if message is None:
-                return False
-            position = message.end()
-            continue
-        char = text[position]
-        if char in ('\x1b', '\x9b') and not text.startswith('testcase', position + 1):
-            sequence = CSI_PREFIX.match(text, position)
-            if sequence:
-                position = sequence.end()
-                continue
-        if char.isspace() or char in UNSUPPORTED_CONTROLS or 0xDC80 <= ord(char) <= 0xDCFF:
+def _tokenize(units):
+    """控制字符串外层优先；不修改 Unit，也不跨坏字节修复编码。"""
+    tokens, position, total = [], 0, len(units)
+
+    def matches(at, text):
+        return at + len(text) <= total and all(
+            units[at + i].text == char for i, char in enumerate(text))
+
+    def ascii_between(at, low, high):
+        return at < total and units[at].text is not None and low <= ord(units[at].text) <= high
+
+    while position < total:
+        begin = position
+        unit = units[position]
+        if matches(position, '\x1b]') or unit.text == '\x9d':
+            position += 2 if unit.text == '\x1b' else 1
+            kind = 'opaque'
+            while position < total:
+                if units[position].text in ('\x07', '\x9c'):
+                    position += 1
+                    kind = 'osc'
+                    break
+                if matches(position, '\x1b\\'):
+                    position += 2
+                    kind = 'osc'
+                    break
+                position += 1
+        elif matches(position, '\x1b['):
+            position += 2
+            while ascii_between(position, 0x30, 0x3F):
+                position += 1
+            while ascii_between(position, 0x20, 0x2F):
+                position += 1
+            if ascii_between(position, 0x40, 0x7E):
+                position += 1
+                sequence = ''.join(u.text for u in units[begin:position])
+                kind = 'sgr' if sequence in SGR_TEXT else 'csi'
+            else:
+                position, kind = total, 'opaque'
+        elif unit.text in ('\x1b', '\x90', '\x98', '\x9e', '\x9f'):
+            # 未登记转义或控制字符串的边界未知，不能扫描其消息体。
+            position, kind = total, 'opaque'
+        else:
             position += 1
+            if unit.bad_byte is not None:
+                kind = 'invalid_utf8'
+            elif unit.text in UNSUPPORTED_CONTROLS or (unit.text.isspace() and unit.text not in ' \t'):
+                kind = 'control'
+            else:
+                kind = 'text'
+        if kind == 'text' and tokens and tokens[-1].kind == 'text':
+            begin = tokens.pop().unit_start
+        tokens.append(Token(kind, begin, position, units[begin].start, units[position - 1].end))
+    return tuple(tokens)
+
+
+def _result_prefix(units, tokens):
+    """只从 Token 开头识别保留前缀；显示文本不能反向输入此处。"""
+    keyword, matched = 'testcase', 0
+    for token in tokens:
+        if token.kind == 'sgr':
             continue
-        return False
+        if not matched and token.kind in ('control', 'invalid_utf8', 'csi', 'osc'):
+            continue
+        if token.kind != 'text':
+            return False
+        for unit in units[token.unit_start:token.unit_end]:
+            char = unit.text
+            if not matched and char in ' \t':
+                continue
+            if char != keyword[matched]:
+                return False
+            matched += 1
+            if matched == len(keyword):
+                return True
     return False
 
 
-def _recognition(body, start):
-    normalized, positions = bytearray(), []
-    i, invalid = 0, False
-    while i < len(body):
-        color = next((s for s in SGR if body.startswith(s, i)), None)
-        if color:
-            i += len(color)
+def _view(units, tokens, valid):
+    """仅合法输入可省略顶层 SGR；坏输入的转义字符串只用于显示。"""
+    text, positions = [], []
+    for token in tokens:
+        if valid and token.kind == 'sgr':
             continue
-        byte = body[i]
-        invalid |= byte < 32 and byte != 9 or byte == 127
-        normalized.append(byte)
-        positions.append(start + i)
-        i += 1
-    try:
-        text = normalized.decode('utf-8')
-    except UnicodeDecodeError:
-        result_like = _result_prefix(normalized.decode('utf-8', errors='surrogateescape'))
-        text, mapping = '', []
-        for byte, position in zip(normalized, positions):
-            char = chr(byte) if byte < 128 else f'\\x{byte:02x}'
-            text += char
-            mapping.extend([position] * len(char))
-        return text, tuple(mapping), True, result_like
-    invalid |= any((char.isspace() and char not in ' \t') or
-                   char in UNSUPPORTED_CONTROLS
-                   for char in text)
-    mapping, byte_index = [], 0
-    for char in text:
-        mapping.append(positions[byte_index])
-        byte_index += len(char.encode('utf-8'))
-    return text, tuple(mapping), invalid, _result_prefix(text)
+        for unit in units[token.unit_start:token.unit_end]:
+            char = unit.text if unit.bad_byte is None else f'\\x{unit.bad_byte:02x}'
+            text.append(char)
+            positions.extend([unit.start] * len(char))
+    return ''.join(text), tuple(positions)
 
 
 def _records(raw):
@@ -211,24 +270,33 @@ def _records(raw):
         body = original[:-1] if lf >= 0 else original
         if lf >= 0 and body.endswith(b'\r'):
             body = body[:-1]
-        text, mapping, invalid, result_like = _recognition(body, offset)
-        token = text.strip(' \t')
-        group_match, result_match = GROUP.fullmatch(token), RESULT.fullmatch(token)
-        reserved = token.startswith(RESERVED)
+        units = _units(body, offset)
+        tokens = _tokenize(units)
+        valid = (all(unit.bad_byte is None for unit in units) and
+                 all(token.kind in ('text', 'sgr') for token in tokens))
+        text, mapping = _view(units, tokens, valid)
+        result_like = _result_prefix(units, tokens)
         kind, group, libc, name, status = 'information', None, None, None, None
-        if invalid or (lf < 0 and (reserved or group_match or result_match)):
+        if not valid:
             kind = 'invalid'
-        elif group_match:
-            action, group, libc = group_match.groups()
-            kind = action.lower()
-        elif result_match:
-            group, name, status = result_match.groups()
-            kind = 'result'
-        elif reserved:
-            kind = 'invalid' if token.startswith(('####', 'testcase')) else 'unsupported'
+        else:
+            token = text.strip(' \t')
+            reserved = token.startswith(RESERVED)
+            if lf < 0 and reserved:
+                kind = 'invalid'
+            else:
+                group_match, result_match = GROUP.fullmatch(token), RESULT.fullmatch(token)
+                if group_match:
+                    action, group, libc = group_match.groups()
+                    kind = action.lower()
+                elif result_match:
+                    group, name, status = result_match.groups()
+                    kind = 'result'
+                elif reserved:
+                    kind = 'invalid' if token.startswith(('####', 'testcase')) else 'unsupported'
         records.append(Record(len(records) + 1, len(records) + 1, offset, end, original,
                               text, mapping, kind, group, libc, name, status,
-                              result_like))
+                              result_like, units, tokens))
         offset = end
     return tuple(records)
 
@@ -351,8 +419,51 @@ def analyze_lua(raw, libc, selection=None):
     return result
 
 
+def _validate_record_partition(record):
+    """校验区间与可逆字节引用，不重新识别控制序列或结果语法。"""
+    stop = record.end
+    if record.raw.endswith(b'\n'):
+        stop -= 1
+        if record.raw.endswith(b'\r\n'):
+            stop -= 1
+    position = record.start
+    for unit in record.units:
+        if unit.start != position or unit.end <= unit.start or unit.end > stop:
+            raise RuntimeError('unit partition invariant failed')
+        if unit.bad_byte is None:
+            if unit.text is None or len(unit.text) != 1:
+                raise RuntimeError('scalar unit invariant failed')
+            encoded = unit.text.encode('utf-8')
+        else:
+            if unit.text is not None or not 0x80 <= unit.bad_byte <= 0xFF:
+                raise RuntimeError('invalid byte unit invariant failed')
+            encoded = bytes([unit.bad_byte])
+        if encoded != record.raw[unit.start-record.start:unit.end-record.start]:
+            raise RuntimeError('unit byte identity invariant failed')
+        position = unit.end
+    if position != stop:
+        raise RuntimeError('unit coverage invariant failed')
+    cursor = 0
+    for token in record.tokens:
+        if (token.unit_start != cursor or not cursor < token.unit_end <= len(record.units) or
+                token.start != record.units[cursor].start or token.end != record.units[token.unit_end-1].end):
+            raise RuntimeError('token partition invariant failed')
+        cursor = token.unit_end
+    if cursor != len(record.units):
+        raise RuntimeError('token coverage invariant failed')
+    if len(record.text_offsets) != len(record.text) or any(
+            not record.start <= offset < stop for offset in record.text_offsets):
+        raise RuntimeError('text mapping invariant failed')
+
+
 def _validate_links(result):
     """仅验证规范对象的引用守恒；不重扫原始文本。"""
+    position = 0
+    for record in result.records:
+        if record.start != position or len(record.raw) != record.end - record.start:
+            raise RuntimeError('record partition invariant failed')
+        _validate_record_partition(record)
+        position = record.end
     ids = tuple(record.record_id for record in result.records)
     if ids != tuple(a.record_id for a in result.assignments) or len(set(ids)) != len(ids):
         raise RuntimeError('record ownership invariant failed')

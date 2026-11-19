@@ -18,7 +18,10 @@ class LuaParserTests(unittest.TestCase):
         return {d.code.value for d in result.diagnostics}
 
     def parse(self, raw, names=('date.lua',)):
-        result = analyze_lua(raw, 'musl', names)
+        try:
+            result = analyze_lua(raw, 'musl', names)
+        except RuntimeError as error:
+            self.fail(f'log input must not break internal invariants: {error}')
         self.assertEqual(len(result.records), len(result.assignments))
         self.assertEqual([a.record_id for a in result.assignments], [r.record_id for r in result.records])
         self.assertEqual(b''.join(r.raw for r in result.records), raw)
@@ -250,6 +253,106 @@ class LuaParserTests(unittest.TestCase):
         self.assertEqual(combined.observed_sequence, (('lua', 'musl', 'date.lua'), (None, None, None)))
         self.assertEqual(len(combined.invocations[0].attempts), 1)
         self.assertEqual(combined.protocol.value, 'ERROR')
+
+    def test_sgr_never_repairs_raw_utf8(self):
+        colors = (b'\x1b[0m', b'\x1b[31m', b'\x1b[32m', b'\x1b[33m', b'\x1b[39m')
+        for char in ('©', '中', '🧪'):
+            encoded = char.encode()
+            for split in range(1, len(encoded)):
+                for color in colors:
+                    with self.subTest(char=char, split=split, color=color):
+                        line = encoded[:split] + color + encoded[split:] + A
+                        r = self.parse(START + A + line + END)
+                        self.assertEqual(r.protocol.value, 'ERROR')
+                        self.assertEqual(r.records[2].kind, 'invalid')
+                        self.assertIn(color.decode(), r.records[2].text)
+                        self.assertIn('ORDER_UNVERIFIABLE', self.codes(r))
+                        self.assertEqual(r.observed_sequence, (('lua', 'musl', 'date.lua'), (None, None, None)))
+                        self.assertEqual(len(r.invocations[0].attempts), 1)
+                        self.assertTrue(any(u.bad_byte is not None for u in r.records[2].units))
+            for color in colors:
+                for line in (color + encoded + A, encoded + color + A):
+                    r = self.parse(START + A + line + END)
+                    self.assertEqual(r.protocol.value, 'COMPLETE')
+                    self.assertEqual(r.records[2].kind, 'information')
+                    self.assertEqual(len(r.observations), 1)
+
+    def test_raw_units_and_tokens_partition_without_loss(self):
+        body = b'\x1b[32m' + A[:-1] + b'\x1b[0m\r\n'
+        body += '中文 🧪\n'.encode() + b'\xc2\x1b[31m\xa9' + A
+        raw = START + body + END
+        r = self.parse(raw)
+        for record in r.records:
+            stop = record.end
+            if raw[stop-1:stop] == b'\n':
+                stop -= 1
+                if raw[stop-1:stop] == b'\r':
+                    stop -= 1
+            position = record.start
+            for unit in record.units:
+                self.assertEqual(unit.start, position)
+                fragment = raw[unit.start:unit.end]
+                if unit.bad_byte is None:
+                    self.assertEqual(fragment.decode('utf-8'), unit.text)
+                    self.assertEqual(len(unit.text), 1)
+                else:
+                    self.assertIsNone(unit.text)
+                    self.assertEqual(fragment, bytes([unit.bad_byte]))
+                position = unit.end
+            self.assertEqual(position, stop)
+            cursor = 0
+            for token in record.tokens:
+                self.assertEqual(token.unit_start, cursor)
+                self.assertGreater(token.unit_end, token.unit_start)
+                self.assertEqual(token.start, record.units[token.unit_start].start)
+                self.assertEqual(token.end, record.units[token.unit_end-1].end)
+                cursor = token.unit_end
+            self.assertEqual(cursor, len(record.units))
+
+    def test_invalid_encodings_are_not_replaced_or_ignored(self):
+        for bad in (b'\xff', b'\xc0\xaf', b'\xe0\x80\xaf', b'\xed\xa0\x80',
+                    b'\xf4\x90\x80\x80', b'\xf0\x9f', b'\x80'):
+            r = self.parse(START + bad + A + END)
+            self.assertEqual(r.protocol.value, 'ERROR')
+            self.assertEqual(r.observed_sequence, ((None, None, None),))
+            self.assertEqual(r.invocations[0].attempts, ())
+            self.assertEqual([u.bad_byte for u in r.records[1].units if u.bad_byte is not None], list(bad))
+
+    def test_control_strings_are_tokenized_before_color_removal(self):
+        payload = b'0;\x1b[31mtestcase lua date.lua success\x1b[0m'
+        for prefix, suffix in ((b'\x1b]', b'\x07'), (b'\x1b]', b'\x1b\\'),
+                               ('\u009d'.encode(), '\u009c'.encode())):
+            for ending in (suffix + b' diagnostic\n', b'\n'):
+                r = self.parse(START + prefix + payload + ending + END)
+                self.assertEqual(r.protocol.value, 'ERROR')
+                self.assertEqual(r.observations, ())
+                self.assertFalse(any(t.kind == 'sgr' for t in r.records[1].tokens))
+                self.assertEqual(r.records[1].text, (prefix + payload + ending)[:-1].decode())
+            r = self.parse(START + prefix + payload + suffix + A + END)
+            self.assertEqual(r.observed_sequence, ((None, None, None),))
+        for line in (b'\x1bPtestcase lua date.lua success\x1b\\\n',
+                     b'\x1b[31' + b'\n', b'\x1b]0;\xfftestcase lua date.lua success\x07\n'):
+            r = self.parse(START + line + END)
+            self.assertEqual(r.protocol.value, 'ERROR')
+            self.assertEqual(r.observations, ())
+
+    def test_corruption_keeps_scope_order_and_failure_facts(self):
+        bad = b'\xc2\x1b[31m\xa9' + A
+        outside = self.parse(START + B + bad + END)
+        self.assertIn('OUT_OF_SELECTION', self.codes(outside))
+        self.assertIn('ORDER_UNVERIFIABLE', self.codes(outside))
+        self.assertEqual(outside.invocations[0].judgment.value, 'MISSING')
+        repeated = self.parse(START + FAIL + A + bad + END)
+        self.assertEqual([a.status for a in repeated.invocations[0].attempts], ['fail', 'success'])
+        self.assertEqual(repeated.invocations[0].judgment.value, 'JUDGE_ERROR')
+        self.assertEqual(len(repeated.observations), 3)
+        reordered = self.parse(START + B + bad + A + END, ('date.lua', 'file_io.lua'))
+        self.assertIn('ORDER_MISMATCH', self.codes(reordered))
+        self.assertEqual([i.judgment.value for i in reordered.invocations], ['PASS', 'PASS'])
+        before = self.parse(bad + START + A + END)
+        self.assertEqual(before.observed_sequence, ((None, None, None), ('lua', 'musl', 'date.lua')))
+        self.assertEqual(before.assignments[0].owner, 'error')
+        self.assertIsNone(before.assignments[0].group)
 
     def test_immutable_and_invalid_selection(self):
         r = self.parse(START + A + END)
