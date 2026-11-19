@@ -1,51 +1,56 @@
-# 选一个 3–6 小时的第一步
+# 从当前主线选下一步
 
-在 Issue 认领、约 reviewer，再按 [六步 SOP](collaboration.md) 先审 SPEC、写失败测试、实现。负责人、阻塞和完成状态以 Issue 为准；本页只提供任务入口。
+核对日期：2026-11-19。在 Issue 认领、约 reviewer，再按 [六步 SOP](collaboration.md) 先审 SPEC、写失败测试、实现。负责人、阻塞和实时进度以 Issue 为准；本页只保留下一步入口。
 
-## 现在可认领的三个小任务
+## 当前优先推进
 
-PR #32 的架构约定已经合入，先把以下边界落实到实现与测试。
-
-| 子任务 | 第一份交付 | 对应主任务 |
+| 任务 | 已到哪里 | 下一份交付 |
 | --- | --- | --- |
-| [#33 抽离 QEMU 板级配置与启动内存](https://github.com/MindScrath/Focos/issues/33) | 列迁移清单、审 SPEC；保持现有布局和错误行为，回归 BOOT-001/MM-002 | #4 内存，与 #2 对齐板级入口 |
-| [#34 抽取共享块设备契约测试](https://github.com/MindScrath/Focos/issues/34) | 提取写后读与越界测试；先接 MemoryDisk，再保留真实驱动适配入口 | #3 设备，复用已完成的 #1 |
-| [#35 实现可嵌套本核临界区](https://github.com/MindScrath/Focos/issues/35) | 先写 QEMU RISC-V 开/关中断与嵌套状态测试，再实现接口 | #5 进程，与 #2 联调时钟 |
+| [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | 页分配、真实页接入及板级迁移已合入；MM-003 规格已合入 | 审阅 [#43 内核分页实现](https://github.com/MindScrath/Focos/pull/43) 的当前证据；该 PR 尚未合并，用户映射与 mmap 另拆专项 |
+| [#8 测试接入](https://github.com/MindScrath/Focos/issues/8) | 第三轮规格 #49、首批 A0 审计 #50–#53 已合入；完整 A0 未完成 | 继续核对解释器/applet 的实际提供方式、真实输出语法及前置/清理条件，再按 A1–A3 交付解析与外部日志分析 |
+| [#35 本核临界区](https://github.com/MindScrath/Focos/issues/35) | #42 已合入状态恢复、自检与屏障约定；真实中断验收未完成 | 与 #2/#5 先审 QEMU 异常/定时中断 SPEC，再证明待处理中断在临界区退出后按原状态触发 |
 
-#33/#34 是重构，#35 是新增能力。前两项可用现有基线独立推进；#35 状态测试可先做，关闭任务前还须完成真实定时中断验收。三个任务都不代表整个父任务完成。
+这三项可以并行；#4/#35 若修改同一启动或异常入口，先约定接口和合入顺序。#8 的 host 审计与解析可独立推进，FocOS 运行验收等待相关内核能力。
 
-已完成的基础：[#1 块设备接口与内存盘](https://github.com/MindScrath/Focos/issues/1) 已关闭；MM-001 页分配与 [PR #31 的 QEMU 真实内存接入](https://github.com/MindScrath/Focos/pull/31) 已合入。继续复用，不重新认领已有实现；真板内存和用户映射仍在 #4 推进。
+## 已完成，继续复用
+
+- [#1 块接口与内存盘](https://github.com/MindScrath/Focos/issues/1)：PR #26；MM-001 页分配、MM-002 QEMU 真实页接入见 PR #28/#31。
+- [#33 QEMU 板级迁移](https://github.com/MindScrath/Focos/issues/33)：PR #39 已合入并关闭任务，后续内存工作回到 #4。
+- [#34 共享块设备检查](https://github.com/MindScrath/Focos/issues/34)：PR #41 已合入并关闭任务，复用 [TEST-002](../specs/TEST-002.md) 的独立镜像模型；真实 VirtIO/SD 接入回到 #3。
+
+这些完成项不代表真板内存、真实驱动或断电持久化已经验收。
 
 ## 基础模块继续往哪里走
 
 | 主任务 | 下一步入口 |
 | --- | --- |
-| [#2 真板启动、UART 与时钟](https://github.com/MindScrath/Focos/issues/2) | 固定平台运行配置并独立冷启动；按板级/驱动边界接自有设备 |
-| [#3 SD 与 QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 先读 QEMU 已知扇区；SD 资源调查可并行，共用 #34 的测试逻辑 |
-| [#4 内存与用户映射](https://github.com/MindScrath/Focos/issues/4) | #33 板级迁移；随后按专项 SPEC 推进页表、隔离与 mmap |
-| [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) | #35 临界区及上下文/异常事件 SPEC，再接两任务与用户 ELF |
-| [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) | 内存盘 BPB/簇链测试；真实驱动接入前可先推进格式行为 |
-| [#7 VFS 与文件接口](https://github.com/MindScrath/Focos/issues/7) | 路径、FD 生命周期与共享偏移，不依赖具体板型或控制器 |
+| [#2 VisionFive2 启动、UART 与时钟](https://github.com/MindScrath/Focos/issues/2) | PR #16 仅保留历史上板证据，未合入；先审主线真板启动接入 SPEC，再独立冷启动复现 |
+| [#3 SD 与 QEMU 块设备](https://github.com/MindScrath/Focos/issues/3) | 共享检查已就绪；先审 QEMU VirtIO 驱动 SPEC，再读已知扇区；SD 资源调查可并行 |
+| [#5 进程、ELF 与管道](https://github.com/MindScrath/Focos/issues/5) | 先接 #35 的异常/时钟联调，再拆上下文切换与用户 ELF 专项 |
+| [#6 FAT32](https://github.com/MindScrath/Focos/issues/6) | 内存盘 BPB/簇链正常与损坏测试；真实驱动接入前可先推进格式行为 |
+| [#7 VFS 与文件接口](https://github.com/MindScrath/Focos/issues/7) | 路径、FD 生命周期与共享偏移 SPEC，与 #5/#6/#22 共审 |
 
 平台任务先读 [架构与接口交接](architecture.md)：#2/#3 对齐 PLAT-001、DRV-001，#4/#5 对齐 ARCH-001。跨层接口由调用方与实现方共同审阅，认领时说明向谁要资源、向谁交接口。
 
 ## 区域赛兼容工作
 
-| 任务 | 第一份交付 |
+| 任务 | 下一步入口 |
 | --- | --- |
-| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 先审 [TEST-001 第三轮规格](../specs/TEST-001.md)，按 A0–A3 再 B→D 分期交付；当前进度见 Issue |
-| [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 镜像特性调查与 host 只读测试 |
-| [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 动态 ELF 的解释器/库依赖；架构 ABI 与公共运行时分工 |
-| [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时测试 |
-| [#25 vim/gcc/make](https://github.com/MindScrath/Focos/issues/25) | 工具版本、依赖与终端需求 |
+| [#8 完整测例接入](https://github.com/MindScrath/Focos/issues/8) | 按 [TEST-001](../specs/TEST-001.md) 推进 A0→A1→A2→A3，再接 B 构建、C 采集、D 批次；[#47 解析/CLI 门槛](https://github.com/MindScrath/Focos/issues/47)、[#48 BusyBox 清单差异](https://github.com/MindScrath/Focos/issues/48) 随对应阶段闭合 |
+| [#22 Ext4](https://github.com/MindScrath/Focos/issues/22) | 冻结实际镜像特性，先审支持范围 SPEC，再做 host 只读测试 |
+| [#23 动态加载、线程、信号](https://github.com/MindScrath/Focos/issues/23) | 选一个动态 ELF，明确解释器、入口栈与库依赖；与 #4/#5/#7 共审 |
+| [#24 TCP/UDP loopback](https://github.com/MindScrath/Focos/issues/24) | 一对客户端/服务端收发及超时 SPEC，运行验收依赖进程与 ABI |
+| [#25 vim/gcc/make](https://github.com/MindScrath/Focos/issues/25) | 冻结工具版本、依赖与终端需求，再拆编辑、编译与增量构建验收 |
 
-基础运行依赖 #2/#4/#5；文件依赖已完成的 #1 与 #3/#6/#7。Ext4 和运行时调查可提前开始，运行验收要等相关能力接通。#8 的失败结果分派给能力 owner，不由测试负责人包办所有内核实现。
+区域赛已纳入原 11 组与比赛冻结版本 LTP；调用集合与分母仍待冻结，不沿用旧 427 项或 22 槽作为全量范围。#50–#53 是输入审计，不代表可执行测试配置、参考校准或 FocOS 通过成绩。
+
+基础运行依赖 #2/#4/#5；文件依赖 #3/#6/#7。镜像、运行时与格式调查可提前开始，运行验收等接口接通。#8 的失败结果按能力分派，不由测试负责人包办全部内核实现。
 
 ## 实验与全国赛
 
-- [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9)：公共缓存策略、统一预算与统计位置明确后，比较 B0/B1。
-- [#10 提交与教学材料](https://github.com/MindScrath/Focos/issues/10)：独立复现、许可与赛方提交项。
+- [#9 缓存实验](https://github.com/MindScrath/Focos/issues/9)：先审 B0/B1 实验 SPEC，冻结预算与统计位置；正式测量等待 #3/#6/#7。
+- [#10 提交与教学材料](https://github.com/MindScrath/Focos/issues/10)：持续独立复现、归档证据并核对许可和赛方提交项。
 - [#11 LoongArch 与星云板](https://github.com/MindScrath/Focos/issues/11)：资料可先调查；实现先验 QEMU 架构，再验真板资源与设备。
 - [#12 全国赛扩展](https://github.com/MindScrath/Focos/issues/12)：双平台、当届新增兼容测试、2026 参考负载和真实磁盘检索。
 
-交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。
+交付边界见 [REGION-001](../specs/REGION-001.md)，检查点见 [路线](roadmap.md)。任务完成、被替代或下一步改变时，由 owner 同步本页入口。
