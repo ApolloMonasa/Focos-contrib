@@ -165,6 +165,51 @@ class LuaParserTests(unittest.TestCase):
         self.assertEqual(r.records[1].text, '中文诊断')
         self.assertEqual(r.assignments[1].owner, 'information')
 
+    def test_reordered_single_calls_keep_result_and_ownership(self):
+        for first, second, expected in ((B, A, ['PASS', 'PASS']),
+                                         (B, FAIL, ['FAIL', 'PASS']),
+                                         (B.replace(b'success', b'fail'), A, ['PASS', 'FAIL'])):
+            with self.subTest(expected=expected):
+                r = self.parse(START + first + second + END, ('date.lua', 'file_io.lua'))
+                self.assertEqual(r.protocol.value, 'ERROR')
+                self.assertIn('ORDER_MISMATCH', self.codes(r))
+                self.assertEqual([i.judgment.value for i in r.invocations], expected)
+                self.assertEqual([a.owner for a in r.assignments[1:3]], ['invocation', 'invocation'])
+                self.assertEqual([a.rule for a in r.assignments[1:3]], ['lua_result', 'lua_result'])
+                self.assertEqual([a.invocation for a in r.assignments[1:3]], ['file_io.lua', 'date.lua'])
+                self.assertTrue(all(o.diagnostics for o in r.observations))
+
+    def test_unicode_controls_and_formats_cannot_hide_records(self):
+        controls = list(range(0x80, 0xa0)) + [0xad, 0x200b, 0x200e, 0x202e, 0x2066, 0x2069, 0xfeff, 0x13439, 0x1343f, 0xe0001, 0xe007f]
+        for point in controls:
+            control = chr(point).encode('utf-8')
+            for line in (control + A, A[:-1] + control + b'\n', b'diagnostic ' + control + b'\n'):
+                with self.subTest(point=hex(point), line=line):
+                    r = self.parse(START + A + line + END)
+                    self.assertEqual(r.protocol.value, 'ERROR')
+                    self.assertIn('INVALID_STRUCTURE', self.codes(r))
+                    self.assertEqual(r.assignments[2].owner, 'error')
+                    self.assertEqual(r.records[2].raw, line)
+
+    def test_order_incomplete_requires_exact_prefix(self):
+        c = b'testcase lua max_min.lua success\n'
+        names = ('date.lua', 'file_io.lua', 'max_min.lua')
+        for body, missing in ((B, ['date.lua', 'max_min.lua']),
+                              (A + c, ['file_io.lua']), (c, ['date.lua', 'file_io.lua'])):
+            with self.subTest(body=body):
+                r = self.parse(START + body + END, names)
+                self.assertEqual(r.protocol.value, 'ERROR')
+                self.assertIn('ORDER_MISMATCH', self.codes(r))
+                self.assertNotIn('ORDER_INCOMPLETE', self.codes(r))
+                self.assertEqual([i.name for i in r.invocations if i.judgment.value == 'MISSING'], missing)
+        for body, next_name in ((b'', 'date.lua'), (A, 'file_io.lua'), (A + B, 'max_min.lua')):
+            with self.subTest(body=body):
+                r = self.parse(START + body + END, names)
+                self.assertEqual(r.protocol.value, 'INCOMPLETE')
+                diagnostics = [d for d in r.diagnostics if d.code.value == 'ORDER_INCOMPLETE']
+                self.assertEqual(len(diagnostics), 1)
+                self.assertEqual(diagnostics[0].expected, ('lua', 'musl', next_name))
+
     def test_immutable_and_invalid_selection(self):
         r = self.parse(START + A + END)
         with self.assertRaises(FrozenInstanceError):

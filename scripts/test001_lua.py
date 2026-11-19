@@ -84,6 +84,11 @@ class Observation:
     in_selection: bool
     diagnostics: tuple
 
+    @property
+    def invocation_diagnostics(self):
+        # 顺序属于组协议；不能据此抹掉已唯一归属的单次调用结果。
+        return tuple(code for code in self.diagnostics if code != Code.ORDER_MISMATCH)
+
 
 @dataclass(frozen=True)
 class InvocationResult:
@@ -107,6 +112,22 @@ class AnalysisResult:
     protocol: Protocol
     acceptance: str = 'BLOCKED'
     trust: str = 'external_log/unknown'
+
+
+# 固定 Unicode 16.0 Cf 范围（170 个字符），避免 Python 3.11/3.14 的
+# Unicode 14/16 分类差异改变协议；Cc 使用固定的 C0/C1 范围，HT 例外。
+FORMAT_CONTROL_RANGES = (
+    (0xAD, 0xAD), (0x600, 0x605), (0x61C, 0x61C), (0x6DD, 0x6DD),
+    (0x70F, 0x70F), (0x890, 0x891), (0x8E2, 0x8E2), (0x180E, 0x180E),
+    (0x200B, 0x200F), (0x202A, 0x202E), (0x2060, 0x2064), (0x2066, 0x206F),
+    (0xFEFF, 0xFEFF), (0xFFF9, 0xFFFB), (0x110BD, 0x110BD), (0x110CD, 0x110CD),
+    (0x13430, 0x1343F), (0x1BCA0, 0x1BCA3), (0x1D173, 0x1D17A),
+    (0xE0001, 0xE0001), (0xE0020, 0xE007F),
+)
+UNSUPPORTED_CONTROLS = frozenset(
+    chr(point) for begin, end in ((0, 8), (10, 31), (127, 159)) + FORMAT_CONTROL_RANGES
+    for point in range(begin, end + 1)
+)
 
 
 SGR = (b'\x1b[0m', b'\x1b[31m', b'\x1b[32m', b'\x1b[33m', b'\x1b[39m')
@@ -139,7 +160,9 @@ def _recognition(body, start):
             text += char
             mapping.extend([position] * len(char))
         return text, tuple(mapping), True
-    invalid |= any(char.isspace() and char not in ' \t' for char in text)
+    invalid |= any((char.isspace() and char not in ' \t') or
+                   char in UNSUPPORTED_CONTROLS
+                   for char in text)
     mapping, byte_index = [], 0
     for char in text:
         mapping.append(positions[byte_index])
@@ -265,15 +288,16 @@ def analyze_lua(raw, libc, selection=None):
             item = observe(record, identity, codes)
             assignment_group, assignment_libc, invocation = identity
             attempt = item.attempt
-            owner = 'error' if item.diagnostics else 'invocation'
-            rule = 'lua_result' if not item.diagnostics else item.diagnostics[0].value
+            invocation_errors = item.invocation_diagnostics
+            owner = 'error' if invocation_errors else 'invocation'
+            rule = invocation_errors[0].value if invocation_errors else 'lua_result'
         assignments.append(Assignment(record.record_id, owner, rule, assignment_group,
                                       assignment_libc, invocation, attempt))
     if not started:
         error(Code.MISSING_GROUP)
     if active:
         error(Code.TRUNCATED)
-    if len(observed) < len(expected):
+    if len(observed) < len(expected) and tuple(observed) == expected[:len(observed)]:
         error(Code.ORDER_INCOMPLETE, want=expected[len(observed)])
     incomplete = {Code.MISSING_GROUP, Code.TRUNCATED, Code.ORDER_INCOMPLETE}
     protocol = (Protocol.ERROR if any(d.code not in incomplete for d in diagnostics) else
@@ -283,7 +307,7 @@ def analyze_lua(raw, libc, selection=None):
         items = tuple(attempts[name])
         if not items:
             judgment = Judgment.MISSING if started else Judgment.NOT_RUN
-        elif len(items) > 1 or any(item.diagnostics for item in items):
+        elif len(items) > 1 or any(item.invocation_diagnostics for item in items):
             judgment = Judgment.JUDGE_ERROR
         else:
             judgment = Judgment.PASS if items[0].status == 'success' else Judgment.FAIL
@@ -311,8 +335,9 @@ def _validate_links(result):
         if record.kind == 'result' and (record.group, record.name, record.status) != (
                 observation.group, observation.name, observation.status):
             raise RuntimeError('observation fields invariant failed')
-        if observation.diagnostics and assignments[record.record_id].owner != 'error':
-            raise RuntimeError('error ownership invariant failed')
+        owner = 'error' if observation.invocation_diagnostics else 'invocation'
+        if assignments[record.record_id].owner != owner:
+            raise RuntimeError('observation ownership invariant failed')
     by_id = {o.record_id: o for o in result.observations}
     for invocation in result.invocations:
         for attempt in invocation.attempts:

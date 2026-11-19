@@ -6,7 +6,7 @@
 
 `analyze_lua(raw, libc, selection=None)` 接收不可变 bytes、musl/glibc，以及九个已审 Lua 参数的非空子集；默认全组。selection 不决定顺序，顺序始终从原脚本九项投影。未知/重复参数和非法 libc 属于 ValueError；不接受自定义 PROFILE。此局部计划是解析测试接口，不宣称运行配置已经冻结。
 
-每条 LF 记录保留原始字节、半开区间、1 起行号和识别字符到原始字节的映射。CRLF 仅去识别副本的尾 CR。允许 SGR 仅为 ESC[0m、ESC[31m、ESC[32m、ESC[33m、ESC[39m；不接受其他转义。结构允许 ASCII SP/HT 首尾及字段间隔，完整单行匹配；NBSP、VT、FF、裸 CR、非法 UTF-8 不得产生结果。无末尾 LF 的结构记损坏，不能构成成功结束。本子集对非法 UTF-8、未支持控制符或非 ASCII 空白的整条记录报错，即使它是诊断；普通可打印 Unicode 诊断仍可保留为信息。
+每条 LF 记录保留原始字节、半开区间、1 起行号和识别字符到原始字节的映射。CRLF 仅去识别副本的尾 CR。允许 SGR 仅为 ESC[0m、ESC[31m、ESC[32m、ESC[33m、ESC[39m；不接受其他转义。结构允许 ASCII SP/HT 首尾及字段间隔，完整单行匹配；NBSP、VT、FF、裸 CR、非法 UTF-8 不得产生结果。无末尾 LF 的结构记损坏，不能构成成功结束。本子集对非法 UTF-8、未支持控制符（固定 Unicode 16.0 的 Cc/Cf 范围，除已允许的 ASCII HT）或非 ASCII 空白的整条记录报错，即使它是诊断；普通可打印 Unicode 诊断仍可保留为信息。Cf 范围固定在源码，依据本机 Python 3.14 的 Unicode 16.0 数据核对为 170 个字符；不调用运行时分类，避免 Python 3.11 的 Unicode 14 将新格式控制符当成未分配字符而漏检。
 
 合法结构为组 START/END 和 `testcase GROUP NAME success|fail`；仅 lua 结果可被本接口消费。保留前缀为去掉 ASCII SP/HT 后的 `####`、`testcase`、RUN/FAIL LTP CASE、Summary、passed/failed/broken/skipped/warnings/Total Tests，以及 TPASS/TFAIL/TBROK/TCONF/TWARN。损坏或未支持结构记错误，不降为信息。TINFO/TDEBUG 等普通消息不递归扫描其中的标记；未知诊断保留 opaque 信息，不承诺识别任意自然语言伪造。
 
@@ -14,7 +14,7 @@
 
 组从 idle 经唯一匹配 START 进入 active，再由匹配 END 闭合。错组/错 libc、嵌套、重复或错配标记不改变有效活动组；EOF 活动组记 TRUNCATED。组前/组后结果记归属错误，不能借用请求中的 libc 绑定为有效调用。
 
-结果行是 Lua 的单行调用观察。保留全部观察及尝试，按原位置比较预期顺序，未知/范围外/重复/组外结果不从观察序列过滤。仅组内、当前 libc 的已知参数可归属调用；范围外项仍保留真实身份和结果，但不扩大 selection。结果缺项：合法组已开始为 MISSING，否则 NOT_RUN。重复尝试为 JUDGE_ERROR，保留先前 fail；合法单次 success/fail 分别为 PASS/FAIL，仅表达包装器协议。顺序、边界和词法错误独立保留在 protocol 中，不以单条 PASS 清除。
+结果行是 Lua 的单行调用观察。保留全部观察及尝试，按原位置比较预期顺序，未知/范围外/重复/组外结果不从观察序列过滤。仅组内、当前 libc 的已知参数可归属调用；范围外项仍保留真实身份和结果，但不扩大 selection。结果缺项：合法组已开始为 MISSING，否则 NOT_RUN。重复尝试为 JUDGE_ERROR，保留先前 fail；合法单次 success/fail 分别为 PASS/FAIL，仅表达包装器协议。顺序、边界和词法错误独立保留在 protocol 中，不以单条 PASS 清除。只有 ORDER_MISMATCH 的合法单次结果仍归 invocation，保持 PASS/FAIL；观察上的顺序诊断同时保留，不冒充调用归属错误。ORDER_INCOMPLETE 仅在观察序列是预期序列的严格前缀时生成；较短但错位的序列保留 ORDER_MISMATCH，实际缺项由调用的 MISSING 表达。
 
 返回冻结 dataclass 与 tuple：Record、Assignment、Observation、InvocationResult、AnalysisResult。每条记录恰有一个 assignment；错误记录归 error，合法信息归当前组或日志范围。证据只引用同一批 record_id，没有第二次正文扫描。protocol 为 COMPLETE/INCOMPLETE/ERROR；错误优先于不完整，零组或缺顺序尾部也不完整。acceptance 永远 BLOCKED、trust=external_log/unknown，不提供 accepted_pass。没有 JSON/Markdown 渲染或 CLI；这些留到 A2。
 
@@ -24,7 +24,7 @@
 
 本批变异检查覆盖非法结构降信息、丢弃首次失败和忽略顺序；完整契约中的 LTP 孤立汇总、对照 judge 授权、包快照等变异随对应阶段实现，不声称已完成完整 A1。
 
-本批实际变异结果（各运行同一组 15 个测试，不改期望）：
+首次提交的变异结果（各运行当时的 15 个测试，不改期望；后续回归结果见 PR 回复）：
 
 | 删除/替换的不变量 | 触发断言失败数 |
 | --- | ---: |
