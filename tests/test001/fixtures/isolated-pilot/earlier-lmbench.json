@@ -1,0 +1,118 @@
+[
+  {
+    "id": "musl-lmbench-default",
+    "plan": {
+      "id": "musl-lmbench-default",
+      "libc_directory": "musl",
+      "command": "exec ./lmbench_all lat_syscall -N 1 -P 1 null",
+      "kind": "image-program-experiment",
+      "policy": "observation",
+      "result_name": "",
+      "argv": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "target/isolated-pilot-final/firmware",
+        "-kernel",
+        "target/isolated-pilot-final/kernel",
+        "-initrd",
+        "target/isolated-pilot-final/musl-lmbench-default/initramfs.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+      "firmware_sha256": "49bdf7b939bda11321132d1042bf99d7324fb190f1feef423171fed3573f8705",
+      "initramfs_sha256": "ecb8e13586463cf4b803e03b50ca7119dcf8e02c5ce391923c7dfb0574f1a1c7",
+      "pilot_sha256": "4c5e2d1df25c99bf5d072d8f175707f233017ad90f6799b54bf87e854fe7b439",
+      "init_sha256": "1b76a402f40334ef0163c07802c301f45258fb2c030a55d52e44cb5c547fcd92"
+    },
+    "report": {
+      "id": "musl-lmbench-default",
+      "host": {
+        "status": "TIMEOUT",
+        "exit": -9,
+        "reaped": true,
+        "limit_seconds": 25
+      },
+      "result": {
+        "judgment": "BLOCKED",
+        "acceptance": "BLOCKED",
+        "reason": "host-timeout",
+        "policy": "observation"
+      },
+      "serial_sha256": "1e61d3992a2110e7124edb6e8fbde837274aedb7f8f979408d557c1aaf35925e",
+      "plan_sha256": "a9b8acefa8f90dbb754c316a27c58315118c3bf4496392d2cc33c09f544312a5"
+    },
+    "serial_fragment_hex": "50494c4f5420424547494e0d0a50494c4f54204348494c44203431390d0a",
+    "fragment_offset": 14100,
+    "qemu_stderr_hex": "",
+    "kind": "earlier-observation-runner-revision-not-current-recipe"
+  },
+  {
+    "id": "glibc-lmbench-default",
+    "plan": {
+      "id": "glibc-lmbench-default",
+      "libc_directory": "glibc",
+      "command": "exec ./lmbench_all lat_syscall -N 1 -P 1 null",
+      "kind": "image-program-experiment",
+      "policy": "observation",
+      "result_name": "",
+      "argv": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "target/isolated-pilot-final/firmware",
+        "-kernel",
+        "target/isolated-pilot-final/kernel",
+        "-initrd",
+        "target/isolated-pilot-final/glibc-lmbench-default/initramfs.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+      "firmware_sha256": "49bdf7b939bda11321132d1042bf99d7324fb190f1feef423171fed3573f8705",
+      "initramfs_sha256": "c95445e0b2756d1018c3d774525aab2acadaef8371806e369e9e3ccdc07b502d",
+      "pilot_sha256": "4c5e2d1df25c99bf5d072d8f175707f233017ad90f6799b54bf87e854fe7b439",
+      "init_sha256": "1b76a402f40334ef0163c07802c301f45258fb2c030a55d52e44cb5c547fcd92"
+    },
+    "report": {
+      "id": "glibc-lmbench-default",
+      "host": {
+        "status": "TIMEOUT",
+        "exit": -9,
+        "reaped": true,
+        "limit_seconds": 25
+      },
+      "result": {
+        "judgment": "BLOCKED",
+        "acceptance": "BLOCKED",
+        "reason": "host-timeout",
+        "policy": "observation"
+      },
+      "serial_sha256": "11c4ad41ea0a9fe0be64a4c1caf3e3c1d55b118fbe397151430c5617806441c6",
+      "plan_sha256": "b77bd70179750a551a26f1cb882d33e66bf814a51a3f6d00afbb37bf1cd1042d"
+    },
+    "serial_fragment_hex": "50494c4f5420424547494e0d0a50494c4f54204348494c44203431390d0a",
+    "fragment_offset": 14100,
+    "qemu_stderr_hex": "",
+    "kind": "earlier-observation-runner-revision-not-current-recipe"
+  }
+]

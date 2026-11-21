@@ -1,10 +1,12 @@
 # TEST-001：可追溯的测试采集与判分
 
-关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 状态：第三轮规格草案，待非作者审阅
+关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 状态：输出复查后的重设计草案，待非作者审阅
 
 ## 要做到什么
 
-接入 2025 初赛原 11 组与比赛冻结版本 LTP，分别报告参考 Linux 校准和 FocOS 验收。一次采集允许用新判据另存重判报告。本轮替代 #29/#46 的实现路线，只交付规格；没有新 runner 或兼容成绩。
+接入 2025 初赛原 11 组与比赛冻结版本 LTP，分别报告参考 Linux 校准和 FocOS 验收。一次采集允许用新判据另存重判报告。本轮交付重审后的规格、输出依据和受限本地实验；没有正式 runner 或兼容成绩。
+
+整体流程、隔离边界及新的交付顺序见[执行重设计](../docs/reference/test001-execution-redesign.md)。先完成 Lua/libc-test 的小范围完整链路，再逐组扩展；本地实验不代替正式 B/C 验收。
 
 ## 行为约定
 

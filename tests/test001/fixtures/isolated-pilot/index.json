@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-22",
+  "kind": "isolated-design-pilot-not-production-acceptance",
+  "runs": 30,
+  "files": {
+    "pilot.py": "e3ad92bf59ff0e071b0bfe35b1b6f5e5157c83e575199a73f53170bfd928d6e5",
+    "init.sh": "1b76a402f40334ef0163c07802c301f45258fb2c030a55d52e44cb5c547fcd92",
+    "samples.json": "bd1e5db3bee96e53e733b78ebe9e400a49caa414dba99b179bfb8f033cd16f27",
+    "earlier-lmbench.json": "a2123b65c0e94f016e869a32ebfae0d0f6348e7d3937f8798375a0112b6c5f43"
+  }
+}
