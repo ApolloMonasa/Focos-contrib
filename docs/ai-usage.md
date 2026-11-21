@@ -94,3 +94,5 @@
 2026-11-19，负责人确认 #57 评审通过后，Codex 按词法重设计重做 #56：原始 UTF-8 Unit、外层优先 Token、完整性校验后才省略顶层 SGR，损坏前缀直接使用 Token。先用新矩阵复现旧实现失败，再修复；make check 通过 52 项 Rust、83 项 Python 和 BOOT-001，Python 3.11 通过 68 项 TEST-001 测试，两版本 284 份完整结果一致，11 种变异均触发断言失败。按 AGENTS.md 自审接口、错误传播、唯一归属与资源边界；未新增运行包/内核验收，非作者人工批准仍需在 GitHub 完成。
 
 2026-11-21，Codex 处理 PR #56 的 HT 保留标记评审：同步远端 48c9576 后，先补 RUN/FAIL LTP CASE、Total Tests 的空格/制表符、SGR、缺 LF、消息引用和非法空白反例，确认旧实现失败；再使保留前缀按既有 ASCII SP/HT 契约匹配，不改词法流水线或原字节。按仓库标准自审接口、错误传播和单一解析路径，make check 通过 87 Rust/101 Python/BOOT-001，Python 3.11 相关 69 项通过，两版本 353 份完整结果一致；未修改内核、未新增运行验收，仍需非作者人工批准。
+
+2026-11-21，Codex 按 hellorester 对 PR #56 的评审核对比赛固定 LTP 源码，补齐无冒号汇总计数行的拒绝规则。先补测试复现 70 次断言失败，再实现 passed/failed/broken/skipped/warnings 的 ASCII 计数前缀，保留普通诊断和引用消息。按仓库标准自审后，make check 通过 87 Rust/102 Python/BOOT-001，Python 3.11 相关 70 项通过，两版本 433 份完整结果一致。仅补已有未支持结构识别，未实现 LTP 判分或修改内核；GitHub 回复先交负责人确认。

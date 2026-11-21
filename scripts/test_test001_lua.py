@@ -179,6 +179,34 @@ class LuaParserTests(unittest.TestCase):
                 self.assertEqual(r.records[2].kind, 'invalid')
                 self.assertEqual(r.protocol.value, 'ERROR')
 
+    def test_ltp_summary_without_colon_is_foreign(self):
+        for field in (b'passed', b'failed', b'broken', b'skipped', b'warnings'):
+            for separator in (b' ', b'  ', b'\t', b' \t '):
+                for count in (b'0', b'1', b'999'):
+                    line = field + separator + count + b'\n'
+                    with self.subTest(line=line):
+                        r = self.parse(START + A + line + END)
+                        self.assertEqual(r.records[2].kind, 'unsupported')
+                        self.assertEqual(r.records[2].raw, line)
+                        self.assertEqual(r.assignments[2].owner, 'error')
+                        self.assertIn('UNSUPPORTED_STRUCTURE', self.codes(r))
+                        self.assertEqual(r.protocol.value, 'ERROR')
+                        self.assertEqual(len(r.observations), 1)
+                        self.assertEqual(r.invocations[0].judgment.value, 'PASS')
+            for line in (b'\x1b[31m' + field + b'  1\x1b[0m\r\n', field + b': 1\n'):
+                with self.subTest(line=line):
+                    self.assertEqual(self.parse(START + A + line + END).records[2].kind, 'unsupported')
+            with self.subTest(field=field, ending='no LF'):
+                r = self.parse(START + A + END + field + b'  1')
+                self.assertEqual(r.records[-1].kind, 'invalid')
+                self.assertEqual(r.protocol.value, 'ERROR')
+        for line in (b'failed to open file\n', b'passed through wrapper\n',
+                     b'TINFO: failed  1\n', b'diagnostic: warnings 0\n', b'failedness 1\n'):
+            with self.subTest(message=line):
+                r = self.parse(START + A + line + END)
+                self.assertEqual(r.records[2].kind, 'information')
+                self.assertEqual(r.protocol.value, 'COMPLETE')
+
     def test_reserved_foreign_structures_block(self):
         for line in (b'failed: 999\n', b'Summary:\n', b'TPASS: fake\n',
                      b'testcase busybox true success\n', b'RUN LTP CASE access01\n'):

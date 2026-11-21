@@ -160,6 +160,10 @@ RESERVED_PREFIX = re.compile('|'.join(
     r'[ \t]+'.join(re.escape(field) for field in prefix.split(' '))
     for prefix in RESERVED
 ))
+# 比赛 LTP 的原生汇总省略冒号；仅登记字段后接 ASCII 空白与计数的前缀。
+LTP_SUMMARY_PREFIX = re.compile(
+    r'(?:passed|failed|broken|skipped|warnings)[ \t]+[0-9]+(?=[ \t]|$)'
+)
 
 
 def _units(body, start):
@@ -286,7 +290,8 @@ def _records(raw):
             kind = 'invalid'
         else:
             token = text.strip(' \t')
-            reserved = RESERVED_PREFIX.match(token) is not None
+            reserved = (RESERVED_PREFIX.match(token) is not None or
+                        LTP_SUMMARY_PREFIX.match(token) is not None)
             if lf < 0 and reserved:
                 kind = 'invalid'
             else:
