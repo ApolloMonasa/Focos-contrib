@@ -4,11 +4,11 @@
 
 ## 1. 准备环境
 
-需要 Linux、Git、rustup、make、sed、Python 3 和 QEMU RISC-V。开发机测试还需要本机 C 链接工具（`cc`）。Ubuntu / Debian 安装示例：
+需要 Linux、Git、rustup、make、sed、Python 3、binutils 的 `readelf` 和 QEMU RISC-V。开发机测试还需要本机 C 链接工具（`cc`）。Ubuntu / Debian 安装示例：
 
 ```sh
 sudo apt update
-sudo apt install -y git build-essential sed python3 qemu-system-misc binutils-riscv64-linux-gnu
+sudo apt install -y git build-essential binutils sed python3 qemu-system-misc binutils-riscv64-linux-gnu
 ```
 
 按 [rustup 官方说明](https://www.rust-lang.org/tools/install) 安装 Rust 管理器。仓库的 `rust-toolchain.toml` 固定工具链；首次运行会下载。Fedora 使用对应系统包；WSL2 可用于 QEMU 开发，板卡连接需另配。
@@ -35,6 +35,10 @@ make check
 [MM-002 真实内存接入](../specs/MM-002.md) 另跑 `make mm-smoke`，通过时显示 `PASS: MM-002`。已验证 QEMU 8.2.2 / OpenSBI 1.3.1，以及 Fedora 45 容器中的 QEMU 11.1.3 / OpenSBI 1.8.1；版本不作为精确门禁，机器仍须使用 `virt`、128 MiB、单核和默认固件。实际内存范围、版本、命令和退出结果保存在 `target/evidence/mm-qemu-rv.log`；带 `dirty` 的源码版本表示工作区还有未提交改动。
 
 [ARCH-001 本核临界区](reference/local-irq-critical-section.md) 的 QEMU 状态自检另跑 `make irq-smoke`，通过时显示 `PASS: ARCH-001`。它核对单层/两层闭包和初态开/关，日志在 `target/evidence/irq-qemu-rv.log`；真实定时中断屏蔽仍待 #2/#5 联调，不因本项通过而关闭 #35。
+
+[MM-003 内核分页](reference/sv39-paging.md) 另跑 `make vm-smoke`，通过时显示 `PASS: MM-003`。它实际启用分页并检查写读、保护异常、撤销、重映射与销毁；原始异常寄存器、根页表和资源数在 `target/evidence/vm-qemu-rv.log`。结果仅覆盖本次 QEMU 环境，不代表用户态隔离或真板分页。
+
+Sv39 开发机数值模型需要 64 位地址，相关 Rust 用例只在 64 位开发机运行；32 位开发机保留分配器、内存盘、异常匹配和资源交接等通用用例。完整 MM-003 验收仍须运行 64 位开发机测试与 `make vm-smoke`。
 
 | 遇到问题 | 先检查 |
 | --- | --- |
@@ -69,6 +73,7 @@ make build
 make check
 make mm-smoke
 make irq-smoke
+make vm-smoke
 ```
 
 完整 QEMU 命令以 [scripts/smoke.py](../scripts/smoke.py) 为准，日志也记录实际命令。布局、页读写、中断状态及成功标记通过只证明当前启动自检，不代表用户程序或文件系统已运行。
