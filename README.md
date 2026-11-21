@@ -119,6 +119,7 @@ Focos/
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── test_test001_lua_samples.py    # 真实 Lua 片段身份、成员集合与包装器观察
+│   ├── test_test001_output_samples.py # 固定 LTP 输出实验的字节与语义检查
 │   ├── test001_runtime_audit.py       # 解释器路径、基盘布局与初始写入目标
 │   ├── test_test001_runtime_audit.py   # 缺失/未知、来源、再生与错误传播
 │   ├── test001_elf_audit.py           # 四个锁定 ELF 的私有副本与 readelf 证据
@@ -134,6 +135,7 @@ Focos/
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── test001/                      # A0 审计输入（非可执行 PROFILE）
+│   │   ├── fixtures/output-audit/      # 输出实验配方、来源锁与原始流（非用例成绩）
 │   │   ├── fixtures/lua-a0/           # 参考 Linux Lua 语法样本，非运行包
 │   │   │   ├── init.sh               # 原组调用与组外退出语义探针
 │   │   │   ├── pack.py               # 本实验的确定性 newc 归档配方
@@ -170,6 +172,7 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
+│       ├── test001-output-audit.md    # 全组输出依据复查、纠正与实验边界
 │       ├── test001-redesign.md         # TEST-001 包、采集和批次契约
 │       ├── test001-a0-lua-samples.md  # 真实语法、包装器边界与复现实验
 │       ├── test001-a0-runtime.md      # 解释器缺口、PATH 与文件生命周期

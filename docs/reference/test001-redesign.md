@@ -60,9 +60,9 @@ test001 campaign --plan PLAN --out NEW_CAMPAIGN
 
 运行适配器只调度被冻结的调用，记录独立 start/end、调用 ID、退出码/信号、前置与清理结果；不得由日志出现顺序猜测身份。LTP 原生输出、汇总与退出码分别留存，原始字节和定位可回查。新增边界标记、环境准备或分片调度属于显式 instrumentation，须冻结补丁/实现与版本，保留比赛原脚本对照，不能声称未经修改的原版执行。
 
-结果适配器按比赛固定版本解析 TPASS/TFAIL/TBROK/TCONF/TWARN，[固定版本结果标志](https://github.com/oscomp/testsuits-for-oskernel/blob/8b58dd16d26d30f7c74d48d5832d870d3051b703/ltp-full-20240524/include/tst_res_flags.h)中的 TINFO/TDEBUG 仅为信息；原始事件与原生汇总分别保存，不把两者重复加总。保留原生计数和未知标志，按固定版本处理退出位组合，不把非零一律解释为断言失败。解析器崩溃/非法输出是 JUDGE_ERROR；测试程序 TBROK、信号终止、超时是被测调用结果，不能改成判分器错误。未知/无法归属输出、缺结束或无有效结果均阻断验收。
+结果适配器按比赛固定版本及每个调用实际使用的 C/shell API 解析 TPASS/TFAIL/TBROK/TCONF/TWARN，[固定版本结果标志](https://github.com/oscomp/testsuits-for-oskernel/blob/8b58dd16d26d30f7c74d48d5832d870d3051b703/ltp-full-20240524/include/tst_res_flags.h)中的 TINFO/TDEBUG 仅为信息；原始事件与原生汇总分别保存，不把两者重复加总。结果行位置前缀、颜色、汇总与退出逻辑还须核对实际生产者；头文件的枚举不等于输出语法，已核实差异见[输出复查](test001-output-audit.md)。保留原生计数和未知标志，按固定版本及 API 处理退出位组合，不把非零一律解释为断言失败。解析器崩溃/非法输出是 JUDGE_ERROR；测试程序 TBROK、信号终止、超时是被测调用结果，不能改成判分器错误。未知/无法归属输出、缺结束或无有效结果均阻断验收。
 
-每调用只有在结束完整、退出 0、至少一个有效 TPASS、无 TFAIL/TBROK/TCONF/TWARN、前置与清理均成功且满足冻结判据时才能 judgment=PASS；混合 TPASS 与跳过/警告仍不通过。TCONF/跳过、TBROK 和 TWARN 各自保留计数、原因及阻断项，不降级为通过。原生断言计数可动态变化，`selected_total` 只统计预先冻结的调用；`observed_pass` 按通过的调用计，动态断言另列，不能用运行后观察到的断言数或跳过数改覆盖分母。原有 origin/capture/protocol/input_integrity 等验收条件仍全部适用。
+以下是团队的验收要求，不是 LTP 原生退出码的定义（原生成功与跳过混合时可能退出 0）。每调用只有在结束完整、退出 0、至少一个有效 TPASS、无 TFAIL/TBROK/TCONF/TWARN、前置与清理均成功且满足冻结判据时才能 judgment=PASS；混合 TPASS 与跳过/警告仍不通过。TCONF/跳过、TBROK 和 TWARN 各自保留计数、原因及阻断项，不降级为通过。原生断言计数可动态变化，`selected_total` 只统计预先冻结的调用；`observed_pass` 按通过的调用计，动态断言另列，不能用运行后观察到的断言数或跳过数改覆盖分母。原有 origin/capture/protocol/input_integrity 等验收条件仍全部适用。
 
 配置为每调用/分片冻结权限、用户、挂载/设备/文件系统、网络、工作目录、环境、CPU/内存、时限、输出限额与清理策略。开始前真实检查依赖；失败后不执行该调用，保留失败事实及未运行项。分片内串行执行且无隐式重试，前一调用清理失败即停止该槽，后续调用记 NOT_RUN；下一槽必须全新 QEMU 与写时复制层。主机超时仍回收整个进程组。参考 Linux 校准不能代替 FocOS 能力，FocOS/VF2 采集适配器仍须另行审规格。
 
