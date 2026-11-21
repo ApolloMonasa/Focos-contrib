@@ -154,6 +154,31 @@ class LuaParserTests(unittest.TestCase):
         self.assertEqual(failed_outside.observations[0].status, 'fail')
         self.assertEqual(failed_outside.invocations[0].judgment.value, 'MISSING')
 
+    def test_reserved_markers_accept_ascii_field_whitespace(self):
+        for fields in ((b'RUN', b'LTP', b'CASE'), (b'FAIL', b'LTP', b'CASE'),
+                       (b'Total', b'Tests')):
+            for separator in (b' ', b'\t', b'  ', b' \t ', b'\t\t'):
+                marker = separator.join(fields) + b' access01'
+                for line in (marker + b'\n', b' \t\x1b[31m' + marker + b'\x1b[0m\t\n'):
+                    with self.subTest(fields=fields, separator=separator, line=line):
+                        r = self.parse(START + A + line + END)
+                        self.assertEqual(r.records[2].kind, 'unsupported')
+                        self.assertEqual(r.assignments[2].owner, 'error')
+                        self.assertIn('UNSUPPORTED_STRUCTURE', self.codes(r))
+                        self.assertEqual(r.protocol.value, 'ERROR')
+                        self.assertEqual(len(r.observations), 1)
+                        self.assertEqual(r.invocations[0].judgment.value, 'PASS')
+                partial = self.parse(START + A + END + marker)
+                self.assertEqual(partial.records[-1].kind, 'invalid')
+                self.assertIn('INVALID_STRUCTURE', self.codes(partial))
+                quoted = self.parse(START + A + b'TINFO: quotes ' + marker + b'\n' + END)
+                self.assertEqual(quoted.records[2].kind, 'information')
+                self.assertEqual(quoted.protocol.value, 'COMPLETE')
+            for separator in (b'\v', b'\f', '\u00a0'.encode()):
+                r = self.parse(START + A + separator.join(fields) + b' access01\n' + END)
+                self.assertEqual(r.records[2].kind, 'invalid')
+                self.assertEqual(r.protocol.value, 'ERROR')
+
     def test_reserved_foreign_structures_block(self):
         for line in (b'failed: 999\n', b'Summary:\n', b'TPASS: fake\n',
                      b'testcase busybox true success\n', b'RUN LTP CASE access01\n'):

@@ -155,6 +155,11 @@ RESULT = re.compile(r'testcase[ \t]+([a-z0-9_]+)[ \t]+([A-Za-z0-9_.+-]+)[ \t]+(s
 RESERVED = ('####', 'testcase', 'RUN LTP CASE', 'FAIL LTP CASE', 'Summary',
             'passed:', 'failed:', 'broken:', 'skipped:', 'warnings:', 'Total Tests',
             'TPASS', 'TFAIL', 'TBROK', 'TCONF', 'TWARN')
+# 保留前缀与合法结构共用 ASCII SP/HT 字段分隔；不改变记录文本或字节映射。
+RESERVED_PREFIX = re.compile('|'.join(
+    r'[ \t]+'.join(re.escape(field) for field in prefix.split(' '))
+    for prefix in RESERVED
+))
 
 
 def _units(body, start):
@@ -281,7 +286,7 @@ def _records(raw):
             kind = 'invalid'
         else:
             token = text.strip(' \t')
-            reserved = token.startswith(RESERVED)
+            reserved = RESERVED_PREFIX.match(token) is not None
             if lf < 0 and reserved:
                 kind = 'invalid'
             else:
