@@ -4,7 +4,7 @@
 
 ## 证据怎样分级
 
-- **比赛镜像真实执行**：已有双 libc Lua/QEMU 样本，可证明对应环境的原包装器输出；仍不是 FocOS 成绩。
+- **比赛镜像真实执行**：已有双 libc Lua/QEMU 样本；本轮扩展实验及其适配/失败边界见[全组复查](test001-benchmark-output-audit.md)。均不是 FocOS 成绩。
 - **固定源码 + 输出函数实验**：本轮核对比赛仓库 `8b58dd16d26d30f7c74d48d5832d870d3051b703` 的全部 12 个组包装脚本，以及 LTP 新旧 C/shell 输出库。运行了 18 个输出/退出实验；原生测试程序、内核行为、依赖闭合没有执行。
 - **设计规则或合成反例**：例如遇到跨组结构阻断、用 NBSP 破坏结果、重复失败后成功，是我们的判据/故障注入，不是比赛脚本必然生成的输出。
 
@@ -24,28 +24,13 @@
 | 将 Lua 的五种颜色序列视为全套输出支持 | [颜色定义](https://github.com/oscomp/testsuits-for-oskernel/blob/8b58dd16d26d30f7c74d48d5832d870d3051b703/ltp-full-20240524/include/tst_ansi_color.h)及实验包含 `ESC[1;32m`、`1;35m`、`1;34m`，而 Lua 只允许五种已登记序列 | 不扩大全局去色规则。当前 Lua 对额外颜色报错；实现 LTP 前必须单独冻结颜色开关、完整序列和样本 |
 | 源码组标记和镜像组标记混为一谈 | 固定源码包装脚本通常只有 `lua`/`ltp`；已锁镜像脚本和 Lua 实测使用 `lua-musl`/`ltp-musl` 等 | 当前接口以镜像语法为准；源码差异不得静默正常化，也不能从请求参数补造缺失 libc |
 
-## 全部组的输出依据与边界
+## 全部组的复查结果
 
-以下固定源码入口均位于同一提交的 [scripts](https://github.com/oscomp/testsuits-for-oskernel/tree/8b58dd16d26d30f7c74d48d5832d870d3051b703/scripts)。表中“源码”只表示读过实际输出语句，不表示运行过对应 benchmark 或完成镜像版本核对。
+后续按负责人要求扩展到全部 12 组的实际打印代码、镜像程序和参考 Linux 实验，见[全组 benchmark 复查](test001-benchmark-output-audit.md)。该页取代本页初轮仅检查包装脚本的覆盖表；除 LTP 格式外，还发现 libc-test 固定返回 1、UnixBench 标签与实际单位冲突、目录标签与 ELF ABI 不一致，以及包装器掩盖失败等问题。
 
-| 组 | 已核对的输出来源 | 可确认与尚不能确认的部分 |
-| --- | --- | --- |
-| Lua | `lua/lua_testcode.sh`、`lua/test.sh`；锁定镜像脚本、九份输入及真实样本 | 九条 success、缺文件 fail、包装器退出与 Lua 进程退出不同均有实测。success 不证明脚本内所有逻辑断言成立 |
-| BusyBox | `busybox/busybox_testcode.sh`、镜像原样脚本/命令表 | 源码打印 `testcase busybox 命令 success/fail`，false 是特殊例外；命令可能含空格且有重复。实际组输出/新调用身份仍未闭合，不能套用 Lua 的单 token NAME |
-| LTP | `ltp/ltp_testcode.sh`、镜像脚本、新旧 C/shell 输出库 | 本页列出已核对的形式和函数实验；没有完整比赛 LTP 用例运行或镜像 ELF 到源码 API 的逐项绑定，尚不能开放 LTP 判分 |
-| basic | `basic/basic_testcode.sh` 调用 `basic/run-all.sh` | 包装层只确认组边界，不能从包装器推断每个内核测试的 Pass! 含义；逐程序语法/真实样本待审 |
-| libc-test | `libctest/libctest_testcode.sh` 调用 run-static.sh/run-dynamic.sh | 组边界已核对；每个测试和运行器输出、缺项及退出映射未闭合，不从旧 judge 键复制格式 |
-| libc-bench | `libcbench/libcbench_testcode.sh` 执行 libc-bench | 包装层只有组边界；指标名称、单位、成功条件仍需逐项核对程序和实际样本 |
-| cyclictest | `cyclictest/cyclictest_testcode.sh` | begin/end 包含场景名与 success/fail；kill hackbench 失败明确写 `fail, ignore STRESS result`。具体指标/环境和清理实测未完成，不能只看 end success |
-| iperf | `iperf/iperf_testcode.sh` | begin/end 和客户端退出状态，不足以证明服务端启动及流量指标有效；逐场景真实样本待审 |
-| netperf | `netperf/netperf_testcode.sh` | begin/end 包装返回状态；服务端、指标表格和场景语法待实际运行核对 |
-| iozone | `iozone/iozone_testcode.sh` | 输出测量类别并执行多组参数；表格数值/单位来自程序，不能仅凭脚本标签宣称完整语法 |
-| lmbench | `lmbench/lmbench_testcode.sh` | latency/bandwidth 等类别和一个 lmdd label；具体匿名数字的上下文、单位仍待样本，不把旧解析器当定义 |
-| unixbench | `unixbench/unixbench_testcode.sh` | 管道提取 COUNT 并打印 `Unixbench 名称 test(单位): 数值`，lps/MFLOPS/KBps/lpm 由脚本区分；管道末端成功不证明原程序完成，原始 COUNT 和失败样本仍需核对 |
+固定源码 `scripts/test_all.sh` 的 LTP 调用被注释，不能作为本项目完整执行入口。24 份镜像组脚本与固定源码的差异已逐字节核对，只有 libc 组标记后缀；ELF 的逐项源码构建身份仍未建立。
 
-额外检查了源码 `scripts/test_all.sh`：LTP 调用在那里被注释，不能把它当作本项目包含 LTP 的完整执行入口；本项目后续采集需要显式冻结自己的调度清单。源码脚本和已锁镜像脚本不同，表中没有替未审计的其他组建立镜像身份等价关系。
-
-所有组都受“先有该组真实正例、固定来源与错误例，再实现语法”的门槛约束。未知格式不能临时用宽泛关键字扫描补成支持；指标/旧式汇总没有来源时撤回确定性描述，列为未支持。当前 Lua 的拒绝清单也不是任意其他组输出的全集，不承诺从所有普通文本推断来源。
+所有组仍须先有真实正例、固定来源与错误例，再实现语法。未知格式不能临时用宽泛关键字扫描补成支持；当前 Lua 的拒绝清单不是任意其他组输出的全集。
 
 ## 实验怎样复现
 

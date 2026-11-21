@@ -26,7 +26,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
 
-测试接入按 [TEST-001](specs/TEST-001.md) 的 A0–A3 门槛推进。目前 A0 已有 [BusyBox/Lua 调用审计](docs/reference/test001-a0-audit.md)、[LTP 目录审计](docs/reference/test001-a0-ltp.md)和 [ELF 链接证据](docs/reference/test001-a0-elf.md)；启动缺口见[脚本启动路径与共享数据](docs/reference/test001-a0-runtime.md)；本批补充 [Lua 真实语法样本](docs/reference/test001-a0-lua-samples.md)，供 A1 单组解析使用。完整 A0 和新 runner 尚未交付，参考 Linux 与外部日志不能计为 FocOS 成绩。
+测试接入按 [TEST-001](specs/TEST-001.md) 的 A0–A3 门槛推进。目前 A0 已有 [BusyBox/Lua 调用审计](docs/reference/test001-a0-audit.md)、[LTP 目录审计](docs/reference/test001-a0-ltp.md)和 [ELF 链接证据](docs/reference/test001-a0-elf.md)；启动缺口见[脚本启动路径与共享数据](docs/reference/test001-a0-runtime.md)；本批补充 [Lua 真实语法样本](docs/reference/test001-a0-lua-samples.md)，供 A1 单组解析使用。本轮扩展的 [12 组输出复查](docs/reference/test001-benchmark-output-audit.md)记录格式、单位、退出值和实际运行缺口。完整 A0 和新 runner 尚未交付，参考 Linux 与外部日志不能计为 FocOS 成绩。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -119,6 +119,7 @@ Focos/
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
 │   ├── test_test001_lua_samples.py    # 真实 Lua 片段身份、成员集合与包装器观察
+│   ├── test_test001_benchmark_samples.py # 12 组原始样本与已知反例核对
 │   ├── test_test001_output_samples.py # 固定 LTP 输出实验的字节与语义检查
 │   ├── test001_runtime_audit.py       # 解释器路径、基盘布局与初始写入目标
 │   ├── test_test001_runtime_audit.py   # 缺失/未知、来源、再生与错误传播
@@ -135,6 +136,7 @@ Focos/
 │   └── test_smoke.py                  # 检查器标记、退出状态与超时测试
 ├── tests/                             # 往届测例清单与来源
 │   ├── test001/                      # A0 审计输入（非可执行 PROFILE）
+│   │   ├── fixtures/benchmark-output/  # 12 组实验来源、原始片段与复现入口
 │   │   ├── fixtures/output-audit/      # 输出实验配方、来源锁与原始流（非用例成绩）
 │   │   ├── fixtures/lua-a0/           # 参考 Linux Lua 语法样本，非运行包
 │   │   │   ├── init.sh               # 原组调用与组外退出语义探针
@@ -172,6 +174,7 @@ Focos/
 │       ├── experiment-protocol.md     # 实验参数与数据记录要求
 │       ├── local-irq-critical-section.md # 临界区实现、屏障审阅与限制
 │       ├── sv39-paging.md             # 页表接口、启动映射与分页验收细节
+│       ├── test001-benchmark-output-audit.md # 12 组格式、单位、退出和未闭合范围
 │       ├── test001-output-audit.md    # 全组输出依据复查、纠正与实验边界
 │       ├── test001-redesign.md         # TEST-001 包、采集和批次契约
 │       ├── test001-a0-lua-samples.md  # 真实语法、包装器边界与复现实验

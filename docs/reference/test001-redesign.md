@@ -110,11 +110,15 @@ REPORT/ report.json  report.md  [source.log：仅外部日志分析]
 | judgment | `PASS / PARTIAL / FAIL / MISSING / JUDGE_ERROR / NOT_RUN` | 固定判据与规范化 |
 | acceptance | `PASS / BLOCKED`，附全部原因 | 分析器的单一纯函数 |
 
-`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、input_integrity 为 VERIFIED、协议 VALID、每个所选脚本退出 0、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、每个组/libc 的观察调用序列与冻结预期序列长度及逐项身份完全相等、没有判据错误、未知用例或 selection 外的已观察调用。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
+`acceptance=PASS` 当且仅当：来源为校验完整的运行包、capture 为 EXITED 且退出码为 0、input_integrity 为 VERIFIED、协议 VALID、每个所选组调度脚本按冻结协议正常完成（当前要求退出 0），且每个子调用满足该生产者经审定的退出与结果联合判据、范围内所有段 COMPLETE、范围内所有冻结项 judgment 为 PASS、每个组/libc 的观察调用序列与冻结预期序列长度及逐项身份完全相等、没有判据错误、未知用例或 selection 外的已观察调用。未知项单列且不改分母，但阻断验收，促使重新审查清单。运行包伪造不在本地主机信任模型内；把普通日志附上当前构件或相同 build ID 不改变其 origin。
 
 例如 `capture=EXITED(exit=7)`、`section=TRUNCATED` 与 `judgment=PASS` 可以同时存在，报告保留三项事实，验收为 BLOCKED，原因包含非零退出与截断；不挑一个状态覆盖其他信息。`observed_pass` 统计规范 judgment 为 PASS 的调用（旧 judge 对照计数另列），`accepted_pass` 只有本运行范围验收通过时才等于该范围的 `selected_total`，否则为 0；始终并列显示 origin 和 subject。性能指标保留单位与原值，不合成总分。
 
 外部历史日志仍检查组边界，并可诊断其中协议，但报告的 capture 为 NOT_RECORDED，subject/platform 均为 unknown。运行包分析的 subject/platform 从已校验的采集清单读取，首版仅允许 reference_linux/qemu_riscv64；未知或冲突值作为输入错误拒绝。完整运行包在另一次分析中保持 recorded_capture，表示可追溯的记录，不表示此次重新执行、硬件认证或 FocOS 成绩。
+
+子程序/运行器退出不等于 capture 退出：例如固定 libc-test 运行器无论 Pass! 或 FAIL 都可返回 1，不能套用主机的非零退出阻断规则。此例不放宽 LTP 的严格判据，也不允许运行器异常被成功文字覆盖。状态映射必须先审定；未审定时阻断验收，禁止为得到 PASS 临时加入允许退出值。
+
+PROFILE 的 libc 槽位还须绑定实际 ELF ABI、解释器和共享库；目录名不是证据。本轮发现的 musl/basic 实际 glibc 依赖、缺失加载器以及脚本权限问题见[全组复查](test001-benchmark-output-audit.md)。显式 shell 或解释器别名均计入适配条件，不可宣称原环境已闭合。
 
 ## 范围、汇总与退出码
 

@@ -1,0 +1,736 @@
+{
+  "kind": "reference-linux-output-audit-not-acceptance",
+  "date": "2026-11-21",
+  "image_sha256": "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8",
+  "kernel_sha256": "7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638",
+  "firmware_sha256": "49bdf7b939bda11321132d1042bf99d7324fb190f1feef423171fed3573f8705",
+  "qemu_version": "QEMU emulator version 10.2.2 (qemu-10.2.2-1.fc44)",
+  "runs": [
+    {
+      "id": "original-musl",
+      "experiment": "original",
+      "libc_directory": "musl",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "musl.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "c4957f398641ee49c82eebaebceafea4f056d8660cbef6bfd1b2cc5d1abb589d",
+      "fragment_offset": 14100,
+      "fragment_length": 78141,
+      "fragment_sha256": "4ffd58adf89a3d97d0e49d8fce8282754479a85c4a005a8340ee2b5d755521f5",
+      "initramfs_sha256": "88d467f0ee505d332b8f6aa563484099e0a33bd420c4f94309d6c231bc73aa7b",
+      "init_sha256": "c21042f68e23ef42e5b75d1ce3baf43472f9437172850c63be32ca4d79aeb58c",
+      "groups": [
+        {
+          "name": "basic",
+          "shell_status": 0
+        },
+        {
+          "name": "busybox",
+          "shell_status": 0
+        },
+        {
+          "name": "lua",
+          "shell_status": 0
+        },
+        {
+          "name": "libctest",
+          "shell_status": 0
+        },
+        {
+          "name": "libcbench",
+          "shell_status": 0
+        },
+        {
+          "name": "cyclictest",
+          "shell_status": 0
+        },
+        {
+          "name": "iperf",
+          "shell_status": 0
+        },
+        {
+          "name": "netperf",
+          "shell_status": 0
+        },
+        {
+          "name": "iozone",
+          "shell_status": 0
+        },
+        {
+          "name": "lmbench",
+          "shell_status": 137
+        },
+        {
+          "name": "unixbench",
+          "shell_status": 0
+        },
+        {
+          "name": "ltp_subset",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "original-glibc",
+      "experiment": "original",
+      "libc_directory": "glibc",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "glibc.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "baff0d7aa7c027fa8b7a600460d461d48fd0492502a5096ec32f6172b48c35f9",
+      "fragment_offset": 14100,
+      "fragment_length": 151157,
+      "fragment_sha256": "408a813c50c98f3c90f9a8d4b1448d6d2b0de178de9f6cbaa904217c3309134f",
+      "initramfs_sha256": "0ce163852f5729f1ebda108894e5874fb2a4a516a694a429d046607bf3e61a0a",
+      "init_sha256": "c21042f68e23ef42e5b75d1ce3baf43472f9437172850c63be32ca4d79aeb58c",
+      "groups": [
+        {
+          "name": "basic",
+          "shell_status": 0
+        },
+        {
+          "name": "busybox",
+          "shell_status": 0
+        },
+        {
+          "name": "lua",
+          "shell_status": 0
+        },
+        {
+          "name": "libctest",
+          "shell_status": 0
+        },
+        {
+          "name": "libcbench",
+          "shell_status": 0
+        },
+        {
+          "name": "cyclictest",
+          "shell_status": 0
+        },
+        {
+          "name": "iperf",
+          "shell_status": 0
+        },
+        {
+          "name": "netperf",
+          "shell_status": 0
+        },
+        {
+          "name": "iozone",
+          "shell_status": 0
+        },
+        {
+          "name": "lmbench",
+          "shell_status": 137
+        },
+        {
+          "name": "unixbench",
+          "shell_status": 0
+        },
+        {
+          "name": "ltp_subset",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "supplement-musl",
+      "experiment": "supplement",
+      "libc_directory": "musl",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "musl.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "993ee5b1033fe275db98c16fe5163ce8b0a02b3dd616a337f68c1ae8784df27f",
+      "fragment_offset": 14100,
+      "fragment_length": 22579,
+      "fragment_sha256": "cd55c499d467643876d5600cc9cb78996cbc2e949c9e4239e8973bd8e39e7f03",
+      "initramfs_sha256": "444d7c74eeede87756343b4ec957a2d66495a5532658827a8848f43eadfffd2e",
+      "init_sha256": "841fdd64b7850f41463a76c2b64c2fa116588530d56fc07789591326746e7717",
+      "groups": [
+        {
+          "name": "basic_explicit_shell",
+          "shell_status": 127
+        },
+        {
+          "name": "libctest_pass_exit",
+          "shell_status": 1
+        },
+        {
+          "name": "libctest_missing_exit",
+          "shell_status": 1
+        },
+        {
+          "name": "ltp_subset",
+          "shell_status": 0
+        },
+        {
+          "name": "netperf_loader",
+          "shell_status": 0
+        },
+        {
+          "name": "iozone_loader",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "supplement-glibc",
+      "experiment": "supplement",
+      "libc_directory": "glibc",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "glibc.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "795306823aa03b4d79c1bd530081c88375de75d4f1d5226d587f33a8df3c9361",
+      "fragment_offset": 14100,
+      "fragment_length": 30356,
+      "fragment_sha256": "33f57adb12c9e1db77c61f6d79c5ca8e493216c28af52788bd17520277de8a12",
+      "initramfs_sha256": "c28e32015355357e3df92870115d7b424f6bf98d5de820034366e951fc9971ff",
+      "init_sha256": "841fdd64b7850f41463a76c2b64c2fa116588530d56fc07789591326746e7717",
+      "groups": [
+        {
+          "name": "basic_explicit_shell",
+          "shell_status": 0
+        },
+        {
+          "name": "libctest_pass_exit",
+          "shell_status": 1
+        },
+        {
+          "name": "libctest_missing_exit",
+          "shell_status": 1
+        },
+        {
+          "name": "ltp_subset",
+          "shell_status": 0
+        },
+        {
+          "name": "netperf_loader",
+          "shell_status": 0
+        },
+        {
+          "name": "iozone_loader",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "format-probes-musl",
+      "experiment": "format-probes",
+      "libc_directory": "musl",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "musl.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "248d6158da663e97a80e59c4d2b7f35f33ddbd3c03eafdbb32610838ed1b4a44",
+      "fragment_offset": 14100,
+      "fragment_length": 4230,
+      "fragment_sha256": "8fb232112f19de08e15c4f3a221cadbc6adde6805d7590a69c199c3be5ad27de",
+      "initramfs_sha256": "d34e7c0dd508b7de1072e0b9967a96a9fcaf11c1e25041ec57b4a4891ddf52be",
+      "init_sha256": "c22c22d1c3d8b075861fde608531cd659f9b95b5762eab0eca0d1ddd32fc6fa7",
+      "groups": [
+        {
+          "name": "unix_dhry2reg",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_whetstone-double",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_syscall",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_context1",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_pipe",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_spawn",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_execl",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_arithoh",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_short",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_int",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_long",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_float",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_double",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_hanoi",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_w",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_r",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_c",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_shell1",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_shell8",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_shell16",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_exec",
+          "shell_status": 0
+        },
+        {
+          "name": "lmdd_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_syscall",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_bw_pipe",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_bw_file",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_mmap",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_ctx",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_fs",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "format-probes-glibc",
+      "experiment": "format-probes",
+      "libc_directory": "glibc",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "glibc.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "b07d3b6ca401f3aa31c071fb7b7d295cc515b7097e750751e4160782f7e8072e",
+      "fragment_offset": 14100,
+      "fragment_length": 3831,
+      "fragment_sha256": "a142811dff5c2d40e8ec1d26f23c1f737ee8a89eb8a6c3618a9219b4ce3e5106",
+      "initramfs_sha256": "659a1a3f5bc1d4342996a6b19f33759aba5f40811b2eaa66c0afdfcba6c7a4c1",
+      "init_sha256": "c22c22d1c3d8b075861fde608531cd659f9b95b5762eab0eca0d1ddd32fc6fa7",
+      "groups": [
+        {
+          "name": "unix_dhry2reg",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_whetstone-double",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_syscall",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_context1",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_pipe",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_spawn",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_execl",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_arithoh",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_short",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_int",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_long",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_float",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_double",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_hanoi",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_w",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_r",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_fstime_c",
+          "shell_status": 0
+        },
+        {
+          "name": "unix_shell1",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_shell8",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_shell16",
+          "shell_status": 2
+        },
+        {
+          "name": "unix_exec",
+          "shell_status": 0
+        },
+        {
+          "name": "lmdd_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_syscall",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_bw_pipe",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_bw_file",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_mmap",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_ctx",
+          "shell_status": 137
+        },
+        {
+          "name": "lm_fs",
+          "shell_status": 137
+        }
+      ]
+    },
+    {
+      "id": "timing-probes-musl",
+      "experiment": "timing-probes",
+      "libc_directory": "musl",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "musl.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "905d902995d770191d4e66764b802d1cfaaa74a0279d1995193a0f0932490319",
+      "fragment_offset": 14100,
+      "fragment_length": 1045,
+      "fragment_sha256": "ca5dc330131f1bbe2aec8404b994c90cbe10ef8d7f54c55adb300920608516c2",
+      "initramfs_sha256": "fdba6abf6978c0acc8212a4ea7a82df85fc53bca784d9a7601b13dbf84623584",
+      "init_sha256": "e30ea5daec82e48be479b9c5d2645dc16ef369ffcdd88d0a4a876cad8dbb5b2f",
+      "groups": [
+        {
+          "name": "lmdd_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_syscall",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_bw_pipe",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_bw_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_mmap",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_ctx",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_fs",
+          "shell_status": 0
+        }
+      ]
+    },
+    {
+      "id": "timing-probes-glibc",
+      "experiment": "timing-probes",
+      "libc_directory": "glibc",
+      "host_exit": 0,
+      "host_timeout_seconds": 1600,
+      "argv_template": [
+        "qemu-system-riscv64",
+        "-machine",
+        "virt",
+        "-m",
+        "1024M",
+        "-smp",
+        "2",
+        "-nographic",
+        "-no-reboot",
+        "-nic",
+        "none",
+        "-bios",
+        "FIRMWARE",
+        "-kernel",
+        "KERNEL",
+        "-initrd",
+        "glibc.cpio",
+        "-append",
+        "console=ttyS0 rdinit=/init panic=-1"
+      ],
+      "serial_sha256": "ba6c949f1596eeed3dcbdaf9a6860dff140466a0e009887541fca928e36f21fc",
+      "fragment_offset": 14100,
+      "fragment_length": 746,
+      "fragment_sha256": "f931b0d1d40a3c3d1b6700ff8d968a1b0d0c17a9188fdcbc7fb7a4927c1cbdb2",
+      "initramfs_sha256": "63fd68e7937080c2efa26db741d4235171f8157bdaa28774c1b5260e415bf146",
+      "init_sha256": "e30ea5daec82e48be479b9c5d2645dc16ef369ffcdd88d0a4a876cad8dbb5b2f",
+      "groups": [
+        {
+          "name": "lmdd_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_syscall",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_bw_pipe",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_bw_file",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_mmap",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_ctx",
+          "shell_status": 0
+        },
+        {
+          "name": "lm_fs",
+          "shell_status": 0
+        }
+      ]
+    }
+  ],
+  "files": {
+    "elf-observations.json": "7e35fbe6c0cbc0af477f8c84ac0f29f3ce4b90d99871aa81d3844ab48d9eac9d",
+    "extract.py": "b4781e9431f3759b2526b6b6f0c7307f6350347b103e28acce39eb8b1527d743",
+    "format-probes-init.sh": "c22c22d1c3d8b075861fde608531cd659f9b95b5762eab0eca0d1ddd32fc6fa7",
+    "image-members.json": "8d9ec0f3aeabf7df5696a127615a895b1c26404334fafa532bc0cb7cfc17524f",
+    "original-init.sh": "c21042f68e23ef42e5b75d1ce3baf43472f9437172850c63be32ca4d79aeb58c",
+    "pack.py": "712f9c582f5c456c458ecb38170dea297bfaa838cac24176e8103b05600df552",
+    "run.py": "9713b3ced237fd54c945d769eccebfffdcd29cd1a16c9140e0fdc4ba0b3d7464",
+    "samples.json": "63e33ce5f3d75a7e1d9e693b753ec3f0c312388a2c7f6f6752149584f5e52d57",
+    "sources.json": "a452c3ab99d880c3e0aa31a5a045cf1e5fd17e5e86754faeccfd6a89076ee45f",
+    "supplement-init.sh": "841fdd64b7850f41463a76c2b64c2fa116588530d56fc07789591326746e7717",
+    "timing-probes-init.sh": "e30ea5daec82e48be479b9c5d2645dc16ef369ffcdd88d0a4a876cad8dbb5b2f",
+    "wrapper-comparison.json": "ec8f4f424acd539285e3dda37ae152b5434af7952e1ea5ad0fbcd7da446bf32b"
+  }
+}

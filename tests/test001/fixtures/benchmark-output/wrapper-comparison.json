@@ -1,0 +1,194 @@
+{
+  "basic": {
+    "source": "scripts/basic/basic_testcode.sh",
+    "source_sha256": "2b25b7f1c245ebe210100ae5815a7ddc1ae322801a605db2443e399343843d5a",
+    "image": {
+      "musl": {
+        "sha256": "640d684a236f2c72c5ff26bbe0a3872a508e98fb28faaa8e462edbc2813619f7",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,5 +1,5 @@\n-./busybox echo \"#### OS COMP TEST GROUP START basic ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START basic-musl ####\"\n cd ./basic\n ./run-all.sh\n cd ..\n-./busybox echo \"#### OS COMP TEST GROUP END basic ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END basic-musl ####\"\n"
+      },
+      "glibc": {
+        "sha256": "22c9600e5648ec45613cf9c01f67a658cd7b297ca492a7bb8f3b1e83b901108f",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,5 +1,5 @@\n-./busybox echo \"#### OS COMP TEST GROUP START basic ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START basic-glibc ####\"\n cd ./basic\n ./run-all.sh\n cd ..\n-./busybox echo \"#### OS COMP TEST GROUP END basic ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END basic-glibc ####\"\n"
+      }
+    }
+  },
+  "busybox": {
+    "source": "scripts/busybox/busybox_testcode.sh",
+    "source_sha256": "4b01090cc9f2e24ba0060d1e75f8fccfff64d70ecf88d7448a33173e8d078d01",
+    "image": {
+      "musl": {
+        "sha256": "5c8fe2230c928b716517631fad55b2f68fbdb351bd344d321bfd4c54c769b4d4",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,6 +1,6 @@\n #!/busybox sh\n \n-./busybox echo \"#### OS COMP TEST GROUP START busybox ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START busybox-musl ####\"\n # RST=result.txt\n # if [ -f $RST ];then\n # \trm $RST\n@@ -24,4 +24,4 @@\n done\n \n # echo \"TEST END\" >> $RST\n-./busybox echo \"#### OS COMP TEST GROUP END busybox ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END busybox-musl ####\"\n"
+      },
+      "glibc": {
+        "sha256": "2b533111800370f23e5c5f6228f5153d7024e2b8b984bbff42f9cd34d63fc820",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,6 +1,6 @@\n #!/busybox sh\n \n-./busybox echo \"#### OS COMP TEST GROUP START busybox ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START busybox-glibc ####\"\n # RST=result.txt\n # if [ -f $RST ];then\n # \trm $RST\n@@ -24,4 +24,4 @@\n done\n \n # echo \"TEST END\" >> $RST\n-./busybox echo \"#### OS COMP TEST GROUP END busybox ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END busybox-glibc ####\"\n"
+      }
+    }
+  },
+  "lua": {
+    "source": "scripts/lua/lua_testcode.sh",
+    "source_sha256": "1df4027614450fc5abada76c153c05825e8dcd94e0231ae07a96455fa4b6cea2",
+    "image": {
+      "musl": {
+        "sha256": "d9a4e3f51de689766dbfe067f11a0a54ddb6c2e8e9bc0c956a3535194a9a6e26",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,4 +1,4 @@\n-./busybox echo \"#### OS COMP TEST GROUP START lua ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START lua-musl ####\"\n \n ./test.sh date.lua\n ./test.sh file_io.lua\n@@ -10,4 +10,4 @@\n ./test.sh sort.lua\n ./test.sh strings.lua\n \n-./busybox echo \"#### OS COMP TEST GROUP END lua ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END lua-musl ####\"\n"
+      },
+      "glibc": {
+        "sha256": "345221f53b3d487e9c00e3bf84cd07f874305e875be7c0ea9b4390cfaec589cb",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,4 +1,4 @@\n-./busybox echo \"#### OS COMP TEST GROUP START lua ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START lua-glibc ####\"\n \n ./test.sh date.lua\n ./test.sh file_io.lua\n@@ -10,4 +10,4 @@\n ./test.sh sort.lua\n ./test.sh strings.lua\n \n-./busybox echo \"#### OS COMP TEST GROUP END lua ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END lua-glibc ####\"\n"
+      }
+    }
+  },
+  "libctest": {
+    "source": "scripts/libctest/libctest_testcode.sh",
+    "source_sha256": "ec81ff019c770bacc17dfafc4f29e9e82410953247bb7d1963a28cc27aa37e2c",
+    "image": {
+      "musl": {
+        "sha256": "1e69ee92b710897fcb99cd0c0aafd007b82c512187204a9d7ed904fbc9239ff0",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,6 +1,6 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START libctest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START libctest-musl ####\"\n ./run-static.sh\n ./run-dynamic.sh\n-./busybox echo \"#### OS COMP TEST GROUP END libctest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END libctest-musl ####\"\n \n"
+      },
+      "glibc": {
+        "sha256": "d1996c1ad6934bff8eae9359c547f4342b27bf15f14e194ef3a61ef60e39190e",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,6 +1,6 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START libctest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START libctest-glibc ####\"\n ./run-static.sh\n ./run-dynamic.sh\n-./busybox echo \"#### OS COMP TEST GROUP END libctest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP END libctest-glibc ####\"\n \n"
+      }
+    }
+  },
+  "iozone": {
+    "source": "scripts/iozone/iozone_testcode.sh",
+    "source_sha256": "33bd2f2083eee2d617c10b0850c4e020c5aee03a3fccaccc27a16a8285459f5b",
+    "image": {
+      "musl": {
+        "sha256": "0ef595da41baaa5a7fd598f2210ebf70936802938ac1db6e933a2877245efa60",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,4 +1,4 @@\n-./busybox echo \"#### OS COMP TEST GROUP START iozone ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START iozone-musl ####\"\n ./busybox echo iozone automatic measurements\n ./iozone -a -r 1k -s 4m\n ./busybox echo iozone throughput write/read measurements\n@@ -15,4 +15,4 @@\n ./iozone -t 4 -i 9 -i 10 -r 1k -s 1m\n ./busybox echo iozone throughtput pwritev/preadv measurements\n ./iozone -t 4 -i 11 -i 12 -r 1k -s 1m\n-./busybox echo \"#### OS COMP TEST GROUP END iozone ####\"+./busybox echo \"#### OS COMP TEST GROUP END iozone-musl ####\""
+      },
+      "glibc": {
+        "sha256": "6ece77b9527b5cc79ccd69ede7e574ea1e1c0a394e46ff3ea455e7fa232a303b",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,4 +1,4 @@\n-./busybox echo \"#### OS COMP TEST GROUP START iozone ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START iozone-glibc ####\"\n ./busybox echo iozone automatic measurements\n ./iozone -a -r 1k -s 4m\n ./busybox echo iozone throughput write/read measurements\n@@ -15,4 +15,4 @@\n ./iozone -t 4 -i 9 -i 10 -r 1k -s 1m\n ./busybox echo iozone throughtput pwritev/preadv measurements\n ./iozone -t 4 -i 11 -i 12 -r 1k -s 1m\n-./busybox echo \"#### OS COMP TEST GROUP END iozone ####\"+./busybox echo \"#### OS COMP TEST GROUP END iozone-glibc ####\""
+      }
+    }
+  },
+  "unixbench": {
+    "source": "scripts/unixbench/unixbench_testcode.sh",
+    "source_sha256": "214d9b6d21311a29d9949166d6990c7eeb2e40ebca4838ccb2e8802c0fc1eec8",
+    "image": {
+      "musl": {
+        "sha256": "26447428518bad6952fec25a8d8e0bd72987b4eb2fb89f1ffdc449cbdab407c2",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -2,7 +2,7 @@\n \n #export CC=gcc\n \n-./busybox echo \"#### OS COMP TEST GROUP START unixbench ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START unixbench-musl ####\"\n \n ./dhry2reg 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench DHRY2 test(lps): \"$0}'\n ./whetstone-double 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+.[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+.[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench WHETSTONE test(MFLOPS): \"$0}'\n@@ -40,4 +40,4 @@\n ./hanoi 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench HANOI test(lps): \"$0}'\n ./syscall 10 exec | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench EXEC test(lps): \"$0}'\n \n-./busybox echo \"#### OS COMP TEST GROUP END unixbench ####\"+./busybox echo \"#### OS COMP TEST GROUP END unixbench-musl ####\""
+      },
+      "glibc": {
+        "sha256": "904e606f11b70c10c9f2e984efea7c8c451a2c2675646b1d220d1053fb2bfc77",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -2,7 +2,7 @@\n \n #export CC=gcc\n \n-./busybox echo \"#### OS COMP TEST GROUP START unixbench ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START unixbench-glibc ####\"\n \n ./dhry2reg 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench DHRY2 test(lps): \"$0}'\n ./whetstone-double 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+.[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+.[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench WHETSTONE test(MFLOPS): \"$0}'\n@@ -40,4 +40,4 @@\n ./hanoi 10 | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench HANOI test(lps): \"$0}'\n ./syscall 10 exec | ./busybox grep -o \"COUNT|[[:digit:]]\\+|\" | ./busybox grep -o \"[[:digit:]]\\+\" | ./busybox awk '{print \"Unixbench EXEC test(lps): \"$0}'\n \n-./busybox echo \"#### OS COMP TEST GROUP END unixbench ####\"+./busybox echo \"#### OS COMP TEST GROUP END unixbench-glibc ####\""
+      }
+    }
+  },
+  "iperf": {
+    "source": "scripts/iperf/iperf_testcode.sh",
+    "source_sha256": "81f782cdfd777cda3e0a588a1b27984e89939c2d9467beba0e0709f3dfc425ac",
+    "image": {
+      "musl": {
+        "sha256": "9880903b788174a1efb4c50193fc3ffdb71d37e4d486fc998bff34b5cec47ea5",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -3,7 +3,7 @@\n iperf=\"./iperf3\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP START iperf ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START iperf-musl ####\"\n \n \n run_iperf() {\n@@ -39,4 +39,4 @@\n run_iperf \"REVERSE_TCP\" \"-R\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END iperf ####\"+./busybox echo \"#### OS COMP TEST GROUP END iperf-musl ####\""
+      },
+      "glibc": {
+        "sha256": "abfc1ed786c1e78092276f13b7def006cb6d06b217256a1a3711b854dd0d8fc8",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -3,7 +3,7 @@\n iperf=\"./iperf3\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP START iperf ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START iperf-glibc ####\"\n \n \n run_iperf() {\n@@ -39,4 +39,4 @@\n run_iperf \"REVERSE_TCP\" \"-R\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END iperf ####\"+./busybox echo \"#### OS COMP TEST GROUP END iperf-glibc ####\""
+      }
+    }
+  },
+  "libcbench": {
+    "source": "scripts/libcbench/libcbench_testcode.sh",
+    "source_sha256": "a9f9cac119b97169e308af9fdf41995c3e6a8f4f3a6f0f959d9df70e304d4fc0",
+    "image": {
+      "musl": {
+        "sha256": "634578cc23dc005ed2f45540c1a7e556809febb154399aea639243f6c8e6f219",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,4 +1,4 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START libcbench ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START libcbench-musl ####\"\n ./libc-bench\n-./busybox echo \"#### OS COMP TEST GROUP END libcbench ####\"+./busybox echo \"#### OS COMP TEST GROUP END libcbench-musl ####\""
+      },
+      "glibc": {
+        "sha256": "fdc4e28d3fd6df7ea98e7344219795bdd03728a95af8b89d8b1062dcc3a6452f",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,4 +1,4 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START libcbench ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START libcbench-glibc ####\"\n ./libc-bench\n-./busybox echo \"#### OS COMP TEST GROUP END libcbench ####\"+./busybox echo \"#### OS COMP TEST GROUP END libcbench-glibc ####\""
+      }
+    }
+  },
+  "lmbench": {
+    "source": "scripts/lmbench/lmbench_testcode.sh",
+    "source_sha256": "71c05d4d48431a3ef3efa41cd6874e77d383f9c74a11e6f64042a22ff3a6b753",
+    "image": {
+      "musl": {
+        "sha256": "4d499d05caf4b4ff865a8b1242c0cbf536a6f7963649c5f6333396291cd06708",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,6 +1,6 @@\n #!/bin/sh\n \n-echo \"#### OS COMP TEST GROUP START lmbench ####\"\n+echo \"#### OS COMP TEST GROUP START lmbench-musl ####\"\n \n echo latency measurements\n ./lmbench_all lat_syscall -P 1 null\n@@ -35,4 +35,4 @@\n ./lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96\n \n \n-echo \"#### OS COMP TEST GROUP END lmbench ####\"\n+echo \"#### OS COMP TEST GROUP END lmbench-musl ####\"\n"
+      },
+      "glibc": {
+        "sha256": "86c5b0203adea6c86ab90e3b29c73023d591e70ce0e5a65bdfd25703aea27319",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,6 +1,6 @@\n #!/bin/sh\n \n-echo \"#### OS COMP TEST GROUP START lmbench ####\"\n+echo \"#### OS COMP TEST GROUP START lmbench-glibc ####\"\n \n echo latency measurements\n ./lmbench_all lat_syscall -P 1 null\n@@ -35,4 +35,4 @@\n ./lmbench_all lat_ctx -P 1 -s 32 2 4 8 16 24 32 64 96\n \n \n-echo \"#### OS COMP TEST GROUP END lmbench ####\"\n+echo \"#### OS COMP TEST GROUP END lmbench-glibc ####\"\n"
+      }
+    }
+  },
+  "netperf": {
+    "source": "scripts/netperf/netperf_testcode.sh",
+    "source_sha256": "d3afb4c0bd88db94de253af8d8f37395e85df884bb1cdc15bff5cf2fcb547053",
+    "image": {
+      "musl": {
+        "sha256": "f21b968600090c837d47d825ddd8e311a00c75ad7d9b6d2cf8f312d62a335b6f",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -2,7 +2,7 @@\n port=12865\n \n \n-./busybox echo \"#### OS COMP TEST GROUP START netperf ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START netperf-musl ####\"\n \n run_netperf() {\n     echo \"====== netperf $1 begin ======\"\n@@ -27,4 +27,4 @@\n kill -9 $server_pid\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END netperf ####\"+./busybox echo \"#### OS COMP TEST GROUP END netperf-musl ####\""
+      },
+      "glibc": {
+        "sha256": "06725f6fe0ce659bcca896c131db913ba4b93155905f20d0bfcd5bffac52e4c3",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -2,7 +2,7 @@\n port=12865\n \n \n-./busybox echo \"#### OS COMP TEST GROUP START netperf ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START netperf-glibc ####\"\n \n run_netperf() {\n     echo \"====== netperf $1 begin ======\"\n@@ -27,4 +27,4 @@\n kill -9 $server_pid\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END netperf ####\"+./busybox echo \"#### OS COMP TEST GROUP END netperf-glibc ####\""
+      }
+    }
+  },
+  "cyclictest": {
+    "source": "scripts/cyclictest/cyclictest_testcode.sh",
+    "source_sha256": "fd06891533a4792a1473ced2304312d81c01f5670baf335997c3b0497b420e94",
+    "image": {
+      "musl": {
+        "sha256": "e78aa50ac4aa9412f853caa6a719cbd323ce76cce0eda469cfbd9bddbc095c30",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,5 +1,5 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START cyclictest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START cyclictest-musl ####\"\n \n run_cyclictest() {\n     echo \"====== cyclictest $1 begin ======\"\n@@ -36,4 +36,4 @@\n echo \"====== kill hackbench: $ans ======\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END cyclictest ####\"+./busybox echo \"#### OS COMP TEST GROUP END cyclictest-musl ####\""
+      },
+      "glibc": {
+        "sha256": "fe16a0678d1e9bc3706477d2bd9945932d99494be49b839efb7af54541984a5d",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,5 +1,5 @@\n \n-./busybox echo \"#### OS COMP TEST GROUP START cyclictest ####\"\n+./busybox echo \"#### OS COMP TEST GROUP START cyclictest-glibc ####\"\n \n run_cyclictest() {\n     echo \"====== cyclictest $1 begin ======\"\n@@ -36,4 +36,4 @@\n echo \"====== kill hackbench: $ans ======\"\n \n \n-./busybox echo \"#### OS COMP TEST GROUP END cyclictest ####\"+./busybox echo \"#### OS COMP TEST GROUP END cyclictest-glibc ####\""
+      }
+    }
+  },
+  "ltp": {
+    "source": "scripts/ltp/ltp_testcode.sh",
+    "source_sha256": "967ac849fa976e8cd484f78d14c4a50431f1ad8f204c044c8e53b49857df1c75",
+    "image": {
+      "musl": {
+        "sha256": "dddc3475744e266173cfc7b57de0e51a8b53e3d131508d5f66de05bb5ebb5368",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-musl\n@@ -1,6 +1,6 @@\n #!/bin/bash\n \n-echo \"#### OS COMP TEST GROUP START ltp ####\"\n+echo \"#### OS COMP TEST GROUP START ltp-musl ####\"\n \n # \u5b9a\u4e49\u76ee\u6807\u76ee\u5f55\n target_dir=\"ltp/testcases/bin\"\n@@ -21,4 +21,4 @@\n done\n \n \n-echo \"#### OS COMP TEST GROUP END ltp ####\"+echo \"#### OS COMP TEST GROUP END ltp-musl ####\""
+      },
+      "glibc": {
+        "sha256": "2cd432e52d0f8704198d2ba35716de9172efed3c7fc7f82b2d1945d56380b99d",
+        "exact_source_match": false,
+        "diff": "--- fixed-source\n+++ image-glibc\n@@ -1,6 +1,6 @@\n #!/bin/bash\n \n-echo \"#### OS COMP TEST GROUP START ltp ####\"\n+echo \"#### OS COMP TEST GROUP START ltp-glibc ####\"\n \n # \u5b9a\u4e49\u76ee\u6807\u76ee\u5f55\n target_dir=\"ltp/testcases/bin\"\n@@ -21,4 +21,4 @@\n done\n \n \n-echo \"#### OS COMP TEST GROUP END ltp ####\"+echo \"#### OS COMP TEST GROUP END ltp-glibc ####\""
+      }
+    }
+  }
+}
