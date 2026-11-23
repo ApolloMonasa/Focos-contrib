@@ -731,6 +731,7 @@
     "sources.json": "a452c3ab99d880c3e0aa31a5a045cf1e5fd17e5e86754faeccfd6a89076ee45f",
     "supplement-init.sh": "841fdd64b7850f41463a76c2b64c2fa116588530d56fc07789591326746e7717",
     "timing-probes-init.sh": "e30ea5daec82e48be479b9c5d2645dc16ef369ffcdd88d0a4a876cad8dbb5b2f",
-    "wrapper-comparison.json": "ec8f4f424acd539285e3dda37ae152b5434af7952e1ea5ad0fbcd7da446bf32b"
+    "wrapper-comparison.json": "f47a28b2189ec519f35b497740989f7d36e741c442ced7be2497eb9c08ee7286",
+    "wrapper_diff.py": "60ea912b905fea081117b1093104f45ee7e9f9fac24b49327bf9927e0186d6df"
   }
 }

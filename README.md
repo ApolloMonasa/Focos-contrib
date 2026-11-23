@@ -52,6 +52,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 ```text
 Focos/
 ├── README.md                          # 项目首页和成员入口
+├── .gitattributes                     # 保留测试证据原始换行与字节
 ├── AGENTS.md                          # 开发、文档与审阅约定
 ├── kernel/                            # Rust 裸机内核
 │   ├── Cargo.toml                     # 内核可执行文件与通用库的构建定义

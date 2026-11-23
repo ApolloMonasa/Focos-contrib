@@ -1,0 +1,2 @@
+# Test evidence is hashed as raw bytes, including original line endings.
+tests/test001/fixtures/** -text

@@ -3,6 +3,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1] / 'tests/test001/fixtures/benchmark-output'
@@ -44,6 +46,32 @@ class BenchmarkOutputSamples(unittest.TestCase):
             if run['experiment'] == 'original':
                 self.assertEqual({g['name'] for g in run['groups']}, GROUPS)
                 self.assertEqual(len(run['groups']), 12)
+
+    def test_wrapper_patches_reconstruct_exact_image_bytes(self):
+        rows = json.loads((ROOT / 'wrapper-comparison.json').read_text())
+        self.assertEqual(set(rows), GROUPS - {'ltp_subset'} | {'ltp'})
+        members = json.loads((ROOT / 'image-members.json').read_text())
+        sources = json.loads((ROOT / 'sources.json').read_text())['files']
+        for group, row in rows.items():
+            source = bytes.fromhex(row['source_hex'])
+            self.assertEqual(hashlib.sha256(source).hexdigest(), sources[row['source']])
+            self.assertEqual(row['source_sha256'], sources[row['source']])
+            self.assertEqual(set(row['image']), {'musl', 'glibc'})
+            for libc, entry in row['image'].items():
+                with self.subTest(group=group, libc=libc), tempfile.TemporaryDirectory() as tmp:
+                    expected = bytes.fromhex(entry['script_hex'])
+                    self.assertEqual(hashlib.sha256(expected).hexdigest(), entry['sha256'])
+                    self.assertEqual(entry['sha256'], members[f'/{libc}/{group}_testcode.sh']['sha256'])
+                    self.assertEqual(entry['exact_source_match'], source == expected)
+                    # Only paths change for this sandbox; hunks and EOF markers stay untouched.
+                    patch = entry['diff'].splitlines(keepends=True)
+                    patch[:2] = ['--- a/script\n', '+++ b/script\n']
+                    target = Path(tmp) / 'script'
+                    target.write_bytes(source)
+                    process = subprocess.run(['git', '-c', 'core.autocrlf=false', 'apply', '--no-index', '-'],
+                                             input=''.join(patch).encode(), cwd=tmp, capture_output=True)
+                    self.assertEqual(process.returncode, 0, process.stderr.decode())
+                    self.assertEqual(target.read_bytes(), expected)
 
     def test_group_end_zero_can_hide_start_failure(self):
         for libc in ('musl', 'glibc'):

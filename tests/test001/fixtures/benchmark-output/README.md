@@ -5,7 +5,7 @@
 - `index.json`：原盘/内核/固件身份、QEMU 参数、每次 initramfs 哈希、完整串口哈希、保存片段的原始偏移/长度/哈希，以及审计助手观察到的 shell 状态。argv 中 KERNEL/FIRMWARE 是本机路径占位符，文件身份由哈希决定。
 - `samples.json`：保留首次 OUTPUT_AUDIT_BEGIN 到 OUTPUT_AUDIT_DONE 的全部串口字节，使用 hex 防止换行转换；另外保留 QEMU stderr。来宾 stdout/stderr 已合流，不能据此恢复流归属。没有删掉失败、超时或迟到输出。边界是实验助手新增的，不是比赛输出。
 - `image-members.json`：只读提取的原始文件大小、权限和哈希。未提取完整 LTP；四个选定 LTP 文件的执行权限在提取时显式设为 0755，其 mode 是实验安装值，不是原盘权限证据。
-- `wrapper-comparison.json`：24 份镜像脚本与固定源码的完整差异。
+- `wrapper-comparison.json`：12 份源码脚本与 24 份镜像脚本的原始字节（hex）、哈希和完整差异。diff 显式标注文件末尾没有换行，不能替原脚本补换行；原始字节为事实依据。`wrapper_diff.py INPUT NEW_OUTPUT` 可从这些字节再生 diff；独立检查用 git apply 逐字节还原全部 24 份镜像脚本。
 - `sources.json`：核对输出时使用的固定源码文件哈希，包括 nested netperf 压缩包与其中源码；哈希不表示已逐行审计所有代码，也不表示镜像 ELF 的构建来源已经证明。
 - `elf-observations.json`：选定实际 ELF 的 readelf 头和程序头；basic 的两套文件相同、加载器与浮点 ABI 的事实可回查。
 - 四份 `*-init.sh` 是实际运行入口。`extract.py / pack.py / run.py` 将本机输入路径改为参数，分别只读提取、构造 initramfs、运行两个 libc 目录的参考实验。它们不实现 TEST-001 的安全采集/所有权协议，不可当作 C 阶段入口发布。
@@ -39,4 +39,6 @@ gh api repos/oscomp/testsuits-for-oskernel/tarball/8b58dd16d26d30f7c74d48d5832d8
 python3 -B -m unittest discover -s scripts -p 'test_test001_benchmark_samples.py'
 ```
 
-这六项独立样本检查保护来源、全组尝试范围和关键反例，不启动 benchmark、不验证内核兼容性。特别保留 libc-test 成功/失败都退出 1、组 END/0 掩盖启动失败、UnixBench 单位冲突、lmbench 超时、glibc netperf 地址解析失败与 LTP TBROK；不可把测试检查通过写成 benchmark 通过。
+这些独立样本检查保护来源、全组尝试范围和关键反例，不启动 benchmark、不验证内核兼容性。特别保留 libc-test 成功/失败都退出 1、组 END/0 掩盖启动失败、UnixBench 单位冲突、lmbench 超时、glibc netperf 地址解析失败与 LTP TBROK；不可把测试检查通过写成 benchmark 通过。
+
+仓库 `.gitattributes` 对 `tests/test001/fixtures/**` 设置 `-text`，防止检出时自动转换换行。哈希始终按原字节计算，不在校验前做 LF/CRLF 规范化。
