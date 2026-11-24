@@ -1,0 +1,56 @@
+# 官方测试怎样接入
+
+本页记录 2026-11-23 的核查。下一步只实现构建、启动、原始日志和进程清理；官方判分的版本问题单独处理。
+
+## 采用哪些来源
+
+- [2025 测试源码及运行说明](https://github.com/oscomp/testsuits-for-oskernel/tree/8b58dd16d26d30f7c74d48d5832d870d3051b703)：`pre-2025` 固定提交。README 定义 12 组测试、Ext4 无分区表镜像、内核主动扫描并串行执行脚本、完成后主动关机。
+- [官方本地评测框架](https://github.com/oscomp/autotest-for-oskernel/tree/d1bb3a3c4b27274e196a2648518525c1a304e339)：README 指定 `pre-20250615` 镜像，但容器标签是 `20260510`。这是可核查的公开搭配，不等于已证明与 2025 赛场环境完全相同。
+- [官方判分接口说明](https://github.com/oscomp/oskernel-testsuits-cooperation/tree/44fa7ac65f292580c3974a8252f533c4484ebe6b/judge)：按组开始/结束标记，将组内输出交给对应 judge 的标准输入。保留官方工具的输出，不自行统一成通过率。
+- [RISC-V 镜像](https://github.com/oscomp/testsuits-for-oskernel/releases/download/pre-20250615/sdcard-rv.img.xz)：解压后 SHA-256 为 `95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8`，本次重新计算确认。不要用当前源码重新构建的镜像冒充该发布物。
+
+官方 RISC-V 命令采用 `virt`、SBI、VirtIO 块设备和用户态网络、UTC RTC、`-no-reboot`；公开框架配置为 1 CPU、1G 内存、3600 秒。拟定入口沿用这些参数，用临时写入层保护基础镜像。实际 QEMU/固件版本和命令必须记录；本地不同版本的结果不冒充赛场结果。官方提交还要求 `make all` 产生 `kernel-rv/kernel-la`，本轮本地 RISC-V 入口不意味着双架构提交规范已经完成。
+
+## 目前不能跳过的差异
+
+1. 源码 `scripts/test_all.sh` 注释掉了 LTP，并有与现行组脚本不一致的名称。完整执行必须以固定镜像中的两套测试脚本为准，不能直接运行这个总脚本就称为全量。
+2. 镜像 BusyBox 命令表有 55 行、54 个不同命令；`echo "bbbbbbb" >> test.txt` 重复。官方 autotest 的 musl judge 仍要求 `kill 10`，镜像却使用 `sh -c 'sleep 5' & ./busybox kill $!`，另有 `printf "abc\n"`。这不是 FocOS 的失败，不能靠修改官方 judge 掩盖；#48 继续保留，尚不能宣布判分版本对应完成。
+3. 镜像 LTP 脚本对每个程序无条件打印 `FAIL LTP CASE 名称 : 返回值`，包括返回值为 0 的情况。官方 LTP judge 正是读取该行收尾，不能仅凭单词 FAIL 判定失败。本轮只核查脚本和 judge，未实际运行全量 LTP。
+4. 组结束标记、脚本退出 0 和 QEMU 退出 0 都不能证明组内测试已执行成功，下面的实测直接重现了这一点。
+
+## 全部组入口复核（静态检查）
+
+本次从固定镜像重新提取两套 libc 的全部 24 个 `*_testcode.sh`，逐个查看；对应脚本除组名的 libc 后缀外内容相同。下表只说明脚本实际调用和环境依赖，不代表这些组已实测通过，也未完成所有子程序的运行审计。
+
+| 组 | 脚本调用和必须保留的行为 |
+| --- | --- |
+| basic | 进入 `basic` 执行 `run-all.sh`，然后回到原目录 |
+| busybox | 按命令表逐行执行，保留重复命令、转义处理及原始 success/fail 文本 |
+| lua | 通过 `test.sh` 调用 9 个 Lua 文件，子脚本需要 `/bin/busybox` |
+| libctest | 依次执行 `run-static.sh`、`run-dynamic.sh`；动态加载环境必须另行验证 |
+| libcbench | 执行 `libc-bench`，保留程序原始输出 |
+| iozone | 多种读写模式与多进程测试，需要可写文件系统 |
+| unixbench | 经管道提取程序性能输出；部分命令每次运行 10 或 20 秒，外层退出码不代表每段管道成功 |
+| lmbench | 多种延迟、带宽测试，使用 `/var/tmp`、`/tmp` 和子进程 |
+| iperf | 在客体 `127.0.0.1:5001` 启动后台服务器；组脚本没有停止服务器 |
+| netperf | 在客体 `127.0.0.1:12865` 启动服务器，末尾执行 kill |
+| cyclictest | 实时调度测试并启动 hackbench，末尾发 SIGINT；不能只看最后的 echo |
+| ltp | 遍历 `ltp/testcases/bin`，逐个执行并打印返回值，需要 `/bin/bash` |
+
+这些脚本使用相对路径，必须在各自 `/musl`、`/glibc` 工作目录执行。两组 iperf 共用端口且留下服务器，完整运行设计还需验证组间后台进程的生命周期；当前宿主入口只能保证结束 QEMU 时一并销毁客体进程，不能声称解决了组间干扰。不能以宿主网络参数替代客体回环网络支持。
+
+## 当前 FocOS 的启动阻塞
+
+补做实际启动：使用固定镜像、临时写入层及官方 1G 参数，当前内核打印 `FOCOS_PANIC` 和 `memory initialization failed: InvalidLayout`，QEMU 仍返回 0。代码 `kernel/src/platform/qemu_riscv64/memory.rs` 将 RAM 末尾固定为 `0x88000000`，拒绝范围外的设备树地址。
+
+仅把内存改为 128M 做对照，输出 `FOCOS_BOOT_OK` 后退出，未运行官方测试。正式入口保留官方 1G 配置；内存支持作为内核依赖处理，不能悄悄缩小配置后称为官方环境。这项发现也要求运行状态只记录进程退出码，不能表述成“内核正常完成”。
+
+## 本地小范围实验
+
+从上述镜像重新提取 musl/glibc 的 BusyBox、Lua、脚本和 Lua 输入文件。分别放入临时 initramfs，在参考 Linux 上串行执行原始 `lua_testcode.sh`、`busybox_testcode.sh`。没有改动测试脚本和命令表；环境提供 `/proc`、`/sys`、`/dev`、BusyBox applet 和解释器路径。这是内存文件系统上的小范围环境实验，不是原始 Ext4 镜像全套运行。
+
+参考内核 SHA-256：`7745b858c72bbd6e1b368e6057f5ec166319da6319ccf2cd0f40e8b609b6e638`；QEMU 10.2.2，virt、1 CPU、512M。它不同于官方参数，不能作为性能比较或 FocOS/VisionFive2 兼容成绩。
+
+初次实验漏配 `/bin/busybox`，Lua 的 `test.sh` 无法执行，日志显示 `not found`，但 Lua 外层脚本和 QEMU 都退出 0。保留这份失败证据后，仅补上解释器路径重新运行，测试文件未改。补齐后两套 Lua 分别输出 9 条 success，BusyBox 两组均到达结束标记。将 musl BusyBox 开始/结束标记之间的原始字节交给上述官方 judge，输出唯一未通过条目为 `busybox kill 10`。这是实际官方工具的结果，不是自行计算的通过率；不把这次环境修正包装成 FocOS 修复。
+
+实验命令、环境哈希和两轮完整串口日志保存在本地 `target/official-entry-research/`；该目录不入库。SPEC 审阅确认后再实现正式入口及异常回收测试，当前没有这些入口的实现或验收成绩。
