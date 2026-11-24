@@ -1,6 +1,6 @@
 # 官方测试怎样接入
 
-本页记录 2026-11-23 的核查。下一步只实现构建、启动、原始日志和进程清理；官方判分的版本问题单独处理。
+本页记录 2026-11-23 的核查。宿主入口提供构建、启动、原始日志和进程清理；官方判分的版本问题单独处理。
 
 ## 采用哪些来源
 
@@ -53,7 +53,7 @@
 
 初次实验漏配 `/bin/busybox`，Lua 的 `test.sh` 无法执行，日志显示 `not found`，但 Lua 外层脚本和 QEMU 都退出 0。保留这份失败证据后，仅补上解释器路径重新运行，测试文件未改。补齐后两套 Lua 分别输出 9 条 success，BusyBox 两组均到达结束标记。将 musl BusyBox 开始/结束标记之间的原始字节交给上述官方 judge，输出唯一未通过条目为 `busybox kill 10`。这是实际官方工具的结果，不是自行计算的通过率；不把这次环境修正包装成 FocOS 修复。
 
-实验命令、环境哈希和两轮完整串口日志保存在本地 `target/official-entry-research/`；该目录不入库。SPEC 审阅确认后再实现正式入口及异常回收测试，当前没有这些入口的实现或验收成绩。
+实验命令、环境哈希和两轮完整串口日志保存在本地 `target/official-entry-research/`；该目录不入库。宿主入口的实际运行方法如下。
 
 ## 怎样独立核对 BusyBox 的差异
 
@@ -83,3 +83,13 @@ python3 glibc.py < glibc.group > glibc.result.json
 ```
 
 本次用已有的两份参考 Linux 串口日志重放。两份官方判分脚本的哈希相同，各自产生的唯一零分条目都是 `{"name":"busybox kill 10","pass":0,"all":1,"score":0}`。对照两套镜像命令表，实际执行的是结束后台进程的 `kill $!`。这个差异已在两套 libc 上复现。2025 赛场采用的具体判分版本仍待 #48 核实。
+
+## 在仓库运行
+
+在 Linux 安装仓库 Rust 工具链、make、Git、Python 3.11 或更新版本、QEMU RISC-V 和 OpenSBI。当前入口读取系统固件 `/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin`。从上面的发布链接下载并解压比赛镜像，在仓库根目录执行：
+
+```bash
+python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out target/official/run-001
+```
+
+选择尚未存在的输出目录。构建输出见 `build.log`，串口原文见 `serial.log`，QEMU 宿主诊断见 `qemu.stderr`。运行结束后查看 `run.json` 中的内核、固件和镜像哈希、QEMU 实际命令、版本和结束原因。当前内核在 1G 配置下输出内存初始化失败，尚未到达客体脚本。测试超时默认为 3600 秒。

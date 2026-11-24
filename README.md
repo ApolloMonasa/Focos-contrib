@@ -26,7 +26,7 @@ main 已有 QEMU 启动、SBI 输出、关机和 CI。2026-11-05 的首次 Visio
 
 本分支按 [MM-003](specs/MM-003.md) 实现 QEMU 内核 Sv39 分页，新增 `make vm-smoke` 验证非恒等地址写读、只读与不可执行保护、撤销、重映射及页表回收。接口与验收约定见[参考页](docs/reference/sv39-paging.md)，运行方法见[上手指南](docs/getting-started.md)。实现待人工审阅；用户态隔离与真板分页另行验收。
 
-测试接入目标已调整为提供官方测试入口，沿用比赛对应版本的脚本与原始输出；旧自研解析和判分路线已停用。范围与停用说明见 [TEST-001](specs/TEST-001.md)，后续工作见 [Issue #8](https://github.com/MindScrath/Focos/issues/8)。官方流程与小范围实验见[核查记录](docs/reference/official-test-entry.md)；新入口仍待实现，判分版本问题仍待解决，参考 Linux 结果不能计为 FocOS 成绩。
+测试接入目标已调整为提供官方测试入口，沿用比赛对应版本的脚本与原始输出；旧自研解析和判分路线已停用。范围与停用说明见 [TEST-001](specs/TEST-001.md)，后续工作见 [Issue #8](https://github.com/MindScrath/Focos/issues/8)。官方流程与小范围实验见[核查记录](docs/reference/official-test-entry.md)；宿主入口已可运行，当前 FocOS 在 1G 配置下会报告内存初始化失败。运行命令见规格，判分版本见 #48。
 
 接下来：VisionFive2 启动、内存管理、任务与用户程序、SD 驱动、FAT32。它们目前都还没有验收通过。历史官方测例和性能实验也还没有运行结果。
 
@@ -120,6 +120,8 @@ Focos/
 │   ├── REGION-001.md                  # 区域赛交付范围
 │   └── TEMPLATE.md                    # 新 SPEC 的简短模板
 ├── scripts/                           # 构建与验证辅助脚本
+│   ├── official_test.py               # 构建并启动比赛镜像，保留原始串口
+│   ├── test_official_test.py          # 原始输出、超时和中断回收测试
 │   ├── smoke.py                       # 检查启动、物理页、中断状态与分页专项
 │   ├── test_build.py                  # 构建目标拒绝、板型选择与开发机边界测试
 │   ├── test_irq_api.py                # 编译调用方，验证启动自检的 unsafe 边界

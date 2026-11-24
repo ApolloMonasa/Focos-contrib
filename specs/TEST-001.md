@@ -1,6 +1,6 @@
 # TEST-001：运行官方测试并保留原始输出
 
-关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 状态：草案，待人工审阅；入口尚未实现。
+关联：[Issue #8](https://github.com/MindScrath/Focos/issues/8) · 状态：草案，待人工审阅；宿主入口已实现，客体执行待联调。
 
 ## 要做到什么
 
@@ -8,7 +8,7 @@
 
 ## 行为约定
 
-- 入口（待实现）：`python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out target/official/run-001 --timeout 3600`。先校验参数、镜像哈希和新输出目录，再调用 `make build` 构建当前 FocOS，按官方 RISC-V 启动参数挂载镜像；参数取值与版本见[依据](../docs/reference/official-test-entry.md)。不把参考 Linux 当作默认内核。
+- 宿主入口：`python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out target/official/run-001 --timeout 3600`。先校验参数、镜像哈希和新输出目录，再调用 `make build` 构建当前 FocOS，按官方 RISC-V 启动参数挂载镜像；参数取值与版本见[依据](../docs/reference/official-test-entry.md)。不把参考 Linux 当作默认内核。
 - 使用固定镜像的原始程序和脚本。宿主入口负责启动 QEMU；内核负责扫描、串行运行两套 libc 的测试脚本并关机。不得把上游 `test_all.sh` 当成全量入口，它未启用 LTP。当前内核只支持 128 MiB 布局，官方 1G 配置会 panic；该依赖及用户态能力未就绪必须在运行说明中明示，不自动改成较小内存或通过扫描日志推断兼容状态。
 - 在客体内以对应的 `/musl` 或 `/glibc` 为工作目录，按脚本要求提供 shell、子脚本解释器和 ELF 所需的动态加载器与库。启动出错时保留原始诊断和脚本路径。每组结束后回收该组留下的后台服务及后代，确认资源释放后再启动下一组。清理失败时停止后续组，记录中止位置。
 - 每次使用全新的输出目录，保存实际命令、内核/镜像 SHA-256、工具版本、构建日志、原始串口日志及运行结束原因；已有目录直接拒绝。运行时同步显示串口输出。串口内容不删改、不去重，不从中计算总通过结论。
@@ -18,7 +18,7 @@
 
 ## 怎样验收
 
-| 场景 | 操作（入口均待实现） | 应看到什么 |
+| 场景 | 操作 | 应看到什么 |
 | --- | --- | --- |
 | 当前 FocOS | 上述命令 | 保留实际启动输出、版本与退出码。当前基线在 1G 下 panic，未来内核修复后以新日志为准 |
 | 组间清理 | 顺序执行 musl、glibc 的 iperf | 前组后台服务器已退出，后一组能在客体内重新绑定 5001 端口；清理失败时保留日志并停止 |
