@@ -54,3 +54,32 @@
 初次实验漏配 `/bin/busybox`，Lua 的 `test.sh` 无法执行，日志显示 `not found`，但 Lua 外层脚本和 QEMU 都退出 0。保留这份失败证据后，仅补上解释器路径重新运行，测试文件未改。补齐后两套 Lua 分别输出 9 条 success，BusyBox 两组均到达结束标记。将 musl BusyBox 开始/结束标记之间的原始字节交给上述官方 judge，输出唯一未通过条目为 `busybox kill 10`。这是实际官方工具的结果，不是自行计算的通过率；不把这次环境修正包装成 FocOS 修复。
 
 实验命令、环境哈希和两轮完整串口日志保存在本地 `target/official-entry-research/`；该目录不入库。SPEC 审阅确认后再实现正式入口及异常回收测试，当前没有这些入口的实现或验收成绩。
+
+## 怎样独立核对 BusyBox 的差异
+
+在 Linux 上准备 Bash、debugfs、Python 3 和 gh。在新的临时目录运行下面的命令，先将 `IMAGE` 设为上文发布镜像解压后的绝对路径。debugfs 默认只读。即使手头没有运行日志，也能用这个步骤比较镜像命令和判分工具要求的命令。
+
+```bash
+set -eu
+: "${IMAGE:?请设置 IMAGE 为解压镜像的绝对路径}"
+cd "$(mktemp -d)"
+ref=d1bb3a3c4b27274e196a2648518525c1a304e339
+echo "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8  $IMAGE" | sha256sum -c -
+for libc in musl glibc; do
+    debugfs -R "dump /${libc}/busybox_cmd.txt ${libc}.commands" "$IMAGE"
+    gh api -H 'Accept: application/vnd.github.raw+json' \
+        "repos/oscomp/autotest-for-oskernel/contents/kernel/judge/judge_busybox-${libc}.py?ref=$ref" > "${libc}.py"
+    echo "307c6d0325abe22e35c3c3cc27566b41f26598e1e690d7e2a504aadab678d03d  ${libc}.py" | sha256sum -c -
+    grep -nF 'kill' "${libc}.commands"
+    grep -nxF 'kill 10' "${libc}.py"
+done
+```
+
+复核运行结果时，选取一次串口日志中对应 BusyBox 组开始与结束标记之间的完整字节，分别保存为 `musl.group`、`glibc.group`。在上一步的临时目录执行：
+
+```bash
+python3 musl.py < musl.group > musl.result.json
+python3 glibc.py < glibc.group > glibc.result.json
+```
+
+本次用已有的两份参考 Linux 串口日志重放。两份官方判分脚本的哈希相同，各自产生的唯一零分条目都是 `{"name":"busybox kill 10","pass":0,"all":1,"score":0}`。对照两套镜像命令表，实际执行的是结束后台进程的 `kill $!`。这个差异已在两套 libc 上复现。2025 赛场采用的具体判分版本仍待 #48 核实。
