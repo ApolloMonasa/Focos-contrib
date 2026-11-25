@@ -1,5 +1,6 @@
 """构建 FocOS，挂载固定比赛镜像并记录 QEMU 原始串口。"""
 import argparse
+import ctypes
 from contextlib import contextmanager
 import hashlib
 import json
@@ -32,6 +33,13 @@ def group_exists(pid):
 
 @contextmanager
 def child(cmd, **kwargs):
+    # Linux reparents orphaned grandchildren to this runner, so waitpid can
+    # release their process table entries even if the container init does not.
+    pr_set_child_subreaper = 36
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(pr_set_child_subreaper, 1, 0, 0, 0) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
     proc = subprocess.Popen(cmd, cwd=ROOT, start_new_session=True,
                             stdin=subprocess.DEVNULL, **kwargs)
     try:
@@ -48,27 +56,28 @@ def child(cmd, **kwargs):
 
 
 def reap(proc):
-    proc.poll()
-    if group_exists(proc.pid):
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        proc.poll()
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
-            until = time.monotonic() + 5
-            while group_exists(proc.pid) and time.monotonic() < until:
-                proc.poll()
-                time.sleep(0.05)
-            if group_exists(proc.pid):
-                os.killpg(proc.pid, signal.SIGKILL)
+            os.killpg(proc.pid, sig)
         except ProcessLookupError:
-            pass
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError("清理失败，子进程仍未退出") from exc
-    if group_exists(proc.pid):
-        raise RuntimeError("清理失败，进程组仍存在")
+            return
+        until = time.monotonic() + 5
+        while time.monotonic() < until:
+            # Let Popen collect its own leader and retain the exit status.
+            if proc.poll() is not None:
+                try:
+                    while os.waitpid(-proc.pid, os.WNOHANG)[0]:
+                        pass
+                except ChildProcessError:
+                    pass
+            if not group_exists(proc.pid):
+                return
+            time.sleep(0.05)
+    raise RuntimeError("清理失败，进程组仍存在")
 
 
-def run_serial(cmd, out, timeout, screen):
+def run_serial(cmd, out, timeout, screen, record=None):
     deadline = time.monotonic() + timeout
 
     def remaining():
@@ -84,7 +93,10 @@ def run_serial(cmd, out, timeout, screen):
                 while selector.select(remaining()):
                     data = os.read(proc.stdout.fileno(), 65536)
                     if not data:
-                        return proc.wait(timeout=remaining())
+                        rc = proc.wait(timeout=remaining())
+                        if record is not None:
+                            record["qemu_exit"] = rc
+                        return rc
                     pending = memoryview(data)
                     while pending:
                         written = log.write(pending)
@@ -120,6 +132,9 @@ def main():
         record["image_sha256"] = digest(image)
         if record["image_sha256"] != IMAGE_SHA:
             raise ValueError("镜像 SHA-256 不匹配")
+        record["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        record["dirty"] = bool(subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=ROOT))
         with (out / "build.log").open("xb") as log:
             # Pin Cargo's output to the same tree used for hashing and boot.
             record["build_env"] = {"CARGO_TARGET_DIR": str(TARGET_DIR)}
@@ -128,7 +143,6 @@ def main():
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
         record["kernel_sha256"] = digest(ELF)
-        record["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
         record["firmware_sha256"] = digest(firmware)
         cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(ELF),
@@ -139,8 +153,7 @@ def main():
                "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
         record["command"] = cmd
         record["qemu_version"] = subprocess.check_output([cmd[0], "--version"], text=True).splitlines()[0]
-        rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer)
-        record["qemu_exit"] = rc
+        rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer, record)
         record["reason"] = f"QEMU 进程退出 {rc}"
         code = int(rc != 0)
     except ValueError as exc:
@@ -151,6 +164,8 @@ def main():
         code, record["reason"] = 130, "用户中断"
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         record["reason"] = str(exc)
+        if "qemu_exit" in record:
+            record["reason"] = f"QEMU 进程退出 {record['qemu_exit']}；清理失败：{exc}"
     print(record["reason"], file=sys.stderr)
     record["exit"] = code
     try:

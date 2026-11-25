@@ -82,3 +82,34 @@ sys.exit(1)
                         raise original
                 self.assertIn(text, str(raised.exception))
                 self.assertIn("cleanup error", str(raised.exception))
+
+    def test_return_code_survives_failed_cleanup(self):
+        record = {}
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "wb") as screen:
+            with patch("official_test.reap", side_effect=OSError("cleanup failed")):
+                with self.assertRaises(OSError):
+                    run_serial([sys.executable, "-c", "raise SystemExit(7)"],
+                               Path(tmp), 3, screen, record)
+        self.assertEqual(record["qemu_exit"], 7)
+
+    def test_sigkill_reaps_orphan(self):
+        # The leader exits only after its helper is ready and ignores TERM.
+        cmd = """import os, signal
+r, w = os.pipe()
+pid = os.fork()
+if not pid:
+    os.close(r)
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    os.write(w, b'1')
+    signal.pause()
+else:
+    os.close(w)
+    os.read(r, 1)
+    print(pid)
+"""
+        with child([sys.executable, "-c", cmd], stdout=subprocess.PIPE) as proc:
+            with proc.stdout:
+                helper = int(proc.stdout.readline())
+                self.assertEqual(proc.wait(timeout=3), 0)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(helper, 0)
