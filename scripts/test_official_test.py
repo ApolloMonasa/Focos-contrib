@@ -43,3 +43,28 @@ class SerialTests(unittest.TestCase):
                 self.assertEqual((root / "serial.log").read_bytes(), b"boot\n")
                 with self.assertRaises(ProcessLookupError):
                     os.kill(int(pidfile.read_text()), 0)
+
+    def test_short_disk_write_is_reported(self):
+        # Linux can accept a prefix without raising until the next write.
+        with tempfile.TemporaryDirectory() as tmp:
+            probe = """
+import os, resource, signal, sys
+from pathlib import Path
+from official_test import run_serial
+signal.signal(signal.SIGXFSZ, signal.SIG_IGN)
+resource.setrlimit(resource.RLIMIT_FSIZE, (8, 8))
+with open(os.devnull, 'wb') as screen:
+    try:
+        run_serial([sys.executable, '-c', 'print("0123456789")'],
+                   Path(sys.argv[1]), 3, screen)
+    except OSError as error:
+        import errno
+        if error.errno == errno.EFBIG:
+            sys.exit(0)
+        raise
+sys.exit(1)
+"""
+            result = subprocess.run([sys.executable, "-B", "-c", probe, tmp],
+                                    cwd=Path(__file__).resolve().parent)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual((Path(tmp) / "serial.log").read_bytes(), b"01234567")

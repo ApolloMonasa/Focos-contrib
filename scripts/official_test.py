@@ -73,7 +73,12 @@ def run_serial(cmd, out, timeout, screen):
                     data = os.read(proc.stdout.fileno(), 65536)
                     if not data:
                         return proc.wait(timeout=remaining())
-                    log.write(data)
+                    pending = memoryview(data)
+                    while pending:
+                        written = log.write(pending)
+                        if not written:
+                            raise OSError("串口日志写入停滞")
+                        pending = pending[written:]
                     screen.write(data)
                     screen.flush()
                 raise subprocess.TimeoutExpired(cmd, timeout)
