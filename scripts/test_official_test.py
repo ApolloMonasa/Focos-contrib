@@ -5,7 +5,9 @@ import sys
 import tempfile
 import unittest
 
-from official_test import run_serial
+from unittest.mock import patch
+
+from official_test import child, run_serial
 
 
 class SerialTests(unittest.TestCase):
@@ -68,3 +70,15 @@ sys.exit(1)
                                     cwd=Path(__file__).resolve().parent)
             self.assertEqual(result.returncode, 0)
             self.assertEqual((Path(tmp) / "serial.log").read_bytes(), b"01234567")
+
+    def test_cleanup_failure_keeps_both_reasons(self):
+        for original, text in [(KeyboardInterrupt(), "用户中断"),
+                               (subprocess.TimeoutExpired("qemu", 1), "timed out")]:
+            with self.subTest(original=original), patch("official_test.reap",
+                                                       side_effect=OSError("cleanup error")):
+                with self.assertRaises(RuntimeError) as raised:
+                    with child([sys.executable, "-c", "pass"]) as proc:
+                        proc.wait()
+                        raise original
+                self.assertIn(text, str(raised.exception))
+                self.assertIn("cleanup error", str(raised.exception))

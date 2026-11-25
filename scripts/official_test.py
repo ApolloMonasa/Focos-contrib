@@ -13,7 +13,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_SHA = "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
-ELF = ROOT / "target/riscv64gc-unknown-none-elf/release/focos-kernel"
+TARGET_DIR = ROOT / "target"
+ELF = TARGET_DIR / "riscv64gc-unknown-none-elf/release/focos-kernel"
 
 
 def digest(path):
@@ -36,24 +37,35 @@ def child(cmd, **kwargs):
     try:
         yield proc
     finally:
-        proc.poll()
-        if group_exists(proc.pid):
-            try:
-                os.killpg(proc.pid, signal.SIGTERM)
-                until = time.monotonic() + 5
-                while group_exists(proc.pid) and time.monotonic() < until:
-                    proc.poll()
-                    time.sleep(0.05)
-                if group_exists(proc.pid):
-                    os.killpg(proc.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+        original = sys.exc_info()[1]
         try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError("清理失败，子进程仍未退出") from exc
-        if group_exists(proc.pid):
-            raise RuntimeError("清理失败，进程组仍存在")
+            reap(proc)
+        except (RuntimeError, OSError) as exc:
+            if original is None:
+                raise
+            reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
+            raise RuntimeError(f"{reason}；清理失败：{exc}") from exc
+
+
+def reap(proc):
+    proc.poll()
+    if group_exists(proc.pid):
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+            until = time.monotonic() + 5
+            while group_exists(proc.pid) and time.monotonic() < until:
+                proc.poll()
+                time.sleep(0.05)
+            if group_exists(proc.pid):
+                os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("清理失败，子进程仍未退出") from exc
+    if group_exists(proc.pid):
+        raise RuntimeError("清理失败，进程组仍存在")
 
 
 def run_serial(cmd, out, timeout, screen):
@@ -109,7 +121,10 @@ def main():
         if record["image_sha256"] != IMAGE_SHA:
             raise ValueError("镜像 SHA-256 不匹配")
         with (out / "build.log").open("xb") as log:
-            with child(record["build"], stdout=log, stderr=subprocess.STDOUT) as proc:
+            # Pin Cargo's output to the same tree used for hashing and boot.
+            record["build_env"] = {"CARGO_TARGET_DIR": str(TARGET_DIR)}
+            with child(record["build"], env=os.environ | record["build_env"],
+                       stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
         record["kernel_sha256"] = digest(ELF)
