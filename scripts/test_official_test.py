@@ -190,3 +190,18 @@ else:
                         [sys.executable, Path(__file__).with_name("official_test.py"), *args],
                         stderr=sink)
                     self.assertEqual(result.returncode, 2)
+
+    @unittest.skipIf(os.geteuid() == 0, "root can read mode-000 files")
+    def test_unreadable_image_is_input_error(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "image"
+            image.touch(mode=0)
+            out = root / "out"
+            result = subprocess.run(
+                [sys.executable, Path(__file__).with_name("official_test.py"),
+                 "--image", image, "--out", out], capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 2)
+            self.assertFalse((out / "build.log").exists())

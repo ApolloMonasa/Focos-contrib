@@ -14,8 +14,6 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_SHA = "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
-TARGET_DIR = ROOT / "target"
-ELF = TARGET_DIR / "riscv64gc-unknown-none-elf/release/focos-kernel"
 
 
 def digest(path):
@@ -181,28 +179,33 @@ def main():
     record = {"image": str(image), "timeout_seconds": args.timeout, "build": ["make", "build"]}
     code = 1
     try:
-        record["image_sha256"] = digest(image)
+        try:
+            record["image_sha256"] = digest(image)
+        except OSError as exc:
+            raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
         if record["image_sha256"] != IMAGE_SHA:
             raise ValueError("镜像 SHA-256 不匹配")
         record["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         record["dirty"] = bool(subprocess.check_output(
             ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=ROOT))
         with (out / "build.log").open("xb") as log:
-            # Pin Cargo's output to the same tree used for hashing and boot.
-            record["build_env"] = {"CARGO_TARGET_DIR": str(TARGET_DIR)}
+            target_dir = out / "cargo-target"
+            kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
+            compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
+            record["build_env"] = {"CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler}
             build_env = os.environ | record["build_env"]
-            for tool in ("rustc", "cargo"):
+            for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
                 record[f"{tool}_version"] = subprocess.check_output(
-                    [tool, "--version", "--verbose"], cwd=ROOT, env=build_env,
+                    [executable, "--version", "--verbose"], cwd=ROOT, env=build_env,
                     text=True).strip()
             with child(record["build"], env=build_env,
                        stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
-        record["kernel_sha256"] = digest(ELF)
+        record["kernel_sha256"] = digest(kernel)
         firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
         record["firmware_sha256"] = digest(firmware)
-        cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(ELF),
+        cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(kernel),
                "-m", "1G", "-smp", "1", "-display", "none", "-monitor", "none",
                "-serial", "stdio", "-bios", str(firmware), "-no-reboot",
                "-drive", "file=" + str(image).replace(",", ",,") + ",if=none,format=raw,id=x0,snapshot=on",
