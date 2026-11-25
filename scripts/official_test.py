@@ -206,7 +206,7 @@ def main():
     print(record["reason"], file=sys.stderr)
     record["exit"] = code
     try:
-        (out / "run.json").write_text(json.dumps(record, indent=2, ensure_ascii=False) + "\n")
+        (out / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
         print(exc, file=sys.stderr)
         return 1

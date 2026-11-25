@@ -139,3 +139,20 @@ else:
         self.assertIsNotNone(proc.returncode)
         with self.assertRaises(ProcessLookupError):
             os.killpg(proc.pid, 0)
+
+    def test_bad_image_records_utf8_reason_in_ascii_locale(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "image"
+            image.write_bytes(b"invalid")
+            out = root / "run"
+            result = subprocess.run(
+                [sys.executable, Path(__file__).with_name("official_test.py"),
+                 "--image", image, "--out", out],
+                env=os.environ | {"LC_ALL": "C", "PYTHONUTF8": "0"},
+                capture_output=True)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            record = json.loads((out / "run.json").read_text(encoding="utf-8"))
+            self.assertEqual(record["exit"], 2)
+            self.assertEqual(record["reason"], "镜像 SHA-256 不匹配")
