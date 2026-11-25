@@ -85,7 +85,7 @@ sys.exit(1)
         record = {}
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "wb") as screen:
             with patch("official_test.reap", side_effect=OSError("cleanup failed")):
-                with self.assertRaises(OSError):
+                with self.assertRaisesRegex(RuntimeError, "进程退出 7；清理失败"):
                     run_serial([sys.executable, "-c", "raise SystemExit(7)"],
                                Path(tmp), 3, screen, record)
         self.assertEqual(record["qemu_exit"], 7)
@@ -137,9 +137,9 @@ else:
     def test_second_sigint_during_cleanup(self):
         from official_test import reap
 
-        def interrupt_cleanup(proc, existing_children):
+        def interrupt_cleanup(proc):
             os.kill(os.getpid(), signal.SIGINT)
-            reap(proc, existing_children)
+            reap(proc)
 
         with patch("official_test.reap", side_effect=interrupt_cleanup):
             with self.assertRaises(KeyboardInterrupt):
@@ -303,7 +303,7 @@ sys.exit(runner.main())
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             def git(*args):
-                subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+                subprocess.run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args], cwd=root, check=True, capture_output=True)
             git("init")
             source = root / "source"
             source.write_bytes(b"base")
@@ -367,3 +367,84 @@ assert probe_version(cmd, subprocess.DEVNULL) == "version \u00e9\\xff"
                     source_state(root / "out")
             with self.assertRaises(ProcessLookupError):
                 os.kill(int((root / "helper").read_text()), 0)
+
+    def test_exited_vm_with_inherited_serial_pipe(self):
+        script = """
+import sys, subprocess
+helper = subprocess.Popen(["sleep", "30"], start_new_session=True)
+print(helper.pid, flush=True)
+sys.exit(7)
+"""
+        with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "wb") as screen:
+            out = Path(tmp)
+            record = {}
+            self.assertEqual(run_serial([sys.executable, "-c", script], out, 2, screen, record), 7)
+            self.assertEqual(record["qemu_exit"], 7)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((out / "serial.log").read_bytes()), 0)
+
+    def test_existing_child_is_left_running(self):
+        with subprocess.Popen(["sleep", "30"]) as existing:
+            try:
+                with self.assertRaisesRegex(RuntimeError, "已有子进程"):
+                    with child(["true"]):
+                        self.fail("unexpected launch")
+                self.assertIsNone(existing.poll())
+            finally:
+                existing.terminate()
+
+    def test_empty_proc_listing_does_not_prove_cleanup(self):
+        from official_test import direct_children
+        scans = []
+        def incomplete_first_scan():
+            scans.append(True)
+            return set() if len(scans) == 1 else direct_children()
+
+        with patch("official_test.direct_children", incomplete_first_scan):
+            with child(["sh", "-c", "sleep 30 </dev/null >/dev/null 2>&1 & echo $!"],
+                       stdout=subprocess.PIPE) as proc:
+                with proc.stdout:
+                    helper = int(proc.stdout.readline())
+                proc.wait(timeout=3)
+        self.assertGreaterEqual(len(scans), 2)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(helper, 0)
+
+    def test_build_cleanup_failure_stops_entry_and_records_reason(self):
+        import json
+        script = """
+import sys
+from pathlib import Path
+import official_test as runner
+runner.IMAGE_SHA = runner.digest(Path(sys.argv[2]))
+reap = runner.reap
+def fail_after_build(proc):
+    reap(proc)
+    if proc.args == ["make", "build"]:
+        raise OSError("无法确认子进程状态")
+runner.reap = fail_after_build
+sys.exit(runner.main())
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image, out, make = root / "image", root / "output", root / "make"
+            image.write_bytes(b"fixture")
+            profile = {"CARGO_PROFILE_RELEASE_OPT_LEVEL": "1", "CARGO_PROFILE_RELEASE_LTO": "off"}
+            make.write_text("#!/bin/sh\necho \"$CARGO_PROFILE_RELEASE_OPT_LEVEL $CARGO_PROFILE_RELEASE_LTO\"\nexit 7\n")
+            make.chmod(0o755)
+            compiler = root / "compiler"
+            compiler.write_text("#!/bin/sh\necho fixture\n")
+            compiler.chmod(0o755)
+            result = subprocess.run([sys.executable, "-B", "-c", script, "--image",
+                                     str(image), "--out", str(out)],
+                                    cwd=Path(__file__).parent, capture_output=True,
+                                    env=os.environ | profile | {"PATH": tmp + os.pathsep + os.environ["PATH"],
+                                                                "RUSTC": str(compiler)})
+            record = json.loads((out / "run.json").read_bytes())
+            self.assertEqual((result.returncode, record["exit"]), (1, 1))
+            self.assertIn(b"1 off", (out / "build.log").read_bytes().splitlines())
+            for key, value in profile.items():
+                self.assertEqual(record["build_env"][key], value)
+            self.assertIn("构建失败", record["reason"])
+            self.assertIn("无法确认子进程状态", record["reason"])
+            self.assertFalse((out / "qemu.stderr").exists())

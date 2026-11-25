@@ -2,6 +2,7 @@
 import argparse
 import ctypes
 import errno
+import fcntl
 from contextlib import contextmanager
 import hashlib
 import json
@@ -9,9 +10,11 @@ import os
 from pathlib import Path
 import selectors
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
+import termios
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,6 +123,15 @@ def direct_children():
     return {int(pid) for pid in children.split()}
 
 
+def has_children():
+    # Only ECHILD proves that the kernel has no child left for us to reap.
+    try:
+        os.waitid(os.P_ALL, 0, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+    except ChildProcessError:
+        return False
+    return True
+
+
 @contextmanager
 def child(cmd, **kwargs):
     # Linux reparents orphaned grandchildren to this runner, so waitpid can
@@ -140,7 +152,8 @@ def child(cmd, **kwargs):
 
     previous = {sig: signal.signal(sig, handle) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        existing_children = direct_children()
+        if has_children():
+            raise RuntimeError("入口已有子进程，无法区分本次命令的后代")
         proc = subprocess.Popen(cmd, cwd=ROOT, start_new_session=True,
                                 stdin=subprocess.DEVNULL, **kwargs)
         try:
@@ -152,12 +165,15 @@ def child(cmd, **kwargs):
             running = False
             original = sys.exc_info()[1]
             try:
-                reap(proc, existing_children)
+                reap(proc)
             except (RuntimeError, OSError) as exc:
-                if original is None:
-                    raise
-                reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
-                raise RuntimeError(f"{reason}；清理失败：{exc}") from exc
+                detail = f"清理失败：{exc}"
+                if original is not None:
+                    reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
+                    detail = f"{reason}；{detail}"
+                elif proc.returncode is not None:
+                    detail = f"{cmd[0]} 进程退出 {proc.returncode}；{detail}"
+                raise RuntimeError(detail) from exc
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
@@ -165,7 +181,7 @@ def child(cmd, **kwargs):
         interrupt(pending_signal, None)
 
 
-def reap(proc, existing_children):
+def reap(proc):
     for sig in (signal.SIGTERM, signal.SIGKILL):
         if proc.poll() is None:
             try:
@@ -177,14 +193,14 @@ def reap(proc, existing_children):
             # Once their parents exit, even detached descendants are adopted
             # by this single-threaded runner. Repeat for successive generations.
             if proc.poll() is not None:
-                adopted = direct_children() - existing_children
-                if not adopted:
+                if not has_children():
                     return
+                adopted = direct_children()
                 for pid in adopted:
                     if os.waitpid(pid, os.WNOHANG)[0] == 0:
                         os.kill(pid, sig)
             time.sleep(0.05)
-    raise RuntimeError("清理失败，子进程仍存在")
+    raise RuntimeError("仍无法确认子进程已全部回收")
 
 
 @contextmanager
@@ -227,13 +243,27 @@ def run_serial(cmd, out, timeout, screen, record=None):
         with child(cmd, stdout=subprocess.PIPE, stderr=err) as proc:
             with proc.stdout, selectors.DefaultSelector() as selector, display_writer(screen, remaining) as display:
                 selector.register(proc.stdout, selectors.EVENT_READ)
-                while selector.select(remaining()):
-                    data = os.read(proc.stdout.fileno(), 65536)
+                fd = proc.stdout.fileno()
+                buffered = None
+                while True:
+                    if buffered is None and proc.poll() is not None:
+                        if record is not None:
+                            record["qemu_exit"] = proc.returncode
+                        # Descendants can hold or keep writing the same pipe.
+                        # Drain exactly the bytes queued when exit is observed.
+                        buffered, = struct.unpack("i", fcntl.ioctl(fd, termios.FIONREAD, bytes(4)))
+                    if buffered == 0:
+                        return proc.returncode
+                    if buffered is None and not selector.select(min(0.1, remaining())):
+                        continue
+                    data = os.read(fd, min(65536, buffered) if buffered is not None else 65536)
                     if not data:
                         rc = proc.wait(timeout=remaining())
                         if record is not None:
                             record["qemu_exit"] = rc
                         return rc
+                    if buffered is not None:
+                        buffered -= len(data)
                     pending = memoryview(data)
                     while pending:
                         written = log.write(pending)
@@ -241,7 +271,6 @@ def run_serial(cmd, out, timeout, screen, record=None):
                             raise OSError("串口日志写入停滞")
                         pending = pending[written:]
                     display(data)
-                raise subprocess.TimeoutExpired(cmd, timeout)
 
 
 def report(reason):
@@ -326,8 +355,10 @@ def main():
                 "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
             }
             for key, value in os.environ.items():
-                if key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS") or (
-                    key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS")
+                if (
+                    key.startswith("CARGO_PROFILE_RELEASE_")
+                    or key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS")
+                    or (key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS"))
                 ):
                     record["build_env"][key] = value
             build_env = os.environ | record["build_env"]
@@ -368,10 +399,8 @@ def main():
         code, record["reason"] = 130, "用户中断"
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         record["reason"] = str(exc)
-        if "qemu_exit" in record:
-            record["reason"] = f"QEMU 进程退出 {record['qemu_exit']}；清理失败：{exc}"
     finally:
-        # All child groups are gone. Keep termination masked through CLI exit
+        # Cleanup has finished or reported an error. Mask signals through CLI exit
         # so a late signal cannot interrupt a record write or change its status.
         signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
     record["exit"] = code

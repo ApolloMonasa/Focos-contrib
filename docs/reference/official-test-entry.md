@@ -96,4 +96,24 @@ python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out targe
 
 1 GiB 内存布局修复由 [#65](https://github.com/MindScrath/Focos/issues/65) 跟踪。修复合入后，保留原运行目录，用相同镜像和 1 GiB 参数选择一个新输出目录复跑，对照修复前后的串口和内核哈希。
 
-输出目录保留只读的镜像副本（逻辑大小 4 GiB），QEMU 从已校验的副本启动。运行记录保留传入的 Rust 编译标志。宿主收到 SIGTERM 时先清理本次进程组，再记录退出码 143。
+输出目录保留只读的镜像副本（逻辑大小 4 GiB），QEMU 从已校验的副本启动。运行记录的 `build_env` 保留传入的 Rust 编译标志，以及通过 `CARGO_PROFILE_RELEASE_*` 环境变量设置的 release 构建参数（例如优化级别和链接时优化）。宿主收到 SIGTERM 时先清理本次进程组，再记录退出码 143。
+
+## 宿主进程验收
+
+从仓库根目录执行。第一条命令单独检查入口，第二条运行仓库的完整检查。
+
+```bash
+python3 -B -m unittest discover -v -s scripts -p 'test_official_test.py'
+make check
+```
+
+| 入口启动的外部命令 | 共用的启动与回收路径 | 可以核对的行为 |
+| --- | --- | --- |
+| 构建前后的 Git 查询 | `source_state → command_output → child` | Git 包装器启动后台进程后向入口发送 SIGTERM，辅助进程被回收。 |
+| rustc、Cargo、QEMU 版本查询 | `probe_version → command_output → child` | 测试中断版本包装器并检查辅助 PID。版本标准输出写临时文件，后代持有写端不影响等待主命令退出。 |
+| `make build` 及其编译器后代 | `main → child` | 等待 make 退出，再清理后台后代；构建失败或无法验证清理结果时停止。 |
+| 运行 QEMU | `run_serial → child` | 替身退出 7，脱组辅助程序保持串口写端打开。测试核对串口原文、退出码 7 和辅助 PID 消失。挂起的替身另测超时。 |
+
+`child` 是唯一启动外部命令的位置。入口要求 Linux 允许 `PR_SET_CHILD_SUBREAPER`，使孤儿后代重新归入口管理。查找子进程时优先读取 `/proc/thread-self/children`，缺少时枚举同一 PID 命名空间的 `/proc`，用 `waitid` 核对亲子关系。主命令退出后，只有内核通过 `waitid(P_ALL)` 报告已经没有子进程，才确认清理成功。进程列表偶尔漏掉某个 PID 时会重查；TERM 和 KILL 的等待期各最多 5 秒，期满仍无法确认则报错。
+
+检查测试名中的 `without_proc_children`、`empty_proc_listing` 和 `existing_child`，可分别验证缺少可选文件时强制回收脱组进程、一次空枚举不会误判成功，以及启动前已有进程时停止并保留该进程。整个入口被 SIGKILL 后的清理由外部作业管理器负责。
