@@ -229,3 +229,37 @@ else:
                  "--image", image, "--out", root / "run"], capture_output=True)
             self.assertEqual(result.returncode, 2)
             self.assertNotIn(b"Traceback", result.stderr)
+
+    def test_output_symlink_loop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "image"
+            image.touch()
+            loop = root / "loop"
+            loop.symlink_to(loop)
+            result = subprocess.run(
+                [sys.executable, Path(__file__).with_name("official_test.py"),
+                 "--image", image, "--out", loop / "run"], capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b"Traceback", result.stderr)
+
+    def test_sigterm_at_final_report(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "image"
+            image.touch()
+            out = root / "out"
+            probe = """
+import os, signal, sys
+import official_test as runner
+def terminate(reason):
+    os.kill(os.getpid(), signal.SIGTERM)
+runner.report = terminate
+signal.signal(signal.SIGTERM, runner.interrupt)
+sys.exit(runner.main())
+"""
+            result = subprocess.run([sys.executable, "-B", "-c", probe, "--image",
+                                     image, "--out", out], cwd=Path(__file__).parent)
+            self.assertEqual(result.returncode, 143)
+            self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)

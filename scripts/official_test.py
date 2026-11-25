@@ -1,6 +1,7 @@
 """构建 FocOS，挂载固定比赛镜像并记录 QEMU 原始串口。"""
 import argparse
 import ctypes
+import errno
 from contextlib import contextmanager
 import hashlib
 import json
@@ -187,7 +188,12 @@ def report(reason):
     # stderr is optional; a buffered retry at interpreter shutdown can
     # otherwise replace the runner's exit code when the reader has gone.
     try:
-        os.write(2, (str(reason) + "\n").encode("utf-8", "backslashreplace"))
+        blocking = os.get_blocking(2)
+        try:
+            os.set_blocking(2, False)
+            os.write(2, (str(reason) + "\n").encode("utf-8", "backslashreplace"))
+        finally:
+            os.set_blocking(2, blocking)
     except OSError:
         pass
 
@@ -210,12 +216,17 @@ def main():
         parser.error(f"无法解析镜像路径：{exc}")
     if args.timeout <= 0 or not image.is_file():
         parser.error("需要有效的镜像文件和正整数超时秒数")
-    out = args.out.resolve()
+    try:
+        out = args.out.resolve()
+    except (OSError, RuntimeError) as exc:
+        parser.error(f"无法解析输出路径：{exc}")
     try:
         out.mkdir(mode=0o700, parents=True, exist_ok=False)
     except FileExistsError:
         parser.error("输出目录已存在")
     except OSError as exc:
+        if exc.errno in (errno.ELOOP, errno.ENOTDIR):
+            parser.error(f"无效输出路径：{exc}")
         report(exc)
         return 1
 
@@ -244,7 +255,7 @@ def main():
             for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
                 record[f"{tool}_version"] = subprocess.check_output(
                     [executable, "--version", "--verbose"], cwd=ROOT, env=build_env,
-                    text=True).strip()
+                    stderr=log, text=True).strip()
             with child(record["build"], env=build_env,
                        stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
@@ -275,13 +286,23 @@ def main():
         record["reason"] = str(exc)
         if "qemu_exit" in record:
             record["reason"] = f"QEMU 进程退出 {record['qemu_exit']}；清理失败：{exc}"
+    finally:
+        # All child groups are gone. Keep termination masked through CLI exit
+        # so a late signal cannot interrupt a record write or change its status.
+        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
     record["exit"] = code
+    path = out / "run.json"
     try:
-        (out / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        report(record["reason"])
+        pending = signal.sigpending()
+        if code != 1 and pending.intersection({signal.SIGTERM, signal.SIGINT}):
+            code = 143 if signal.SIGTERM in pending else 130
+            record.update(exit=code, reason="收到 SIGTERM" if code == 143 else "用户中断")
+            path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
         report(exc)
         return 1
-    report(record["reason"])
     return code
 
 
