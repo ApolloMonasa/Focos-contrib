@@ -95,3 +95,5 @@ python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out targe
 选择尚未存在的输出目录。每次运行使用输出目录下独立的 `cargo-target/` 构建、计算内核哈希并启动 QEMU。入口优先采用环境中的 `RUSTC`，其次采用 `CARGO_BUILD_RUSTC`，默认使用 PATH 中的 rustc。传给 Cargo 的编译器和输出路径记录在 `run.json` 的 `build_env` 中。构建输出见 `build.log`，串口原文见 `serial.log`，QEMU 宿主诊断见 `qemu.stderr`。运行结束后查看 `run.json` 中的内核、固件和镜像哈希、QEMU 实际命令、版本和结束原因。当前内核在 1G 配置下输出内存初始化失败，尚未到达客体脚本。测试超时默认为 3600 秒。
 
 1 GiB 内存布局修复由 [#65](https://github.com/MindScrath/Focos/issues/65) 跟踪。修复合入后，保留原运行目录，用相同镜像和 1 GiB 参数选择一个新输出目录复跑，对照修复前后的串口和内核哈希。
+
+输出目录保留只读的镜像副本（逻辑大小 4 GiB），QEMU 从已校验的副本启动。运行记录保留传入的 Rust 编译标志。宿主收到 SIGTERM 时先清理本次进程组，再记录退出码 143。

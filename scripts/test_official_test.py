@@ -205,3 +205,27 @@ else:
             self.assertEqual(result.returncode, 2)
             self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 2)
             self.assertFalse((out / "build.log").exists())
+
+    def test_image_copy_survives_source_replacement(self):
+        from official_test import copy_image
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source, dest = root / "input", root / "copy"
+            data = b"data" + bytes(2 * 1024 * 1024)
+            source.write_bytes(data)
+            copy_image(source, dest)
+            source.unlink()
+            source.write_bytes(b"replacement")
+            self.assertEqual(dest.read_bytes(), data)
+            self.assertFalse(dest.stat().st_mode & 0o222)
+
+    def test_image_symlink_loop(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "loop"
+            image.symlink_to(image)
+            result = subprocess.run(
+                [sys.executable, Path(__file__).with_name("official_test.py"),
+                 "--image", image, "--out", root / "run"], capture_output=True)
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn(b"Traceback", result.stderr)

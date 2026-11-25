@@ -21,6 +21,37 @@ def digest(path):
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
+def copy_image(image, dest):
+    try:
+        source = image.open("rb")
+    except OSError as exc:
+        raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
+    with source, dest.open("xb") as target:
+        while True:
+            try:
+                data = source.read(1024 * 1024)
+            except OSError as exc:
+                raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
+            if not data:
+                break
+            if data.count(0) == len(data):
+                target.seek(len(data), os.SEEK_CUR)
+            else:
+                target.write(data)
+        target.truncate()
+    dest.chmod(0o400)
+
+
+class Terminated(Exception):
+    pass
+
+
+def interrupt(signum, frame):
+    if signum == signal.SIGTERM:
+        raise Terminated("收到 SIGTERM")
+    raise KeyboardInterrupt
+
+
 def group_exists(pid):
     try:
         os.killpg(pid, 0)
@@ -38,30 +69,39 @@ def child(cmd, **kwargs):
     if libc.prctl(pr_set_child_subreaper, 1, 0, 0, 0) != 0:
         error = ctypes.get_errno()
         raise OSError(error, os.strerror(error))
-    proc = subprocess.Popen(cmd, cwd=ROOT, start_new_session=True,
-                            stdin=subprocess.DEVNULL, **kwargs)
+    pending_signal = None
+    running = False
+
+    def handle(signum, frame):
+        nonlocal pending_signal
+        if running:
+            interrupt(signum, frame)
+        pending_signal = signum
+
+    previous = {sig: signal.signal(sig, handle) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
-        yield proc
-    finally:
-        original = sys.exc_info()[1]
-        interrupted = False
-
-        def defer_interrupt(signum, frame):
-            nonlocal interrupted
-            interrupted = True
-
-        previous_handler = signal.signal(signal.SIGINT, defer_interrupt)
+        proc = subprocess.Popen(cmd, cwd=ROOT, start_new_session=True,
+                                stdin=subprocess.DEVNULL, **kwargs)
         try:
-            reap(proc)
-        except (RuntimeError, OSError) as exc:
-            if original is None:
-                raise
-            reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
-            raise RuntimeError(f"{reason}；清理失败：{exc}") from exc
+            running = True
+            if pending_signal:
+                interrupt(pending_signal, None)
+            yield proc
         finally:
-            signal.signal(signal.SIGINT, previous_handler)
-        if interrupted and original is None:
-            raise KeyboardInterrupt
+            running = False
+            original = sys.exc_info()[1]
+            try:
+                reap(proc)
+            except (RuntimeError, OSError) as exc:
+                if original is None:
+                    raise
+                reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
+                raise RuntimeError(f"{reason}；清理失败：{exc}") from exc
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+    if pending_signal:
+        interrupt(pending_signal, None)
 
 
 def reap(proc):
@@ -164,12 +204,15 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=3600)
     args = parser.parse_args()
-    image = args.image.resolve()
+    try:
+        image = args.image.resolve(strict=True)
+    except (RuntimeError, OSError) as exc:
+        parser.error(f"无法解析镜像路径：{exc}")
     if args.timeout <= 0 or not image.is_file():
         parser.error("需要有效的镜像文件和正整数超时秒数")
     out = args.out.resolve()
     try:
-        out.mkdir(parents=True, exist_ok=False)
+        out.mkdir(mode=0o700, parents=True, exist_ok=False)
     except FileExistsError:
         parser.error("输出目录已存在")
     except OSError as exc:
@@ -179,10 +222,9 @@ def main():
     record = {"image": str(image), "timeout_seconds": args.timeout, "build": ["make", "build"]}
     code = 1
     try:
-        try:
-            record["image_sha256"] = digest(image)
-        except OSError as exc:
-            raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
+        private_image = out / "sdcard-rv.img"
+        copy_image(image, private_image)
+        record["image_sha256"] = digest(private_image)
         if record["image_sha256"] != IMAGE_SHA:
             raise ValueError("镜像 SHA-256 不匹配")
         record["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -193,6 +235,11 @@ def main():
             kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
             compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
             record["build_env"] = {"CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler}
+            for key, value in os.environ.items():
+                if key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS") or (
+                    key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS")
+                ):
+                    record["build_env"][key] = value
             build_env = os.environ | record["build_env"]
             for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
                 record[f"{tool}_version"] = subprocess.check_output(
@@ -208,7 +255,7 @@ def main():
         cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(kernel),
                "-m", "1G", "-smp", "1", "-display", "none", "-monitor", "none",
                "-serial", "stdio", "-bios", str(firmware), "-no-reboot",
-               "-drive", "file=" + str(image).replace(",", ",,") + ",if=none,format=raw,id=x0,snapshot=on",
+               "-drive", "file=" + str(private_image).replace(",", ",,") + ",if=none,format=raw,id=x0,snapshot=on",
                "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0",
                "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
         record["command"] = cmd
@@ -220,6 +267,8 @@ def main():
         code, record["reason"] = 2, str(exc)
     except subprocess.TimeoutExpired as exc:
         code, record["reason"] = 124, str(exc)
+    except Terminated as exc:
+        code, record["reason"] = 143, str(exc)
     except KeyboardInterrupt:
         code, record["reason"] = 130, "用户中断"
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
@@ -237,4 +286,5 @@ def main():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, interrupt)
     sys.exit(main())
