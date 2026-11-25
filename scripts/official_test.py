@@ -30,13 +30,22 @@ class ImageError(ValueError):
     pass
 
 
+def host_environment():
+    keys = {"HOME", "PATH", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
+            "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "CARGO_HOME", "RUSTUP_HOME"}
+    return {key: value for key, value in os.environ.items()
+            if key in keys or key.startswith("LC_")}
+
+
 def source_state(out, err=None):
     paths = ["--", "."]
     if out.is_relative_to(ROOT):
         paths.append(":(exclude,literal)" + str(out.relative_to(ROOT)))
 
+    env = host_environment()
+
     def git(*args):
-        return command_output(["git", *args], err)
+        return command_output(["git", *args], err, env)
 
     for entry in git("ls-files", "-v", "-z", *paths).split(b"\0"):
         if entry and (entry[:1].islower() or entry[:1] == b"S"):
@@ -92,6 +101,10 @@ def copy_image(image, dest):
                 target.write(data)
         target.truncate()
     dest.chmod(0o400)
+
+
+class CleanupError(RuntimeError):
+    pass
 
 
 class Terminated(Exception):
@@ -173,7 +186,9 @@ def child(cmd, **kwargs):
                     detail = f"{reason}；{detail}"
                 elif proc.returncode is not None:
                     detail = f"{cmd[0]} 进程退出 {proc.returncode}；{detail}"
-                raise RuntimeError(detail) from exc
+                if pending_signal:
+                    detail += f"；收到 {signal.Signals(pending_signal).name}"
+                raise CleanupError(detail) from exc
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)
@@ -321,10 +336,73 @@ def prepare():
     return args, image, out
 
 
+def run(args, image, out, record):
+    private_image = out / "sdcard-rv.img"
+    copy_image(image, private_image)
+    record["image_sha256"] = digest(private_image)
+    if record["image_sha256"] != IMAGE_SHA:
+        raise ImageError("镜像 SHA-256 不匹配")
+    with (out / "build.log").open("xb") as log:
+        before = source_state(out, log)
+        record.update(before)
+        target_dir = out / "cargo-target"
+        kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
+        compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
+        record["build_env"] = {
+            "CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler,
+            "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
+        }
+        for key, value in os.environ.items():
+            if (
+                key == "RUSTUP_TOOLCHAIN"
+                or key.startswith("CARGO_PROFILE_RELEASE_")
+                or key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS")
+                or (key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS"))
+            ):
+                record["build_env"][key] = value
+        build_env = host_environment() | record["build_env"]
+        for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
+            record[f"{tool}_version"] = probe_version(
+                [executable, "--version", "--verbose"], log, build_env)
+        with child(record["build"], env=build_env,
+                   stdout=log, stderr=subprocess.STDOUT) as proc:
+            if proc.wait():
+                raise RuntimeError("构建失败，见 build.log")
+        after = source_state(out, log)
+    if after != before:
+        record["source_after_build"] = after
+        raise RuntimeError("构建期间源码状态发生变化，请使用新的输出目录重试")
+    record["kernel_sha256"] = digest(kernel)
+    firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
+    record["firmware_sha256"] = digest(firmware)
+    cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(kernel),
+           "-m", "1G", "-smp", "1", "-display", "none", "-monitor", "none",
+           "-serial", "stdio", "-bios", str(firmware), "-no-reboot",
+           "-drive", "file=" + str(private_image).replace(",", ",,") + ",if=none,format=raw,id=x0,snapshot=on",
+           "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0",
+           "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
+    record["command"] = cmd
+    with (out / "qemu.stderr").open("xb") as err:
+        version = probe_version([cmd[0], "--version"], err)
+    record["qemu_version"] = version.splitlines()[0]
+    rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer, record)
+    record["reason"] = f"QEMU 进程退出 {rc}"
+    return int(rc != 0)
+
+
 def main():
     signals = {signal.SIGTERM, signal.SIGINT}
     previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, signals)
-    signal.signal(signal.SIGTERM, interrupt)
+    active = False
+    received = set()
+
+    def handle(signum, frame):
+        received.add(signum)
+        if active and not isinstance(sys.exception(), CleanupError):
+            interrupt(signum, frame)
+
+    for sig in signals:
+        signal.signal(sig, handle)
     try:
         args, image, out = prepare()
     except SystemExit:
@@ -337,58 +415,15 @@ def main():
 
     record = {"image": str(image), "timeout_seconds": args.timeout, "build": ["make", "build"]}
     code = 1
+    cleanup_failed = False
     try:
-        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
-        private_image = out / "sdcard-rv.img"
-        copy_image(image, private_image)
-        record["image_sha256"] = digest(private_image)
-        if record["image_sha256"] != IMAGE_SHA:
-            raise ImageError("镜像 SHA-256 不匹配")
-        with (out / "build.log").open("xb") as log:
-            before = source_state(out, log)
-            record.update(before)
-            target_dir = out / "cargo-target"
-            kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
-            compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
-            record["build_env"] = {
-                "CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler,
-                "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
-            }
-            for key, value in os.environ.items():
-                if (
-                    key.startswith("CARGO_PROFILE_RELEASE_")
-                    or key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS")
-                    or (key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS"))
-                ):
-                    record["build_env"][key] = value
-            build_env = os.environ | record["build_env"]
-            for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
-                record[f"{tool}_version"] = probe_version(
-                    [executable, "--version", "--verbose"], log, build_env)
-            with child(record["build"], env=build_env,
-                       stdout=log, stderr=subprocess.STDOUT) as proc:
-                if proc.wait():
-                    raise RuntimeError("构建失败，见 build.log")
-            after = source_state(out, log)
-        if after != before:
-            record["source_after_build"] = after
-            raise RuntimeError("构建期间源码状态发生变化，请使用新的输出目录重试")
-        record["kernel_sha256"] = digest(kernel)
-        firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
-        record["firmware_sha256"] = digest(firmware)
-        cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(kernel),
-               "-m", "1G", "-smp", "1", "-display", "none", "-monitor", "none",
-               "-serial", "stdio", "-bios", str(firmware), "-no-reboot",
-               "-drive", "file=" + str(private_image).replace(",", ",,") + ",if=none,format=raw,id=x0,snapshot=on",
-               "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0",
-               "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
-        record["command"] = cmd
-        with (out / "qemu.stderr").open("xb") as err:
-            version = probe_version([cmd[0], "--version"], err)
-        record["qemu_version"] = version.splitlines()[0]
-        rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer, record)
-        record["reason"] = f"QEMU 进程退出 {rc}"
-        code = int(rc != 0)
+        try:
+            active = True
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            code = run(args, image, out, record)
+        finally:
+            # Leave the interruptible phase inside the exception boundary.
+            active = False
     except ImageError as exc:
         code, record["reason"] = 2, str(exc)
     except subprocess.TimeoutExpired as exc:
@@ -397,21 +432,29 @@ def main():
         code, record["reason"] = 143, str(exc)
     except KeyboardInterrupt:
         code, record["reason"] = 130, "用户中断"
+    except CleanupError as exc:
+        cleanup_failed = True
+        record["reason"] = str(exc)
     except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
         record["reason"] = str(exc)
-    finally:
-        # Cleanup has finished or reported an error. Mask signals through CLI exit
-        # so a late signal cannot interrupt a record write or change its status.
-        signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGTERM, signal.SIGINT})
     record["exit"] = code
     path = out / "run.json"
     try:
         path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
         report(record["reason"])
-        pending = signal.sigpending()
-        if code != 1 and pending.intersection({signal.SIGTERM, signal.SIGINT}):
-            code = 143 if signal.SIGTERM in pending else 130
-            record.update(exit=code, reason="收到 SIGTERM" if code == 143 else "用户中断")
+        # Commit the signal decision after the first write and diagnostic.
+        # Signals after this snapshot belong to the already-finished run.
+        signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+        pending = received | signal.sigpending()
+        if pending & signals:
+            sig = signal.SIGTERM if signal.SIGTERM in pending else signal.SIGINT
+            reason = "收到 SIGTERM" if sig == signal.SIGTERM else "用户中断"
+            if cleanup_failed:
+                if reason not in record["reason"]:
+                    record["reason"] += f"；{reason}"
+            else:
+                code = 128 + sig
+                record.update(exit=code, reason=reason)
             path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
         report(exc)

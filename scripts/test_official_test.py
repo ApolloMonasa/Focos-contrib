@@ -302,8 +302,9 @@ sys.exit(runner.main())
         from official_test import source_state
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            fixture_env = os.environ.copy()
             def git(*args):
-                subprocess.run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args], cwd=root, check=True, capture_output=True)
+                subprocess.run(["git", "-c", "maintenance.auto=false", "-c", "gc.auto=0", *args], cwd=root, check=True, capture_output=True, env=fixture_env)
             git("init")
             source = root / "source"
             source.write_bytes(b"base")
@@ -312,7 +313,7 @@ sys.exit(runner.main())
                 "commit", "-m", "base")
             out = root / "run"
             out.mkdir()
-            with patch("official_test.ROOT", root):
+            with patch("official_test.ROOT", root), patch.dict(os.environ, GIT_DIR=str(root / "wrong.git")):
                 self.assertFalse(source_state(out)["dirty"])
                 source.write_bytes(b"first")
                 first = source_state(out)
@@ -413,7 +414,7 @@ sys.exit(7)
     def test_build_cleanup_failure_stops_entry_and_records_reason(self):
         import json
         script = """
-import sys
+import os, signal, sys
 from pathlib import Path
 import official_test as runner
 runner.IMAGE_SHA = runner.digest(Path(sys.argv[2]))
@@ -421,6 +422,7 @@ reap = runner.reap
 def fail_after_build(proc):
     reap(proc)
     if proc.args == ["make", "build"]:
+        os.kill(os.getpid(), signal.SIGTERM)
         raise OSError("无法确认子进程状态")
 runner.reap = fail_after_build
 sys.exit(runner.main())
@@ -447,4 +449,40 @@ sys.exit(runner.main())
                 self.assertEqual(record["build_env"][key], value)
             self.assertIn("构建失败", record["reason"])
             self.assertIn("无法确认子进程状态", record["reason"])
+            self.assertIn("SIGTERM", record["reason"])
             self.assertFalse((out / "qemu.stderr").exists())
+
+    def test_signal_during_final_mask_or_record_write(self):
+        import json
+        probe = """
+import os, signal, sys
+from pathlib import Path
+import official_test as runner
+mode = sys.argv.pop(1)
+mask = signal.pthread_sigmask
+write = Path.write_text
+def inject_mask(how, signals):
+    if how == signal.SIG_BLOCK and "record" in sys._getframe(1).f_locals:
+        os.kill(os.getpid(), signal.SIGTERM)
+    return mask(how, signals)
+def inject_write(path, *args, **kwargs):
+    if path.name == "run.json":
+        os.kill(os.getpid(), signal.SIGTERM)
+    return write(path, *args, **kwargs)
+if mode == "mask":
+    signal.pthread_sigmask = inject_mask
+else:
+    Path.write_text = inject_write
+sys.exit(runner.main())
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "image"
+            image.touch()
+            for mode in ("mask", "write"):
+                with self.subTest(mode=mode):
+                    out = Path(tmp) / mode
+                    result = subprocess.run([sys.executable, "-B", "-c", probe, mode,
+                                             "--image", image, "--out", out],
+                                            cwd=Path(__file__).parent, capture_output=True)
+                    self.assertEqual(result.returncode, 143, result.stderr)
+                    self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)
