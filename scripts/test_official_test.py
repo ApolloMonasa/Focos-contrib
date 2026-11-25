@@ -174,3 +174,19 @@ else:
             record = json.loads((out / "run.json").read_bytes())
             self.assertEqual(record["exit"], 2)
             self.assertEqual(record["reason"], "镜像 SHA-256 不匹配")
+
+    def test_parameter_errors_with_closed_stderr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "image"
+            image.touch()
+            for args in ([], ["--image", image, "--out", root, "--timeout", "0"],
+                         ["--image", root / "missing", "--out", root],
+                         ["--image", image, "--out", root]):
+                reader, writer = os.pipe()
+                os.close(reader)
+                with self.subTest(args=args), os.fdopen(writer, "wb") as sink:
+                    result = subprocess.run(
+                        [sys.executable, Path(__file__).with_name("official_test.py"), *args],
+                        stderr=sink)
+                    self.assertEqual(result.returncode, 2)

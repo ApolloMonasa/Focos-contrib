@@ -154,8 +154,14 @@ def report(reason):
         pass
 
 
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        report(f"{self.format_usage().rstrip()}\n{self.prog}: error: {message}")
+        self.exit(2)
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=3600)
@@ -184,7 +190,12 @@ def main():
         with (out / "build.log").open("xb") as log:
             # Pin Cargo's output to the same tree used for hashing and boot.
             record["build_env"] = {"CARGO_TARGET_DIR": str(TARGET_DIR)}
-            with child(record["build"], env=os.environ | record["build_env"],
+            build_env = os.environ | record["build_env"]
+            for tool in ("rustc", "cargo"):
+                record[f"{tool}_version"] = subprocess.check_output(
+                    [tool, "--version", "--verbose"], cwd=ROOT, env=build_env,
+                    text=True).strip()
+            with child(record["build"], env=build_env,
                        stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
