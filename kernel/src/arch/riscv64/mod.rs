@@ -72,4 +72,7 @@ mod timer_check;
 #[cfg(target_arch = "riscv64")]
 pub use timer_check::{TimerCheckError, check_boot_timer};
 
+#[cfg(any(target_arch = "riscv64", test))]
+mod timer_check_deadline;
+
 mod timer_model;

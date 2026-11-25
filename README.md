@@ -110,6 +110,7 @@ Focos/
 │               │   └── tests.rs       # 期限、计数、固件失败及等待预算
 │               ├── timer_check.rs     # 真实事件、寄存器与嵌套屏蔽自检
 │               ├── timer_check.S      # 整数/浮点哨兵和有界中断窗口
+│               ├── timer_check_deadline.rs # 自检短期限预约与过期重试测试
 │               ├── fault.S            # 共用异常入口、寄存器恢复与重入失败出口
 │               ├── fault.rs           # 单次异常匹配器及注入测试
 │               ├── fault/             # 真实异常入口装配

@@ -62,15 +62,16 @@ fn quiet(timer: &NativeTimer, count: u64) -> Result<(), TimerCheckError> {
         }
     }
 }
-fn deadline(timer: &NativeTimer) -> Result<MonotonicNs, TimerCheckError> {
-    Ok(MonotonicNs(
-        timer
-            .now()?
-            .0
-            .checked_add(2_000_000)
-            .ok_or(TimerError::Overflow)?,
-    ))
+/// 调用方必须满足 NativeTimer::arm_at 的安全前提。
+unsafe fn arm_short(timer: &mut NativeTimer) -> Result<MonotonicNs, TimerError> {
+    super::timer_check_deadline::arm_short(
+        timer,
+        |timer| timer.now(),
+        // SAFETY: 调用方在整个预约期间满足 arm_at 的前提。
+        |timer, target| unsafe { timer.arm_at(target) },
+    )
 }
+
 #[repr(C)]
 struct Context {
     gpr: [usize; 32],
@@ -102,11 +103,11 @@ pub unsafe fn check_boot_timer(timer: &mut NativeTimer) -> Result<(), TimerCheck
     ensure(!local_irqs_enabled(), "initial SIE")?;
     // 三次独立预约，每次都等待真实计数；普通 Rust 循环也实际被异步打断。
     for n in 1..=3 {
-        let target = deadline(timer)?;
         let before = timer.now()?;
+        // SAFETY: 启动自检独占时钟，SIE=0，且上一轮已完成。
+        let target = unsafe { arm_short(timer) }?;
         // SAFETY: 当前由启动自检独占，入口已安装且仅开放本定时源。
         unsafe {
-            timer.arm_at(target)?;
             timer.set_boot_irqs_enabled(true)?;
         }
         wait(timer, "one-shot", |s| s.completed >= n)?;
@@ -129,11 +130,8 @@ pub unsafe fn check_boot_timer(timer: &mut NativeTimer) -> Result<(), TimerCheck
     // 先确认 pending，再在已填满寄存器的汇编窗口内开启 SIE，避免测试 setup 被打断。
     for floating in [false, true] {
         let count = timer.snapshot().completed;
-        let target = deadline(timer)?;
-        // SAFETY: 同上，此时 SIE=0。
-        unsafe {
-            timer.arm_at(target)?;
-        }
+        // SAFETY: 启动自检独占时钟，此时 SIE=0。
+        unsafe { arm_short(timer) }?;
         wait(timer, "context pending", |s| s.pending)?;
         let mut context = Context {
             gpr: [0; 32],
@@ -203,11 +201,8 @@ pub unsafe fn check_boot_timer(timer: &mut NativeTimer) -> Result<(), TimerCheck
         let count = timer.snapshot().completed;
         with_local_irqs_disabled(|| -> Result<(), TimerCheckError> {
             ensure(!local_irqs_enabled(), "outer SIE")?;
-            let target = deadline(timer)?;
-            // SAFETY: 只预约/开放 STIE，不改变全局 SIE；遵守临界区闭包规则。
-            unsafe {
-                timer.arm_at(target)?;
-            }
+            // SAFETY: SIE=0。只预约/开放 STIE，不改变全局 SIE。
+            unsafe { arm_short(timer) }?;
             with_local_irqs_disabled(|| -> Result<(), TimerCheckError> {
                 wait(timer, "nested pending", |s| s.pending)?;
                 let snapshot = timer.snapshot();
