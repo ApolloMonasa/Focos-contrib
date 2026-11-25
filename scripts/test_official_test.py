@@ -288,3 +288,53 @@ sys.exit(runner.main())
             self.assertEqual(result.returncode, 143, result.stderr)
             self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)
             self.assertFalse((out / "build.log").exists())
+
+    def test_source_change_in_already_dirty_tree(self):
+        from official_test import source_state
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            def git(*args):
+                subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+            git("init")
+            source = root / "source"
+            source.write_bytes(b"base")
+            git("add", "source")
+            git("-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                "commit", "-m", "base")
+            out = root / "run"
+            out.mkdir()
+            with patch("official_test.ROOT", root):
+                self.assertFalse(source_state(out)["dirty"])
+                source.write_bytes(b"first")
+                first = source_state(out)
+                (out / "build.log").touch()
+                self.assertEqual(first, source_state(out))
+                source.write_bytes(b"second")
+                self.assertNotEqual(first, source_state(out))
+
+    def test_version_probe_reaps_helpers_on_sigterm(self):
+        from official_test import Terminated, probe_version
+        with tempfile.TemporaryDirectory() as tmp:
+            pidfile = Path(tmp) / "helper"
+            script = """
+import os, signal, subprocess, sys
+from pathlib import Path
+helper = subprocess.Popen(["sleep", "60"])
+Path(sys.argv[1]).write_text(str(helper.pid))
+os.kill(os.getppid(), signal.SIGTERM)
+signal.pause()
+"""
+            with self.assertRaises(Terminated):
+                probe_version([sys.executable, "-c", script, str(pidfile)], subprocess.DEVNULL)
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(pidfile.read_text()), 0)
+
+    def test_version_output_in_ascii_locale(self):
+        script = r"""
+from official_test import probe_version
+import subprocess, sys
+cmd = [sys.executable, "-c", r"import os; os.write(1, b'version \xc3\xa9\xff')"]
+assert probe_version(cmd, subprocess.DEVNULL) == "version \u00e9\\xff"
+"""
+        subprocess.run([sys.executable, "-B", "-c", script], cwd=Path(__file__).parent,
+                       env=os.environ | {"LC_ALL": "C", "PYTHONUTF8": "0"}, check=True)

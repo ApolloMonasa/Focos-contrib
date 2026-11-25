@@ -11,6 +11,7 @@ import selectors
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,17 +23,56 @@ def digest(path):
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
+class ImageError(ValueError):
+    pass
+
+
+def source_state(out):
+    paths = ["--", "."]
+    if out.is_relative_to(ROOT):
+        paths.append(":(exclude,literal)" + str(out.relative_to(ROOT)))
+
+    def git(*args):
+        return subprocess.check_output(["git", *args], cwd=ROOT)
+
+    revision = git("rev-parse", "HEAD").strip().decode("ascii")
+    status = git("status", "--porcelain=v1", "-z", "--untracked-files=all", *paths)
+    signature = hashlib.sha256(status)
+    if status:
+        signature.update(git("diff", "--no-ext-diff", "--no-textconv", "--binary", "HEAD", *paths))
+        for name in git("ls-files", "--others", "--exclude-standard", "-z", *paths).split(b"\0"):
+            if name:
+                path = ROOT / os.fsdecode(name)
+                if path.is_symlink():
+                    signature.update(hashlib.sha256(os.fsencode(os.readlink(path))).digest())
+                elif path.is_file():
+                    signature.update(bytes.fromhex(digest(path)))
+    return {"revision": revision, "dirty": bool(status), "worktree_sha256": signature.hexdigest()}
+
+
+def probe_version(cmd, err, env=None):
+    with tempfile.TemporaryFile() as output:
+        with child(cmd, stdout=output, stderr=err, env=env) as proc:
+            if proc.wait():
+                raise subprocess.CalledProcessError(proc.returncode, cmd)
+        output.seek(0)
+        version = output.read().decode("utf-8", errors="backslashreplace").strip()
+    if not version:
+        raise RuntimeError(f"{cmd[0]} 未返回版本信息")
+    return version
+
+
 def copy_image(image, dest):
     try:
         source = image.open("rb")
     except OSError as exc:
-        raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
+        raise ImageError(f"无法读取镜像 {image}：{exc}") from exc
     with source, dest.open("xb") as target:
         while True:
             try:
                 data = source.read(1024 * 1024)
             except OSError as exc:
-                raise ValueError(f"无法读取镜像 {image}：{exc}") from exc
+                raise ImageError(f"无法读取镜像 {image}：{exc}") from exc
             if not data:
                 break
             if data.count(0) == len(data):
@@ -254,10 +294,9 @@ def main():
         copy_image(image, private_image)
         record["image_sha256"] = digest(private_image)
         if record["image_sha256"] != IMAGE_SHA:
-            raise ValueError("镜像 SHA-256 不匹配")
-        record["revision"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        record["dirty"] = bool(subprocess.check_output(
-            ["git", "status", "--porcelain", "--untracked-files=normal"], cwd=ROOT))
+            raise ImageError("镜像 SHA-256 不匹配")
+        before = source_state(out)
+        record.update(before)
         with (out / "build.log").open("xb") as log:
             target_dir = out / "cargo-target"
             kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
@@ -273,13 +312,16 @@ def main():
                     record["build_env"][key] = value
             build_env = os.environ | record["build_env"]
             for tool, executable in (("rustc", compiler), ("cargo", "cargo")):
-                record[f"{tool}_version"] = subprocess.check_output(
-                    [executable, "--version", "--verbose"], cwd=ROOT, env=build_env,
-                    stderr=log, text=True).strip()
+                record[f"{tool}_version"] = probe_version(
+                    [executable, "--version", "--verbose"], log, build_env)
             with child(record["build"], env=build_env,
                        stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
+        after = source_state(out)
+        if after != before:
+            record["source_after_build"] = after
+            raise RuntimeError("构建期间源码状态发生变化，请使用新的输出目录重试")
         record["kernel_sha256"] = digest(kernel)
         firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
         record["firmware_sha256"] = digest(firmware)
@@ -291,14 +333,12 @@ def main():
                "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
         record["command"] = cmd
         with (out / "qemu.stderr").open("xb") as err:
-            version = subprocess.check_output([cmd[0], "--version"], stderr=err, text=True)
-        if not version.strip():
-            raise RuntimeError("QEMU 未返回版本信息")
+            version = probe_version([cmd[0], "--version"], err)
         record["qemu_version"] = version.splitlines()[0]
         rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer, record)
         record["reason"] = f"QEMU 进程退出 {rc}"
         code = int(rc != 0)
-    except ValueError as exc:
+    except ImageError as exc:
         code, record["reason"] = 2, str(exc)
     except subprocess.TimeoutExpired as exc:
         code, record["reason"] = 124, str(exc)
