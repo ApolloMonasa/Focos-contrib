@@ -46,6 +46,13 @@ def child(cmd, **kwargs):
         yield proc
     finally:
         original = sys.exc_info()[1]
+        interrupted = False
+
+        def defer_interrupt(signum, frame):
+            nonlocal interrupted
+            interrupted = True
+
+        previous_handler = signal.signal(signal.SIGINT, defer_interrupt)
         try:
             reap(proc)
         except (RuntimeError, OSError) as exc:
@@ -53,6 +60,10 @@ def child(cmd, **kwargs):
                 raise
             reason = "用户中断" if isinstance(original, KeyboardInterrupt) else str(original)
             raise RuntimeError(f"{reason}；清理失败：{exc}") from exc
+        finally:
+            signal.signal(signal.SIGINT, previous_handler)
+        if interrupted and original is None:
+            raise KeyboardInterrupt
 
 
 def reap(proc):
@@ -77,6 +88,33 @@ def reap(proc):
     raise RuntimeError("清理失败，进程组仍存在")
 
 
+@contextmanager
+def display_writer(screen, remaining):
+    fd = screen.fileno()
+    was_blocking = os.get_blocking(fd)
+    # poll also accepts terminals, regular files and /dev/null.
+    with selectors.PollSelector() as writable:
+        writable.register(fd, selectors.EVENT_WRITE)
+
+        def write(data):
+            pending = memoryview(data)
+            while pending:
+                if writable.select(remaining()):
+                    try:
+                        count = os.write(fd, pending)
+                    except BlockingIOError:
+                        continue
+                    if not count:
+                        raise OSError("显示输出写入停滞")
+                    pending = pending[count:]
+
+        try:
+            os.set_blocking(fd, False)
+            yield write
+        finally:
+            os.set_blocking(fd, was_blocking)
+
+
 def run_serial(cmd, out, timeout, screen, record=None):
     deadline = time.monotonic() + timeout
 
@@ -88,7 +126,7 @@ def run_serial(cmd, out, timeout, screen, record=None):
 
     with (out / "serial.log").open("xb", buffering=0) as log, (out / "qemu.stderr").open("xb") as err:
         with child(cmd, stdout=subprocess.PIPE, stderr=err) as proc:
-            with proc.stdout, selectors.DefaultSelector() as selector:
+            with proc.stdout, selectors.DefaultSelector() as selector, display_writer(screen, remaining) as display:
                 selector.register(proc.stdout, selectors.EVENT_READ)
                 while selector.select(remaining()):
                     data = os.read(proc.stdout.fileno(), 65536)
@@ -103,8 +141,7 @@ def run_serial(cmd, out, timeout, screen, record=None):
                         if not written:
                             raise OSError("串口日志写入停滞")
                         pending = pending[written:]
-                    screen.write(data)
-                    screen.flush()
+                    display(data)
                 raise subprocess.TimeoutExpired(cmd, timeout)
 
 

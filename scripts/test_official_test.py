@@ -1,4 +1,5 @@
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -36,12 +37,9 @@ class SerialTests(unittest.TestCase):
                        "Path(sys.argv[1]).write_text(str(os.getpid())); "
                        "print('boot', flush=True); time.sleep(30)", str(pidfile)]
 
-                class FailingOutput:
-                    def write(self, data):
-                        raise error()
-
-                with self.assertRaises(error):
-                    run_serial(cmd, root, 3, FailingOutput())
+                with open(os.devnull, "wb") as screen, patch("official_test.os.write", side_effect=error):
+                    with self.assertRaises(error):
+                        run_serial(cmd, root, 3, screen)
                 self.assertEqual((root / "serial.log").read_bytes(), b"boot\n")
                 with self.assertRaises(ProcessLookupError):
                     os.kill(int(pidfile.read_text()), 0)
@@ -113,3 +111,31 @@ else:
                 self.assertEqual(proc.wait(timeout=3), 0)
         with self.assertRaises(ProcessLookupError):
             os.kill(helper, 0)
+
+    def test_stalled_display_times_out(self):
+        r, w = os.pipe()
+        with os.fdopen(r, "rb"), os.fdopen(w, "wb") as screen, tempfile.TemporaryDirectory() as tmp:
+            os.set_blocking(w, False)
+            with self.assertRaises(BlockingIOError):
+                while True:
+                    os.write(w, b"x" * 4096)
+            os.set_blocking(w, True)
+            with self.assertRaises(subprocess.TimeoutExpired):
+                run_serial([sys.executable, "-c", "print('boot')"], Path(tmp), 0.5, screen)
+            self.assertTrue(os.get_blocking(w))
+            self.assertEqual((Path(tmp) / "serial.log").read_bytes(), b"boot\n")
+
+    def test_second_sigint_during_cleanup(self):
+        from official_test import reap
+
+        def interrupt_cleanup(proc):
+            os.kill(os.getpid(), signal.SIGINT)
+            reap(proc)
+
+        with patch("official_test.reap", side_effect=interrupt_cleanup):
+            with self.assertRaises(KeyboardInterrupt):
+                with child([sys.executable, "-c", "import time; time.sleep(30)"]) as proc:
+                    os.kill(os.getpid(), signal.SIGINT)
+        self.assertIsNotNone(proc.returncode)
+        with self.assertRaises(ProcessLookupError):
+            os.killpg(proc.pid, 0)
