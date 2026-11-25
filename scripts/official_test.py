@@ -102,7 +102,22 @@ def interrupt(signum, frame):
 
 
 def direct_children():
-    return {int(pid) for pid in Path("/proc/thread-self/children").read_bytes().split()}
+    try:
+        children = Path("/proc/thread-self/children").read_bytes()
+    except FileNotFoundError:
+        # Some kernels omit the children file. waitid rejects non-children,
+        # and WNOWAIT preserves exit status for Popen and the cleanup loop.
+        children_pids = set()
+        for name in os.listdir("/proc"):
+            if name.isdecimal():
+                pid = int(name)
+                try:
+                    os.waitid(os.P_PID, pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+                except ChildProcessError:
+                    continue
+                children_pids.add(pid)
+        return children_pids
+    return {int(pid) for pid in children.split()}
 
 
 @contextmanager

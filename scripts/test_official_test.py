@@ -90,7 +90,7 @@ sys.exit(1)
                                Path(tmp), 3, screen, record)
         self.assertEqual(record["qemu_exit"], 7)
 
-    def test_sigkill_reaps_orphan(self):
+    def test_sigkill_reaps_orphan_without_proc_children(self):
         # The leader exits only after its helper is ready and ignores TERM.
         cmd = """import os, signal
 r, w = os.pipe()
@@ -106,10 +106,18 @@ else:
     os.read(r, 1)
     print(pid)
 """
-        with child([sys.executable, "-c", cmd], stdout=subprocess.PIPE) as proc:
-            with proc.stdout:
-                helper = int(proc.stdout.readline())
-                self.assertEqual(proc.wait(timeout=3), 0)
+        read_bytes = Path.read_bytes
+
+        def without_children(path):
+            if path == Path("/proc/thread-self/children"):
+                raise FileNotFoundError(str(path))
+            return read_bytes(path)
+
+        with patch.object(Path, "read_bytes", without_children):
+            with child([sys.executable, "-c", cmd], stdout=subprocess.PIPE) as proc:
+                with proc.stdout:
+                    helper = int(proc.stdout.readline())
+                    self.assertEqual(proc.wait(timeout=3), 0)
         with self.assertRaises(ProcessLookupError):
             os.kill(helper, 0)
 
