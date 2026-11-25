@@ -163,7 +163,7 @@ def run_serial(cmd, out, timeout, screen, record=None):
             raise subprocess.TimeoutExpired(cmd, timeout)
         return seconds
 
-    with (out / "serial.log").open("xb", buffering=0) as log, (out / "qemu.stderr").open("xb") as err:
+    with (out / "serial.log").open("xb", buffering=0) as log, (out / "qemu.stderr").open("ab") as err:
         with child(cmd, stdout=subprocess.PIPE, stderr=err) as proc:
             with proc.stdout, selectors.DefaultSelector() as selector, display_writer(screen, remaining) as display:
                 selector.register(proc.stdout, selectors.EVENT_READ)
@@ -204,7 +204,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.exit(2)
 
 
-def main():
+def prepare():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
@@ -228,11 +228,28 @@ def main():
         if exc.errno in (errno.ELOOP, errno.ENOTDIR):
             parser.error(f"无效输出路径：{exc}")
         report(exc)
-        return 1
+        raise SystemExit(1)
+    return args, image, out
+
+
+def main():
+    signals = {signal.SIGTERM, signal.SIGINT}
+    previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+    signal.signal(signal.SIGTERM, interrupt)
+    try:
+        args, image, out = prepare()
+    except SystemExit:
+        pending = signal.sigpending()
+        if signal.SIGTERM in pending:
+            return 143
+        if signal.SIGINT in pending:
+            return 130
+        raise
 
     record = {"image": str(image), "timeout_seconds": args.timeout, "build": ["make", "build"]}
     code = 1
     try:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
         private_image = out / "sdcard-rv.img"
         copy_image(image, private_image)
         record["image_sha256"] = digest(private_image)
@@ -245,7 +262,10 @@ def main():
             target_dir = out / "cargo-target"
             kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
             compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
-            record["build_env"] = {"CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler}
+            record["build_env"] = {
+                "CARGO_TARGET_DIR": str(target_dir), "RUSTC": compiler,
+                "RUSTC_WRAPPER": "", "RUSTC_WORKSPACE_WRAPPER": "",
+            }
             for key, value in os.environ.items():
                 if key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS") or (
                     key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS")
@@ -270,7 +290,11 @@ def main():
                "-device", "virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0",
                "-device", "virtio-net-device,netdev=net", "-netdev", "user,id=net", "-rtc", "base=utc"]
         record["command"] = cmd
-        record["qemu_version"] = subprocess.check_output([cmd[0], "--version"], text=True).splitlines()[0]
+        with (out / "qemu.stderr").open("xb") as err:
+            version = subprocess.check_output([cmd[0], "--version"], stderr=err, text=True)
+        if not version.strip():
+            raise RuntimeError("QEMU 未返回版本信息")
+        record["qemu_version"] = version.splitlines()[0]
         rc = run_serial(cmd, out, args.timeout, sys.stdout.buffer, record)
         record["reason"] = f"QEMU 进程退出 {rc}"
         code = int(rc != 0)
@@ -307,5 +331,4 @@ def main():
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, interrupt)
     sys.exit(main())

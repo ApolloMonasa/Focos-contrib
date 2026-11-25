@@ -263,3 +263,28 @@ sys.exit(runner.main())
                                      image, "--out", out], cwd=Path(__file__).parent)
             self.assertEqual(result.returncode, 143)
             self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)
+
+    def test_termination_during_prepare(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "input"
+            image.touch()
+            out = root / "out"
+            probe = """
+import os, signal, sys
+from pathlib import Path
+import official_test as runner
+mkdir = Path.mkdir
+def interrupted(path, *args, **kwargs):
+    mkdir(path, *args, **kwargs)
+    os.kill(os.getpid(), signal.SIGTERM)
+Path.mkdir = interrupted
+sys.exit(runner.main())
+"""
+            result = subprocess.run([sys.executable, "-B", "-c", probe, "--image",
+                                     image, "--out", out], cwd=Path(__file__).parent,
+                                    capture_output=True)
+            self.assertEqual(result.returncode, 143, result.stderr)
+            self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)
+            self.assertFalse((out / "build.log").exists())
