@@ -156,3 +156,21 @@ else:
             record = json.loads((out / "run.json").read_text(encoding="utf-8"))
             self.assertEqual(record["exit"], 2)
             self.assertEqual(record["reason"], "镜像 SHA-256 不匹配")
+
+    def test_closed_stderr_keeps_bad_image_record(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "bad.img"
+            image.write_bytes(b"invalid")
+            out = root / "out"
+            reader, writer = os.pipe()
+            os.close(reader)
+            with os.fdopen(writer, "wb") as closed_pipe:
+                result = subprocess.run(
+                    [sys.executable, Path(__file__).with_name("official_test.py"),
+                     "--image", image, "--out", out], stderr=closed_pipe)
+            self.assertEqual(result.returncode, 2)
+            record = json.loads((out / "run.json").read_bytes())
+            self.assertEqual(record["exit"], 2)
+            self.assertEqual(record["reason"], "镜像 SHA-256 不匹配")

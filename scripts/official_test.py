@@ -145,6 +145,15 @@ def run_serial(cmd, out, timeout, screen, record=None):
                 raise subprocess.TimeoutExpired(cmd, timeout)
 
 
+def report(reason):
+    # stderr is optional; a buffered retry at interpreter shutdown can
+    # otherwise replace the runner's exit code when the reader has gone.
+    try:
+        os.write(2, (str(reason) + "\n").encode("utf-8", "backslashreplace"))
+    except OSError:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path, required=True)
@@ -160,7 +169,7 @@ def main():
     except FileExistsError:
         parser.error("输出目录已存在")
     except OSError as exc:
-        print(exc, file=sys.stderr)
+        report(exc)
         return 1
 
     record = {"image": str(image), "timeout_seconds": args.timeout, "build": ["make", "build"]}
@@ -203,13 +212,13 @@ def main():
         record["reason"] = str(exc)
         if "qemu_exit" in record:
             record["reason"] = f"QEMU 进程退出 {record['qemu_exit']}；清理失败：{exc}"
-    print(record["reason"], file=sys.stderr)
     record["exit"] = code
     try:
         (out / "run.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     except OSError as exc:
-        print(exc, file=sys.stderr)
+        report(exc)
         return 1
+    report(record["reason"])
     return code
 
 
