@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import selectors
+import shutil
 import signal
 import struct
 import subprocess
@@ -18,6 +19,8 @@ import termios
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
+FIRMWARE = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
+LOADER_VARIABLES = {"LD_LIBRARY_PATH", "NIX_LD", "NIX_LD_LIBRARY_PATH"}
 IMAGE_SHA = "95973543db6b84a9a5e70f30da466ce292867aff5b689fb14c88dc9406e378b8"
 
 
@@ -34,7 +37,7 @@ def host_environment():
     keys = {"HOME", "PATH", "TMPDIR", "TMP", "TEMP", "LANG", "LANGUAGE",
             "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "CARGO_HOME", "RUSTUP_HOME"}
     return {key: value for key, value in os.environ.items()
-            if key in keys or key.startswith("LC_")}
+            if key in keys or key in LOADER_VARIABLES or key.startswith("LC_")}
 
 
 def source_state(out, err=None):
@@ -354,7 +357,8 @@ def run(args, image, out, record):
         }
         for key, value in os.environ.items():
             if (
-                key == "RUSTUP_TOOLCHAIN"
+                key in LOADER_VARIABLES
+                or key == "RUSTUP_TOOLCHAIN"
                 or key.startswith("CARGO_PROFILE_RELEASE_")
                 or key in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_RUSTFLAGS")
                 or (key.startswith("CARGO_TARGET_") and key.endswith("_RUSTFLAGS"))
@@ -373,7 +377,10 @@ def run(args, image, out, record):
         record["source_after_build"] = after
         raise RuntimeError("构建期间源码状态发生变化，请使用新的输出目录重试")
     record["kernel_sha256"] = digest(kernel)
-    firmware = Path("/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin")
+    firmware = out / FIRMWARE.name
+    with FIRMWARE.open("rb") as source, firmware.open("xb") as target:
+        shutil.copyfileobj(source, target)
+    firmware.chmod(0o400)
     record["firmware_sha256"] = digest(firmware)
     cmd = ["qemu-system-riscv64", "-machine", "virt", "-kernel", str(kernel),
            "-m", "1G", "-smp", "1", "-display", "none", "-monitor", "none",
@@ -419,7 +426,7 @@ def main():
     try:
         try:
             active = True
-            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask - signals)
             code = run(args, image, out, record)
         finally:
             # Leave the interruptible phase inside the exception boundary.

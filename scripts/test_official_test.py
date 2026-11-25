@@ -486,3 +486,88 @@ sys.exit(runner.main())
                                             cwd=Path(__file__).parent, capture_output=True)
                     self.assertEqual(result.returncode, 143, result.stderr)
                     self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 143)
+
+    def test_inherited_signal_mask_during_command(self):
+        import json
+        probe = """
+import os, signal, sys
+from pathlib import Path
+import official_test as runner
+sig = int(sys.argv.pop(1))
+signal.pthread_sigmask(signal.SIG_BLOCK, {sig, signal.SIGUSR1})
+def run(args, image, out, record):
+    assert signal.SIGUSR1 in signal.pthread_sigmask(signal.SIG_BLOCK, set())
+    script = "echo $$ > pid; kill -%d $PPID; sleep 0.5; touch finished" % sig
+    with runner.child(["sh", "-c", script]) as proc:
+        proc.wait()
+    record["reason"] = "completed"
+    return 0
+runner.run = run
+runner.ROOT = Path.cwd()
+sys.exit(runner.main())
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            image = Path(tmp) / "image"
+            image.touch()
+            for sig in (signal.SIGTERM, signal.SIGINT):
+                with self.subTest(sig=sig):
+                    out = Path(tmp) / sig.name
+                    result = subprocess.run([sys.executable, "-B", "-c", probe, str(int(sig)),
+                                             "--image", image, "--out", out], cwd=tmp,
+                                            env=os.environ | {"PYTHONPATH": str(Path(__file__).resolve().parent)},
+                                            capture_output=True, timeout=5)
+                    self.assertEqual(result.returncode, 128 + sig, result.stderr)
+                    self.assertEqual(json.loads((out / "run.json").read_bytes())["exit"], 128 + sig)
+                    self.assertFalse((Path(tmp) / "finished").exists())
+                    with self.assertRaises(ProcessLookupError):
+                        os.killpg(int((Path(tmp) / "pid").read_text()), 0)
+
+    def test_private_firmware_and_loader_environment(self):
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image, firmware, out = root / "image", root / "system-bios", root / "run"
+            image.touch()
+            firmware.write_bytes(b"original")
+            loader = {"LD_LIBRARY_PATH": str(root / "libs"), "NIX_LD": "/test/ld",
+                      "NIX_LD_LIBRARY_PATH": str(root / "nix-libs")}
+            compiler = root / "compiler"
+            compiler.write_text('#!/bin/sh\nprintf "%s\\n" "$LD_LIBRARY_PATH" "$NIX_LD" "$NIX_LD_LIBRARY_PATH"\n')
+            make = root / "make"
+            make.write_text('#!/bin/sh\nd="$CARGO_TARGET_DIR/riscv64gc-unknown-none-elf/release"\n'
+                            'mkdir -p "$d" && touch "$d/focos-kernel"\n')
+            qemu = root / "qemu-system-riscv64"
+            qemu.write_text("""#!/bin/sh
+if [ "$1" = --version ]; then
+    echo replacement > "$FIXTURE_BIOS.new" && mv "$FIXTURE_BIOS.new" "$FIXTURE_BIOS"
+    echo fixture
+    exit 0
+fi
+while [ "$1" != -bios ]; do shift; done
+cat "$2"
+""")
+            for tool in (compiler, make, qemu):
+                tool.chmod(0o755)
+            probe = """
+import os, sys
+from pathlib import Path
+import official_test as runner
+runner.FIRMWARE = Path(os.environ["FIXTURE_BIOS"])
+runner.IMAGE_SHA = runner.digest(Path(sys.argv[2]))
+sys.exit(runner.main())
+"""
+            result = subprocess.run([sys.executable, "-B", "-c", probe, "--image", image,
+                                     "--out", out], cwd=Path(__file__).parent, capture_output=True,
+                                    env=os.environ | loader | {"PATH": tmp + os.pathsep + os.environ["PATH"],
+                                                               "RUSTC": str(compiler), "FIXTURE_BIOS": str(firmware)})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            record = json.loads((out / "run.json").read_bytes())
+            self.assertEqual(record["rustc_version"].splitlines(), list(loader.values()))
+            self.assertEqual({k: record["build_env"][k] for k in loader}, loader)
+            bios = Path(record["command"][record["command"].index("-bios") + 1])
+            self.assertEqual(bios.parent, out)
+            self.assertEqual(bios.stat().st_mode & 0o222, 0)
+            self.assertEqual(firmware.read_bytes(), b"replacement\n")
+            self.assertEqual((out / "serial.log").read_bytes(), b"original")
+            self.assertEqual(record["firmware_sha256"], hashlib.sha256(b"original").hexdigest())

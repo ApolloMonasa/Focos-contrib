@@ -86,7 +86,7 @@ python3 glibc.py < glibc.group > glibc.result.json
 
 ## 在仓库运行
 
-在 Linux 安装仓库 Rust 工具链、make、Git、Python 3.11 或更新版本、QEMU RISC-V 和 OpenSBI。当前入口读取系统固件 `/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin`。从上面的发布链接下载并解压比赛镜像，在仓库根目录执行：
+在 Linux 安装仓库 Rust 工具链、make、Git、Python 3.11 或更新版本、QEMU RISC-V 和 OpenSBI。当前入口读取系统固件 `/usr/share/qemu/opensbi-riscv64-generic-fw_dynamic.bin`，将只读副本放入本次输出目录，记录副本的 SHA-256 并用它启动 QEMU。从上面的发布链接下载并解压比赛镜像，在仓库根目录执行：
 
 ```bash
 python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out target/official/run-001
@@ -96,7 +96,7 @@ python3 scripts/official_test.py --image /绝对路径/sdcard-rv.img --out targe
 
 1 GiB 内存布局修复由 [#65](https://github.com/MindScrath/Focos/issues/65) 跟踪。修复合入后，保留原运行目录，用相同镜像和 1 GiB 参数选择一个新输出目录复跑，对照修复前后的串口和内核哈希。
 
-输出目录保留只读的镜像副本（逻辑大小 4 GiB），QEMU 从已校验的副本启动。运行记录的 `build_env` 保留传入的 Rust 编译标志，以及通过 `CARGO_PROFILE_RELEASE_*` 环境变量设置的 release 构建参数（例如优化级别和链接时优化）。宿主收到 SIGTERM 时先清理本次进程组，再记录退出码 143。
+输出目录保留只读的镜像副本（逻辑大小 4 GiB），QEMU 从已校验的副本启动。运行记录的 `build_env` 保留传入的 Rust 编译标志，以及通过 `CARGO_PROFILE_RELEASE_*` 环境变量设置的 release 构建参数（例如优化级别和链接时优化）。Git 查询和构建保留工具所需的 `LD_LIBRARY_PATH`、`NIX_LD` 和 `NIX_LD_LIBRARY_PATH`，已设置的值记录在 `build_env`。宿主收到 SIGTERM 时先清理本次进程组，再记录退出码 143。
 
 ## 宿主进程验收
 
