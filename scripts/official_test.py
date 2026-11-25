@@ -27,13 +27,17 @@ class ImageError(ValueError):
     pass
 
 
-def source_state(out):
+def source_state(out, err=None):
     paths = ["--", "."]
     if out.is_relative_to(ROOT):
         paths.append(":(exclude,literal)" + str(out.relative_to(ROOT)))
 
     def git(*args):
-        return subprocess.check_output(["git", *args], cwd=ROOT)
+        return command_output(["git", *args], err)
+
+    for entry in git("ls-files", "-v", "-z", *paths).split(b"\0"):
+        if entry and (entry[:1].islower() or entry[:1] == b"S"):
+            raise RuntimeError(f"Git 索引标志隐藏了工作区状态：{os.fsdecode(entry[2:])}")
 
     revision = git("rev-parse", "HEAD").strip().decode("ascii")
     status = git("status", "--porcelain=v1", "-z", "--untracked-files=all", *paths)
@@ -50,13 +54,17 @@ def source_state(out):
     return {"revision": revision, "dirty": bool(status), "worktree_sha256": signature.hexdigest()}
 
 
-def probe_version(cmd, err, env=None):
+def command_output(cmd, err, env=None):
     with tempfile.TemporaryFile() as output:
         with child(cmd, stdout=output, stderr=err, env=env) as proc:
             if proc.wait():
                 raise subprocess.CalledProcessError(proc.returncode, cmd)
         output.seek(0)
-        version = output.read().decode("utf-8", errors="backslashreplace").strip()
+        return output.read()
+
+
+def probe_version(cmd, err, env=None):
+    version = command_output(cmd, err, env).decode("utf-8", errors="backslashreplace").strip()
     if not version:
         raise RuntimeError(f"{cmd[0]} 未返回版本信息")
     return version
@@ -93,12 +101,8 @@ def interrupt(signum, frame):
     raise KeyboardInterrupt
 
 
-def group_exists(pid):
-    try:
-        os.killpg(pid, 0)
-    except ProcessLookupError:
-        return False
-    return True
+def direct_children():
+    return {int(pid) for pid in Path("/proc/thread-self/children").read_bytes().split()}
 
 
 @contextmanager
@@ -121,6 +125,7 @@ def child(cmd, **kwargs):
 
     previous = {sig: signal.signal(sig, handle) for sig in (signal.SIGINT, signal.SIGTERM)}
     try:
+        existing_children = direct_children()
         proc = subprocess.Popen(cmd, cwd=ROOT, start_new_session=True,
                                 stdin=subprocess.DEVNULL, **kwargs)
         try:
@@ -132,7 +137,7 @@ def child(cmd, **kwargs):
             running = False
             original = sys.exc_info()[1]
             try:
-                reap(proc)
+                reap(proc, existing_children)
             except (RuntimeError, OSError) as exc:
                 if original is None:
                     raise
@@ -145,26 +150,26 @@ def child(cmd, **kwargs):
         interrupt(pending_signal, None)
 
 
-def reap(proc):
+def reap(proc, existing_children):
     for sig in (signal.SIGTERM, signal.SIGKILL):
-        proc.poll()
-        try:
-            os.killpg(proc.pid, sig)
-        except ProcessLookupError:
-            return
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, sig)
+            except ProcessLookupError:
+                pass
         until = time.monotonic() + 5
         while time.monotonic() < until:
-            # Let Popen collect its own leader and retain the exit status.
+            # Once their parents exit, even detached descendants are adopted
+            # by this single-threaded runner. Repeat for successive generations.
             if proc.poll() is not None:
-                try:
-                    while os.waitpid(-proc.pid, os.WNOHANG)[0]:
-                        pass
-                except ChildProcessError:
-                    pass
-            if not group_exists(proc.pid):
-                return
+                adopted = direct_children() - existing_children
+                if not adopted:
+                    return
+                for pid in adopted:
+                    if os.waitpid(pid, os.WNOHANG)[0] == 0:
+                        os.kill(pid, sig)
             time.sleep(0.05)
-    raise RuntimeError("清理失败，进程组仍存在")
+    raise RuntimeError("清理失败，子进程仍存在")
 
 
 @contextmanager
@@ -295,9 +300,9 @@ def main():
         record["image_sha256"] = digest(private_image)
         if record["image_sha256"] != IMAGE_SHA:
             raise ImageError("镜像 SHA-256 不匹配")
-        before = source_state(out)
-        record.update(before)
         with (out / "build.log").open("xb") as log:
+            before = source_state(out, log)
+            record.update(before)
             target_dir = out / "cargo-target"
             kernel = target_dir / "riscv64gc-unknown-none-elf/release/focos-kernel"
             compiler = os.environ.get("RUSTC") or os.environ.get("CARGO_BUILD_RUSTC") or "rustc"
@@ -318,7 +323,7 @@ def main():
                        stdout=log, stderr=subprocess.STDOUT) as proc:
                 if proc.wait():
                     raise RuntimeError("构建失败，见 build.log")
-        after = source_state(out)
+            after = source_state(out, log)
         if after != before:
             record["source_after_build"] = after
             raise RuntimeError("构建期间源码状态发生变化，请使用新的输出目录重试")

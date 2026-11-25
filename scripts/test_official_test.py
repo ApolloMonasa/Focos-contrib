@@ -97,6 +97,7 @@ r, w = os.pipe()
 pid = os.fork()
 if not pid:
     os.close(r)
+    os.setsid()
     signal.signal(signal.SIGTERM, signal.SIG_IGN)
     os.write(w, b'1')
     signal.pause()
@@ -128,9 +129,9 @@ else:
     def test_second_sigint_during_cleanup(self):
         from official_test import reap
 
-        def interrupt_cleanup(proc):
+        def interrupt_cleanup(proc, existing_children):
             os.kill(os.getpid(), signal.SIGINT)
-            reap(proc)
+            reap(proc, existing_children)
 
         with patch("official_test.reap", side_effect=interrupt_cleanup):
             with self.assertRaises(KeyboardInterrupt):
@@ -311,6 +312,12 @@ sys.exit(runner.main())
                 self.assertEqual(first, source_state(out))
                 source.write_bytes(b"second")
                 self.assertNotEqual(first, source_state(out))
+                for flag in ("assume-unchanged", "skip-worktree"):
+                    with self.subTest(flag=flag):
+                        git("update-index", "--" + flag, "source")
+                        with self.assertRaisesRegex(RuntimeError, "source"):
+                            source_state(out)
+                        git("update-index", "--no-" + flag, "source")
 
     def test_version_probe_reaps_helpers_on_sigterm(self):
         from official_test import Terminated, probe_version
@@ -338,3 +345,17 @@ assert probe_version(cmd, subprocess.DEVNULL) == "version \u00e9\\xff"
 """
         subprocess.run([sys.executable, "-B", "-c", script], cwd=Path(__file__).parent,
                        env=os.environ | {"LC_ALL": "C", "PYTHONUTF8": "0"}, check=True)
+
+    def test_git_probe_reaps_helper_on_sigterm(self):
+        from official_test import Terminated, source_state
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            git = root / "git"
+            git.write_text("#!/bin/sh\nsleep 60 &\necho $! > helper\nkill -TERM $PPID\nwait\n")
+            git.chmod(0o755)
+            with patch("official_test.ROOT", root), patch.dict(
+                    os.environ, PATH=tmp + os.pathsep + os.environ["PATH"]):
+                with self.assertRaises(Terminated):
+                    source_state(root / "out")
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int((root / "helper").read_text()), 0)
